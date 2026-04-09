@@ -15,6 +15,7 @@ export interface BeamProperties {
 export interface Load {
   id: string;
   type: 'udl' | 'point' | 'trapezoidal';
+  category: 'dead' | 'live' | 'wind' | 'snow';
   value: number; // N/mm for UDL, N for point, w1 for trapezoidal
   value2?: number; // w2 for trapezoidal
   position?: number; // mm from left support (for point load)

@@ -15,7 +15,9 @@ import {
   Maximize2,
   Settings2,
   BarChart3,
-  Layout
+  Layout,
+  Layers,
+  PlusCircle
 } from 'lucide-react';
 import { 
   Card, 
@@ -58,8 +60,12 @@ import {
 import { cn } from '@/lib/utils';
 
 const MATERIALS = {
-  aluminum: { name: 'Aluminum 6063-T6', e: 70000, yield: 160 },
-  steel: { name: 'Steel S235', e: 210000, yield: 235 },
+  aluminum_6063_t6: { name: 'Aluminum 6063-T6 (Extrusion)', e: 70000, yield: 160 },
+  aluminum_3003_h14: { name: 'Aluminum 3003-H14 (Cladding)', e: 70000, yield: 145 },
+  aluminum_5005_h34: { name: 'Aluminum 5005-H34 (Anodized)', e: 70000, yield: 135 },
+  aluminum_5754_h22: { name: 'Aluminum 5754-H22 (High Strength)', e: 70000, yield: 190 },
+  steel_s235: { name: 'Steel S235', e: 210000, yield: 235 },
+  steel_s355: { name: 'Steel S355', e: 210000, yield: 355 },
   stainless_304: { name: 'Stainless Steel 304', e: 193000, yield: 205 },
   stainless_316: { name: 'Stainless Steel 316', e: 200000, yield: 215 },
   glass_annealed: { name: 'Glass (Annealed)', e: 70000, yield: 45 },
@@ -69,10 +75,23 @@ const MATERIALS = {
   custom: { name: 'Custom', e: 200000, yield: 200 },
 };
 
+const LOAD_CATEGORIES = {
+  dead: { name: 'Dead Load (D)', color: 'text-slate-500', bg: 'bg-slate-100' },
+  live: { name: 'Live Load (L)', color: 'text-blue-500', bg: 'bg-blue-100' },
+  wind: { name: 'Wind Load (W)', color: 'text-emerald-500', bg: 'bg-emerald-100' },
+  snow: { name: 'Snow Load (S)', color: 'text-cyan-500', bg: 'bg-cyan-100' },
+};
+
+interface Combination {
+  id: string;
+  name: string;
+  factors: Record<keyof typeof LOAD_CATEGORIES, number>;
+}
+
 export default function App() {
   // Beam State
   const [length, setLength] = useState(3000); // mm
-  const [material, setMaterial] = useState<keyof typeof MATERIALS>('aluminum');
+  const [material, setMaterial] = useState<keyof typeof MATERIALS>('aluminum_6063_t6');
   const [sectionType, setSectionType] = useState<'solid' | 'hollow'>('hollow');
   const [width, setWidth] = useState(50);
   const [height, setHeight] = useState(100);
@@ -81,8 +100,16 @@ export default function App() {
 
   // Loads State
   const [loads, setLoads] = useState<Load[]>([
-    { id: '1', type: 'udl', value: 0.5 }, // 0.5 N/mm = 0.5 kN/m
+    { id: '1', type: 'udl', category: 'dead', value: 0.5 },
   ]);
+
+  // Combinations State
+  const [combinations, setCombinations] = useState<Combination[]>([
+    { id: 'c1', name: 'Serviceability (D+L)', factors: { dead: 1.0, live: 1.0, wind: 0, snow: 0 } },
+    { id: 'c2', name: 'Ultimate (1.2D + 1.6L)', factors: { dead: 1.2, live: 1.6, wind: 0, snow: 0 } },
+    { id: 'c3', name: 'Wind Dominant (D + W)', factors: { dead: 1.0, live: 0, wind: 1.0, snow: 0 } },
+  ]);
+  const [activeCombinationId, setActiveCombinationId] = useState('c1');
 
   // Calculations
   const sectionProps = useMemo(() => {
@@ -91,6 +118,18 @@ export default function App() {
     }
     return calculateHollowRectangularProperties(width, height, thickness);
   }, [width, height, thickness, sectionType]);
+
+  const activeCombination = useMemo(() => 
+    combinations.find(c => c.id === activeCombinationId) || combinations[0]
+  , [combinations, activeCombinationId]);
+
+  const factoredLoads = useMemo(() => {
+    return loads.map(load => ({
+      ...load,
+      value: load.value * (activeCombination.factors[load.category] || 0),
+      value2: load.value2 !== undefined ? load.value2 * (activeCombination.factors[load.category] || 0) : undefined,
+    }));
+  }, [loads, activeCombination]);
 
   const beamProps: BeamProperties = useMemo(() => ({
     length,
@@ -101,12 +140,13 @@ export default function App() {
     safetyFactor,
   }), [length, material, sectionProps, safetyFactor]);
 
-  const results = useMemo(() => calculateBeam(beamProps, loads), [beamProps, loads]);
+  const results = useMemo(() => calculateBeam(beamProps, factoredLoads), [beamProps, factoredLoads]);
 
   const addLoad = (type: Load['type'] = 'point') => {
     const newLoad: Load = {
       id: Math.random().toString(36).substr(2, 9),
       type,
+      category: 'dead',
       value: type === 'point' ? 1000 : 0.5,
       position: type === 'point' ? length / 2 : undefined,
       value2: type === 'trapezoidal' ? 0.5 : undefined,
@@ -124,6 +164,33 @@ export default function App() {
     setLoads(loads.map(l => l.id === id ? { ...l, ...updates } : l));
   };
 
+  const addCombination = () => {
+    const newComb: Combination = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: 'New Combination',
+      factors: { dead: 1.0, live: 0, wind: 0, snow: 0 }
+    };
+    setCombinations([...combinations, newComb]);
+    setActiveCombinationId(newComb.id);
+  };
+
+  const updateCombinationFactor = (id: string, category: keyof typeof LOAD_CATEGORIES, factor: number) => {
+    setCombinations(combinations.map(c => 
+      c.id === id ? { ...c, factors: { ...c.factors, [category]: factor } } : c
+    ));
+  };
+
+  const updateCombinationName = (id: string, name: string) => {
+    setCombinations(combinations.map(c => c.id === id ? { ...c, name } : c));
+  };
+
+  const removeCombination = (id: string) => {
+    if (combinations.length <= 1) return;
+    const newCombs = combinations.filter(c => c.id !== id);
+    setCombinations(newCombs);
+    if (activeCombinationId === id) setActiveCombinationId(newCombs[0].id);
+  };
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100">
       {/* Header */}
@@ -139,6 +206,19 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border">
+              <span className="text-[10px] font-bold uppercase px-2 text-slate-500">Active Case:</span>
+              <Select value={activeCombinationId} onValueChange={setActiveCombinationId}>
+                <SelectTrigger className="h-8 border-none bg-white shadow-none focus:ring-0 min-w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {combinations.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
               <BarChart3 className="w-4 h-4" />
               Print Report
@@ -161,6 +241,73 @@ export default function App() {
         {/* Left Column: Inputs */}
         <div className="lg:col-span-4 space-y-6 print:hidden">
           
+          {/* Combinations Manager */}
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
+              <div>
+                <div className="flex items-center gap-2 text-blue-600 mb-1">
+                  <Layers className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase tracking-widest">Load Combinations</span>
+                </div>
+                <CardTitle className="text-lg">Combinations</CardTitle>
+              </div>
+              <Button size="icon" variant="outline" onClick={addCombination} className="h-8 w-8">
+                <PlusCircle className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                {combinations.map(comb => (
+                  <div key={comb.id} className={cn(
+                    "p-3 border rounded-lg transition-all",
+                    activeCombinationId === comb.id ? "border-blue-500 bg-blue-50/30 ring-1 ring-blue-500" : "bg-white"
+                  )}>
+                    <div className="flex items-center justify-between mb-2">
+                      <Input 
+                        value={comb.name} 
+                        onChange={(e) => updateCombinationName(comb.id, e.target.value)}
+                        className="h-7 text-xs font-bold border-none bg-transparent p-0 focus-visible:ring-0"
+                      />
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-slate-400 hover:text-rose-500"
+                          onClick={() => removeCombination(comb.id)}
+                          disabled={combinations.length <= 1}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          variant={activeCombinationId === comb.id ? "default" : "ghost"} 
+                          size="sm" 
+                          className="h-6 text-[10px] px-2"
+                          onClick={() => setActiveCombinationId(comb.id)}
+                        >
+                          Select
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
+                        <div key={key} className="space-y-1">
+                          <Label className="text-[9px] uppercase text-slate-400 block text-center">{key[0].toUpperCase()}</Label>
+                          <Input 
+                            type="number" 
+                            step="0.1"
+                            value={comb.factors[key as keyof typeof LOAD_CATEGORIES]} 
+                            onChange={(e) => updateCombinationFactor(comb.id, key as keyof typeof LOAD_CATEGORIES, Number(e.target.value))}
+                            className="h-6 text-[10px] text-center p-0"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Geometry & Material */}
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="pb-4">
@@ -263,6 +410,33 @@ export default function App() {
               </div>
             </CardFooter>
           </Card>
+          
+          {/* Material Properties */}
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2 text-blue-600 mb-1">
+                <Info className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase tracking-widest">Material Properties</span>
+              </div>
+              <CardTitle className="text-lg">{MATERIALS[material].name}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-slate-400">Young's Modulus (E)</Label>
+                  <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">
+                    {MATERIALS[material].e.toLocaleString()} MPa
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-slate-400">Yield Strength (σy)</Label>
+                  <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">
+                    {MATERIALS[material].yield.toLocaleString()} MPa
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Loads */}
           <Card className="shadow-sm border-slate-200">
@@ -298,24 +472,44 @@ export default function App() {
                     <Trash2 className="h-3 w-3" />
                   </Button>
                   
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#{idx + 1}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#{idx + 1}</span>
+                      <Select 
+                        value={load.type} 
+                        onValueChange={(v: any) => updateLoad(load.id, { 
+                          type: v,
+                          value2: v === 'trapezoidal' ? load.value : undefined,
+                          start: v === 'trapezoidal' ? 0 : undefined,
+                          end: v === 'trapezoidal' ? length : undefined
+                        })}
+                      >
+                        <SelectTrigger className="h-7 text-xs border-none bg-transparent p-0 w-fit gap-1 focus:ring-0">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="udl">UDL (N/mm)</SelectItem>
+                          <SelectItem value="point">Point (N)</SelectItem>
+                          <SelectItem value="trapezoidal">Trapezoidal</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
                     <Select 
-                      value={load.type} 
-                      onValueChange={(v: any) => updateLoad(load.id, { 
-                        type: v,
-                        value2: v === 'trapezoidal' ? load.value : undefined,
-                        start: v === 'trapezoidal' ? 0 : undefined,
-                        end: v === 'trapezoidal' ? length : undefined
-                      })}
+                      value={load.category} 
+                      onValueChange={(v: any) => updateLoad(load.id, { category: v })}
                     >
-                      <SelectTrigger className="h-7 text-xs border-none bg-transparent p-0 w-fit gap-1 focus:ring-0">
+                      <SelectTrigger className={cn(
+                        "h-6 text-[10px] font-bold px-2 rounded-full border-none focus:ring-0 w-fit",
+                        LOAD_CATEGORIES[load.category].bg,
+                        LOAD_CATEGORIES[load.category].color
+                      )}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="udl">UDL (N/mm)</SelectItem>
-                        <SelectItem value="point">Point (N)</SelectItem>
-                        <SelectItem value="trapezoidal">Trapezoidal</SelectItem>
+                        {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
+                          <SelectItem key={key} value={key}>{cat.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -429,6 +623,7 @@ export default function App() {
                     <TabsTrigger value="deflection">Deflection</TabsTrigger>
                     <TabsTrigger value="moment">Moment</TabsTrigger>
                     <TabsTrigger value="shear">Shear</TabsTrigger>
+                    <TabsTrigger value="stress">Stress</TabsTrigger>
                   </TabsList>
                 </div>
                 
@@ -457,9 +652,19 @@ export default function App() {
                     data={results.points} 
                     dataKey="shear" 
                     color="#10B981" 
-                    unit="N" 
+                    unit="kN" 
                     label="Shear Force"
                     formatter={(v) => (v / 1000).toFixed(2) + ' kN'}
+                  />
+                </TabsContent>
+                <TabsContent value="stress" className="h-[400px] mt-0">
+                  <ChartContainer 
+                    data={results.points} 
+                    dataKey="stress" 
+                    color="#F59E0B" 
+                    unit="MPa" 
+                    label="Bending Stress"
+                    formatter={(v) => v.toFixed(1) + ' MPa'}
                   />
                 </TabsContent>
               </Tabs>
@@ -575,7 +780,8 @@ export default function App() {
                   </h4>
                   <ul className="list-disc list-inside space-y-1 ml-2">
                     <li>Deflection limit: L/175 (Facade standard).</li>
-                    <li>Stress limit: Yield strength with safety factor 1.0.</li>
+                    <li>Stress limit: Yield strength / Safety Factor (γ).</li>
+                    <li>Supported Loads: Dead (D), Live (L), Wind (W), Snow (S).</li>
                     <li>Self-weight is not automatically included (add as UDL).</li>
                   </ul>
                 </div>
