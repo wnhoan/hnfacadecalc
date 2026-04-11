@@ -10,6 +10,7 @@ function Slider({
   max = 100,
   ...props
 }: SliderPrimitive.Root.Props) {
+  const isControlled = value !== undefined;
   const _values = Array.isArray(value)
     ? value
     : Array.isArray(defaultValue)
@@ -20,7 +21,7 @@ function Slider({
     <SliderPrimitive.Root
       className={cn("data-horizontal:w-full data-vertical:h-full", className)}
       data-slot="slider"
-      defaultValue={defaultValue}
+      defaultValue={isControlled ? undefined : defaultValue}
       value={value}
       min={min}
       max={max}

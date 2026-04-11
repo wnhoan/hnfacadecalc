@@ -46,6 +46,28 @@ export function calculateBeam(
   steps: number = 100
 ): { points: CalculationResult[]; summary: SummaryResults } {
   const { length, elasticModulus, momentOfInertia, sectionModulus, yieldStrength } = props;
+  
+  // Robustness check: avoid division by zero
+  if (length <= 0 || momentOfInertia <= 0 || elasticModulus <= 0) {
+    return {
+      points: Array.from({ length: steps + 1 }, (_, i) => ({
+        x: (length * i) / steps,
+        deflection: 0,
+        moment: 0,
+        shear: 0,
+        stress: 0
+      })),
+      summary: {
+        maxDeflection: 0,
+        maxMoment: 0,
+        maxShear: 0,
+        maxStress: 0,
+        deflectionRatio: 'N/A',
+        status: 'fail'
+      }
+    };
+  }
+
   const EI = elasticModulus * momentOfInertia;
   const points: CalculationResult[] = [];
 
@@ -180,11 +202,11 @@ export function calculateBeam(
   const maxShear = Math.max(...points.map((p) => Math.abs(p.shear)));
   const maxStress = Math.max(...points.map((p) => p.stress));
 
-  const deflectionRatioValue = maxDeflection > 0.001 ? length / maxDeflection : 9999;
-  const deflectionRatio = maxDeflection > 0.001 ? `L/${Math.round(deflectionRatioValue)}` : 'N/A';
+  const deflectionRatioValue = maxDeflection > 0.0001 ? length / maxDeflection : Infinity;
+  const deflectionRatio = deflectionRatioValue < 100000 ? `L/${Math.round(deflectionRatioValue)}` : 'N/A';
 
-  const allowableStress = yieldStrength / props.safetyFactor;
-  const status = maxStress < allowableStress && deflectionRatioValue > 175 ? 'pass' : 'fail';
+  const allowableStress = yieldStrength / Math.max(0.1, props.safetyFactor);
+  const status = maxStress <= allowableStress && deflectionRatioValue >= 175 ? 'pass' : 'fail';
 
   return {
     points,
@@ -200,19 +222,28 @@ export function calculateBeam(
 }
 
 export function calculateRectangularProperties(width: number, height: number) {
-  const area = width * height;
-  const momentOfInertia = (width * Math.pow(height, 3)) / 12;
-  const sectionModulus = momentOfInertia / (height / 2);
+  const w = Math.max(0, width);
+  const h = Math.max(0, height);
+  const area = w * h;
+  const momentOfInertia = (w * Math.pow(h, 3)) / 12;
+  const sectionModulus = h > 0 ? momentOfInertia / (h / 2) : 0;
   return { area, momentOfInertia, sectionModulus };
 }
 
 export function calculateHollowRectangularProperties(width: number, height: number, thickness: number) {
-  const innerWidth = width - 2 * thickness;
-  const innerHeight = height - 2 * thickness;
-  if (innerWidth <= 0 || innerHeight <= 0) return calculateRectangularProperties(width, height);
+  const w = Math.max(0, width);
+  const h = Math.max(0, height);
+  const t = Math.max(0, thickness);
+  
+  const innerWidth = w - 2 * t;
+  const innerHeight = h - 2 * t;
+  
+  if (innerWidth <= 0 || innerHeight <= 0 || t <= 0) {
+    return calculateRectangularProperties(w, h);
+  }
 
-  const area = (width * height) - (innerWidth * innerHeight);
-  const momentOfInertia = ((width * Math.pow(height, 3)) - (innerWidth * Math.pow(innerHeight, 3))) / 12;
-  const sectionModulus = momentOfInertia / (height / 2);
+  const area = (w * h) - (innerWidth * innerHeight);
+  const momentOfInertia = ((w * Math.pow(h, 3)) - (innerWidth * Math.pow(innerHeight, 3))) / 12;
+  const sectionModulus = h > 0 ? momentOfInertia / (h / 2) : 0;
   return { area, momentOfInertia, sectionModulus };
 }
