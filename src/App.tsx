@@ -22,7 +22,14 @@ import {
   PlusCircle,
   Globe,
   BookOpen,
-  Activity
+  Activity,
+  Download,
+  FileJson,
+  FileSpreadsheet,
+  FileText,
+  Printer,
+  Save,
+  FolderOpen
 } from 'lucide-react';
 import { 
   Card, 
@@ -42,6 +49,15 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -50,11 +66,12 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip, 
+  Tooltip as ChartTooltip, 
   ResponsiveContainer,
   AreaChart,
   Area
 } from 'recharts';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   calculateBeam, 
   calculateRectangularProperties, 
@@ -70,7 +87,7 @@ function ErrorFallback() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 text-center">
       <Card className="max-w-md w-full">
         <CardHeader>
-          <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <CardTitle>Something went wrong</CardTitle>
           <CardDescription>
             The calculation engine encountered an error. This might be due to invalid input values.
@@ -105,7 +122,7 @@ const MATERIALS = {
 const LOAD_CATEGORIES = {
   dead: { name: 'Dead Load (D)', color: 'text-slate-500', bg: 'bg-slate-100' },
   live: { name: 'Live Load (L)', color: 'text-blue-500', bg: 'bg-blue-100' },
-  wind: { name: 'Wind Load (W)', color: 'text-emerald-500', bg: 'bg-emerald-100' },
+  wind: { name: 'Wind Load (W)', color: 'text-green-500', bg: 'bg-green-100' },
   snow: { name: 'Snow Load (S)', color: 'text-cyan-500', bg: 'bg-cyan-100' },
   seismic: { name: 'Seismic Load (E)', color: 'text-rose-500', bg: 'bg-rose-100' },
 };
@@ -154,6 +171,11 @@ const TRANSLATIONS = {
     seismicRegion: 'Seismic Region',
     seismicCoeff: 'Seismic Coeff (Cs)',
     applySeismic: 'Apply Seismic Load',
+    saveProject: 'Save Project',
+    loadProject: 'Load Project',
+    projectSaved: 'Project saved to local storage',
+    projectLoaded: 'Project loaded successfully',
+    noProject: 'No saved project found',
   },
   zh: {
     title: '幕墙结构计算',
@@ -190,6 +212,11 @@ const TRANSLATIONS = {
     seismicRegion: '地震区域',
     seismicCoeff: '地震系数 (Cs)',
     applySeismic: '应用地震荷载',
+    saveProject: '保存项目',
+    loadProject: '加载项目',
+    projectSaved: '项目已保存到本地存储',
+    projectLoaded: '项目加载成功',
+    noProject: '未找到保存的项目',
   },
   th: {
     title: 'FacadeCalc',
@@ -226,6 +253,11 @@ const TRANSLATIONS = {
     seismicRegion: 'ภูมิภาคแผ่นดินไหว',
     seismicCoeff: 'สัมประสิทธิ์แผ่นดินไหว (Cs)',
     applySeismic: 'ใช้น้ำหนักบรรทุกแผ่นดินไหว',
+    saveProject: 'บันทึกโครงการ',
+    loadProject: 'โหลดโครงการ',
+    projectSaved: 'บันทึกโครงการลงในที่เก็บข้อมูลในตัวเครื่องแล้ว',
+    projectLoaded: 'โหลดโครงการสำเร็จแล้ว',
+    noProject: 'ไม่พบโครงการที่บันทึกไว้',
   },
   ms: {
     title: 'FacadeCalc',
@@ -262,6 +294,11 @@ const TRANSLATIONS = {
     seismicRegion: 'Wilayah Seismik',
     seismicCoeff: 'Pekali Seismik (Cs)',
     applySeismic: 'Gunakan Beban Seismik',
+    saveProject: 'Simpan Projek',
+    loadProject: 'Muat Projek',
+    projectSaved: 'Projek disimpan ke storan tempatan',
+    projectLoaded: 'Projek berjaya dimuatkan',
+    noProject: 'Tiada projek yang disimpan ditemui',
   }
 };
 
@@ -283,6 +320,13 @@ interface Combination {
   factors: Record<keyof typeof LOAD_CATEGORIES, number>;
 }
 
+// Helper for robust number parsing
+const safeParseNumber = (val: string | number, fallback: number = 0): number => {
+  if (typeof val === 'number') return isNaN(val) ? fallback : val;
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? fallback : parsed;
+};
+
 export function App() {
   // Beam State
   const [length, setLength] = useState(3000); // mm
@@ -292,6 +336,9 @@ export function App() {
   const [height, setHeight] = useState(100);
   const [thickness, setThickness] = useState(3);
   const [safetyFactor, setSafetyFactor] = useState(1.5);
+  const [selectedCodeId, setSelectedCodeId] = useState<string>('Eurocodes (EU)');
+  const [hoveredLoad, setHoveredLoad] = useState<Load | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   // Loads State
   const [loads, setLoads] = useState<Load[]>([
@@ -312,6 +359,15 @@ export function App() {
   // Seismic State
   const [seismicRegion, setSeismicRegion] = useState<keyof typeof SEISMIC_REGIONS>('china');
   const [seismicCoeff, setSeismicCoeff] = useState(SEISMIC_REGIONS.china.coeff);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Auto-clear notification
+  React.useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   // Calculations
   const sectionProps = useMemo(() => {
@@ -342,7 +398,25 @@ export function App() {
     safetyFactor,
   }), [length, material, sectionProps, safetyFactor]);
 
-  const results = useMemo(() => calculateBeam(beamProps, factoredLoads), [beamProps, factoredLoads]);
+  const results = useMemo(() => {
+    try {
+      if (length <= 0 || !activeCombination) throw new Error('Invalid inputs');
+      return calculateBeam(beamProps, factoredLoads);
+    } catch (error) {
+      console.error('Calculation error:', error);
+      return {
+        points: [],
+        summary: {
+          maxDeflection: 0,
+          maxMoment: 0,
+          maxShear: 0,
+          maxStress: 0,
+          deflectionRatio: 'N/A',
+          status: 'fail' as const
+        }
+      };
+    }
+  }, [beamProps, factoredLoads, length, activeCombination]);
 
   const addLoad = (type: Load['type'] = 'point', category: Load['category'] = 'dead', value?: number) => {
     const newLoad: Load = {
@@ -387,6 +461,59 @@ export function App() {
     setLoads(loads.map(l => l.id === id ? { ...l, ...updates } : l));
   };
 
+  const exportToCSV = () => {
+    const headers = ['Distance (mm)', 'Deflection (mm)', 'Moment (Nmm)', 'Shear (N)', 'Stress (MPa)'];
+    const rows = results.points.map(p => [
+      p.x.toFixed(2),
+      p.deflection.toFixed(4),
+      p.moment.toFixed(2),
+      p.shear.toFixed(2),
+      p.stress.toFixed(4)
+    ]);
+    
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `FacadeCalc_Analysis_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToJSON = () => {
+    const data = {
+      project: {
+        name: t.title,
+        date: new Date().toISOString(),
+        combination: activeCombination.name,
+        designCode: selectedCodeId
+      },
+      beam: {
+        length,
+        material,
+        sectionType,
+        width,
+        height,
+        thickness,
+        safetyFactor
+      },
+      loads,
+      results: {
+        summary: results.summary
+      }
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `FacadeCalc_Report_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+  };
+
   const addCombination = () => {
     const newComb: Combination = {
       id: Math.random().toString(36).substr(2, 9),
@@ -414,6 +541,54 @@ export function App() {
     if (activeCombinationId === id) setActiveCombinationId(newCombs[0].id);
   };
 
+  const saveProject = () => {
+    const projectData = {
+      length,
+      material,
+      sectionType,
+      width,
+      height,
+      thickness,
+      safetyFactor,
+      selectedCodeId,
+      loads,
+      combinations,
+      activeCombinationId,
+      seismicRegion,
+      seismicCoeff
+    };
+    localStorage.setItem('facadecalc_project', JSON.stringify(projectData));
+    setNotification({ message: t.projectSaved, type: 'success' });
+  };
+
+  const loadProject = () => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (data.length !== undefined) setLength(data.length);
+        if (data.material) setMaterial(data.material);
+        if (data.sectionType) setSectionType(data.sectionType);
+        if (data.width !== undefined) setWidth(data.width);
+        if (data.height !== undefined) setHeight(data.height);
+        if (data.thickness !== undefined) setThickness(data.thickness);
+        if (data.safetyFactor !== undefined) setSafetyFactor(data.safetyFactor);
+        if (data.selectedCodeId) setSelectedCodeId(data.selectedCodeId);
+        if (data.loads) setLoads(data.loads);
+        if (data.combinations) setCombinations(data.combinations);
+        if (data.activeCombinationId) setActiveCombinationId(data.activeCombinationId);
+        if (data.seismicRegion) setSeismicRegion(data.seismicRegion);
+        if (data.seismicCoeff !== undefined) setSeismicCoeff(data.seismicCoeff);
+        setNotification({ message: t.projectLoaded, type: 'success' });
+      } catch (e) {
+        console.error("Failed to load project", e);
+        setNotification({ message: 'Error loading project', type: 'error' });
+      }
+    } else {
+      setNotification({ message: t.noProject, type: 'error' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100">
       {/* Header */}
@@ -432,14 +607,35 @@ export function App() {
             <div className={cn(
               "flex md:hidden items-center gap-2 px-2.5 py-1 rounded-full text-[10px] font-bold border",
               results.summary.status === 'pass' 
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                : "bg-rose-50 text-rose-700 border-rose-200"
+                ? "bg-green-50 text-green-700 border-green-200" 
+                : "bg-red-50 text-red-700 border-red-200"
             )}>
               {results.summary.status === 'pass' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
               {results.summary.status === 'pass' ? t.valid.split(' ')[1].toUpperCase() : t.fail.split(' ')[1].toUpperCase()}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={saveProject}
+                className="gap-2 h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{t.saveProject}</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={loadProject}
+                className="gap-2 h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{t.loadProject}</span>
+              </Button>
+            </div>
+
             <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border flex-1 md:flex-none">
               <Globe className="w-3.5 h-3.5 text-slate-500 ml-1" />
               <Select value={lang} onValueChange={(v: any) => setLang(v)}>
@@ -467,16 +663,37 @@ export function App() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2 h-8 text-xs flex-1 md:flex-none">
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{t.print}</span>
-              <span className="sm:hidden">Print</span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={
+                <Button variant="outline" size="sm" className="gap-2 h-8 text-xs flex-1 md:flex-none border-blue-200 text-blue-700 hover:bg-blue-50">
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{t.print}</span>
+                </Button>
+              } />
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => window.print()} className="gap-2">
+                    <Printer className="w-4 h-4 text-slate-500" />
+                    <span>Print / Save as PDF</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToCSV} className="gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-green-500" />
+                    <span>Export Data (CSV)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToJSON} className="gap-2">
+                    <FileJson className="w-4 h-4 text-amber-500" />
+                    <span>Export Report (JSON)</span>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className={cn(
               "hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border",
               results.summary.status === 'pass' 
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                : "bg-rose-50 text-rose-700 border-rose-200"
+                ? "bg-green-50 text-green-700 border-green-200" 
+                : "bg-red-50 text-red-700 border-red-200"
             )}>
               {results.summary.status === 'pass' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
               {results.summary.status === 'pass' ? t.valid : t.fail}
@@ -485,8 +702,52 @@ export function App() {
         </div>
       </header>
 
+      {/* Notification Toast */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 20, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className={cn(
+              "fixed top-16 left-1/2 z-[100] px-4 py-2 rounded-full shadow-lg border text-xs font-bold flex items-center gap-2",
+              notification.type === 'success' 
+                ? "bg-green-50 text-green-700 border-green-200" 
+                : "bg-red-50 text-red-700 border-red-200"
+            )}
+          >
+            {notification.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+            {notification.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 print:block">
         
+        {/* Print Only Header */}
+        <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
+              <p className="text-slate-500 font-medium">{t.subtitle}</p>
+              <div className="mt-6 grid grid-cols-2 gap-x-16 gap-y-3 text-sm">
+                <div className="flex gap-2"><span className="font-bold text-slate-700">Date:</span> <span>{new Date().toLocaleDateString()}</span></div>
+                <div className="flex gap-2"><span className="font-bold text-slate-700">Design Code:</span> <span className="text-blue-700 font-bold">{selectedCodeId}</span></div>
+                <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
+                <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{MATERIALS[material].name}</span></div>
+                <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{length} mm</span></div>
+                <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{sectionType === 'hollow' ? `${width}x${height}x${thickness}mm` : `${width}x${height}mm`}</span></div>
+              </div>
+            </div>
+            <div className={cn(
+              "px-6 py-4 rounded-xl border-4 font-black text-2xl tracking-tighter",
+              results.summary.status === 'pass' ? "border-green-500 text-green-600 bg-green-50" : "border-red-500 text-red-600 bg-red-50"
+            )}>
+              {results.summary.status === 'pass' ? "PASS" : "FAIL"}
+            </div>
+          </div>
+        </div>
+
         {/* Left Column: Inputs */}
         <div className="lg:col-span-4 space-y-6 print:hidden">
           
@@ -574,7 +835,7 @@ export function App() {
                   type="number" 
                   min="0"
                   value={length ?? 0} 
-                  onChange={(e) => setLength(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setLength(Math.max(0, safeParseNumber(e.target.value, length)))}
                   className="bg-slate-50/50"
                 />
               </div>
@@ -600,7 +861,7 @@ export function App() {
                   type="number" 
                   step="0.1"
                   value={safetyFactor ?? 1} 
-                  onChange={(e) => setSafetyFactor(Number(e.target.value))}
+                  onChange={(e) => setSafetyFactor(Math.max(0.1, safeParseNumber(e.target.value, safetyFactor)))}
                   className="bg-slate-50/50"
                 />
               </div>
@@ -625,7 +886,7 @@ export function App() {
                     type="number" 
                     min="0"
                     value={width ?? 0} 
-                    onChange={(e) => setWidth(Math.max(0, Number(e.target.value)))}
+                    onChange={(e) => setWidth(Math.max(0, safeParseNumber(e.target.value, width)))}
                     className="bg-slate-50/50"
                   />
                 </div>
@@ -636,7 +897,7 @@ export function App() {
                     type="number" 
                     min="0"
                     value={height ?? 0} 
-                    onChange={(e) => setHeight(Math.max(0, Number(e.target.value)))}
+                    onChange={(e) => setHeight(Math.max(0, safeParseNumber(e.target.value, height)))}
                     className="bg-slate-50/50"
                   />
                 </div>
@@ -649,7 +910,7 @@ export function App() {
                     id="thickness" 
                     type="number" 
                     value={thickness ?? 0} 
-                    onChange={(e) => setThickness(Number(e.target.value))}
+                    onChange={(e) => setThickness(Math.max(0, safeParseNumber(e.target.value, thickness)))}
                     className="bg-slate-50/50"
                   />
                 </div>
@@ -697,12 +958,26 @@ export function App() {
                 <BookOpen className="w-4 h-4" />
                 <span className="text-xs font-bold uppercase tracking-widest">{t.codes}</span>
               </div>
-              <CardTitle className="text-lg">Reference Standards</CardTitle>
+              <CardTitle className="text-lg">Select Design Code</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {CODES_OF_PRACTICE.map((item) => (
-                <div key={item.country} className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-900">{item.country}</h4>
+                <div 
+                  key={item.country} 
+                  className={cn(
+                    "space-y-1 p-2 rounded-lg border transition-all cursor-pointer",
+                    selectedCodeId === item.country 
+                      ? "bg-blue-50 border-blue-200 ring-1 ring-blue-200" 
+                      : "border-transparent hover:bg-slate-50 hover:border-slate-200"
+                  )}
+                  onClick={() => setSelectedCodeId(item.country)}
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-900">{item.country}</h4>
+                    {selectedCodeId === item.country && (
+                      <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                    )}
+                  </div>
                   <ul className="text-[10px] text-slate-500 list-disc list-inside">
                     {item.codes.map((code, idx) => (
                       <li key={idx}>{code}</li>
@@ -859,7 +1134,7 @@ export function App() {
                       <Input 
                         type="number" 
                         value={load.value ?? 0} 
-                        onChange={(e) => updateLoad(load.id, { value: Number(e.target.value) })}
+                        onChange={(e) => updateLoad(load.id, { value: safeParseNumber(e.target.value, load.value) })}
                         className="h-8 text-sm"
                       />
                     </div>
@@ -869,7 +1144,7 @@ export function App() {
                         <Input 
                           type="number" 
                           value={load.position ?? 0} 
-                          onChange={(e) => updateLoad(load.id, { position: Number(e.target.value) })}
+                          onChange={(e) => updateLoad(load.id, { position: safeParseNumber(e.target.value, load.position ?? 0) })}
                           className="h-8 text-sm"
                         />
                       </div>
@@ -880,7 +1155,7 @@ export function App() {
                         <Input 
                           type="number" 
                           value={load.value2 ?? load.value} 
-                          onChange={(e) => updateLoad(load.id, { value2: Number(e.target.value) })}
+                          onChange={(e) => updateLoad(load.id, { value2: safeParseNumber(e.target.value, load.value2 ?? load.value) })}
                           className="h-8 text-sm"
                         />
                       </div>
@@ -894,7 +1169,7 @@ export function App() {
                         <Input 
                           type="number" 
                           value={load.start ?? 0} 
-                          onChange={(e) => updateLoad(load.id, { start: Number(e.target.value) })}
+                          onChange={(e) => updateLoad(load.id, { start: safeParseNumber(e.target.value, load.start ?? 0) })}
                           className="h-8 text-sm"
                         />
                       </div>
@@ -903,7 +1178,7 @@ export function App() {
                         <Input 
                           type="number" 
                           value={load.end ?? length} 
-                          onChange={(e) => updateLoad(load.id, { end: Number(e.target.value) })}
+                          onChange={(e) => updateLoad(load.id, { end: safeParseNumber(e.target.value, load.end ?? length) })}
                           className="h-8 text-sm"
                         />
                       </div>
@@ -947,7 +1222,7 @@ export function App() {
             <SummaryCard 
               label="Max Shear" 
               value={`${(results.summary.maxShear / 1000).toFixed(2)} kN`} 
-              icon={<ChevronRight className="w-4 h-4 text-emerald-500" />}
+              icon={<ChevronRight className="w-4 h-4 text-green-500" />}
             />
           </div>
 
@@ -1027,94 +1302,144 @@ export function App() {
               <CardTitle className="text-lg">{t.structuralModel}</CardTitle>
               <CardDescription>Simplified representation of supports and loads</CardDescription>
             </CardHeader>
-            <CardContent className="h-48 relative flex items-center justify-center bg-slate-50 px-8 sm:px-12">
-              <div className="w-full h-1 bg-slate-300 relative">
+            <CardContent className="h-64 relative flex items-center justify-center bg-slate-50 px-4 sm:px-8">
+              <svg 
+                className="w-full h-full overflow-visible" 
+                viewBox="0 0 1000 250" 
+                preserveAspectRatio="xMidYMid meet"
+              >
+                {/* Definitions for gradients and patterns */}
+                <defs>
+                  <linearGradient id="beamGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#94a3b8" />
+                    <stop offset="50%" stopColor="#cbd5e1" />
+                    <stop offset="100%" stopColor="#94a3b8" />
+                  </linearGradient>
+                  <pattern id="seismicPattern" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                    <line x1="0" y1="0" x2="0" y2="8" stroke="#ef4444" strokeWidth="2" opacity="0.3" />
+                  </pattern>
+                </defs>
+
+                {/* Beam Body */}
+                <rect 
+                  x="50" 
+                  y="120" 
+                  width="900" 
+                  height="12" 
+                  fill="url(#beamGradient)" 
+                  rx="2"
+                  className="stroke-slate-400 stroke-1"
+                />
+
                 {/* Supports */}
-                <div className="absolute -bottom-4 left-0 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-b-[15px] border-b-slate-600" />
-                <div className="absolute -bottom-4 right-0 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-b-[15px] border-b-slate-600" />
-                
-                {/* Loads Visualization */}
+                {/* Left Support (Pinned) */}
+                <g transform="translate(50, 132)">
+                  <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
+                  <rect x="-20" y="25" width="40" height="4" fill="#1e293b" rx="1" />
+                </g>
+                {/* Right Support (Roller) */}
+                <g transform="translate(950, 132)">
+                  <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
+                  <circle cx="-8" cy="28" r="3" fill="#1e293b" />
+                  <circle cx="8" cy="28" r="3" fill="#1e293b" />
+                  <rect x="-20" y="31" width="40" height="4" fill="#1e293b" rx="1" />
+                </g>
+
+                {/* Loads */}
                 {(() => {
                   const maxLoadVal = Math.max(...loads.map(l => Math.max(l.value, l.value2 ?? 0, 1)), 1);
-                  const getScale = (val: number) => Math.min(Math.max((val / maxLoadVal) * 40, 10), 60);
+                  const getScale = (val: number) => Math.min(Math.max((val / maxLoadVal) * 80, 20), 100);
 
                   return loads.map((load) => {
-                    const left = load.type === 'udl' ? 0 : 
-                               load.type === 'point' ? (load.position! / length) * 100 :
-                               (load.start! / length) * 100;
-                    const width_pct = load.type === 'udl' ? 100 :
-                                     load.type === 'point' ? 0 :
-                                     ((load.end! - load.start!) / length) * 100;
-                    
                     const isSeismic = load.category === 'seismic';
-                    const colorClass = isSeismic ? "rose-500" : "blue-500";
-                    const bgColorClass = isSeismic ? "bg-rose-500/10" : "bg-blue-500/10";
-                    const strokeColorClass = isSeismic ? "stroke-rose-500/40" : "stroke-blue-500/40";
+                    const color = isSeismic ? "#ef4444" : "#3b82f6";
+                    const fillColor = isSeismic ? "url(#seismicPattern)" : `${color}22`;
+                    
+                    const handleMouseEnter = (e: React.MouseEvent) => {
+                      const factored = factoredLoads.find(fl => fl.id === load.id);
+                      setHoveredLoad({ ...load, factoredValue: factored?.value, factoredValue2: factored?.value2 });
+                      setMousePos({ x: e.clientX, y: e.clientY });
+                    };
+                    
+                    const handleMouseMove = (e: React.MouseEvent) => {
+                      setMousePos({ x: e.clientX, y: e.clientY });
+                    };
 
-                    return (
-                      <div 
-                        key={load.id} 
-                        className="absolute bottom-1 group"
-                        style={{ 
-                          left: `${left}%`,
-                          width: load.type === 'point' ? 'auto' : `${width_pct}%`,
-                          transform: load.type === 'point' ? 'translateX(-50%)' : 'none'
-                        }}
-                      >
-                        {load.type === 'point' ? (
-                          <div className="flex flex-col items-center">
-                            <div 
-                              className={cn("w-0.5 mb-0.5", isSeismic ? "bg-rose-500" : "bg-blue-500")} 
-                              style={{ height: `${getScale(load.value)}px` }} 
-                            />
-                            <ChevronRight className={cn("w-3 h-3 rotate-90 -mt-2", isSeismic ? "text-rose-500" : "text-blue-500")} />
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-white shadow-md border px-1.5 py-0.5 rounded text-[8px] font-bold whitespace-nowrap z-10">
-                              {load.value}N @ {load.position}mm
-                            </div>
-                          </div>
-                        ) : load.type === 'udl' ? (
-                          <div className="w-full flex flex-col items-center">
-                            <div 
-                              className={cn("w-full border-t-2 border-x relative", bgColorClass, isSeismic ? "border-rose-500/40" : "border-blue-500/40")}
-                              style={{ height: `${getScale(load.value)}px` }}
-                            >
-                              <div className="absolute inset-0 flex justify-around items-end pb-0.5">
-                                {[...Array(Math.max(2, Math.floor(width_pct / 5)))].map((_, i) => (
-                                  <ChevronRight key={i} className={cn("w-2 h-2 rotate-90", isSeismic ? "text-rose-500/50" : "text-blue-500/50")} />
-                                ))}
-                              </div>
-                              {isSeismic && (
-                                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 4px)', color: 'inherit' }} />
-                              )}
-                            </div>
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-white shadow-md border px-1.5 py-0.5 rounded text-[8px] font-bold whitespace-nowrap z-10 left-1/2 -translate-x-1/2">
-                              {load.value}N/mm (Full Span)
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-full flex flex-col items-center">
-                            <div className="w-full relative" style={{ height: `${Math.max(getScale(load.value), getScale(load.value2 ?? load.value))}px` }}>
-                              <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-                                <polygon 
-                                  points={`0,100 0,${100 - (load.value / maxLoadVal * 100)} 100,${100 - ((load.value2 ?? load.value) / maxLoadVal * 100)} 100,100`}
-                                  className={cn(isSeismic ? "fill-rose-500/10 stroke-rose-500/40" : "fill-blue-500/10 stroke-blue-500/40", "stroke-2")}
-                                  vectorEffect="non-scaling-stroke"
-                                />
-                              </svg>
-                            </div>
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-white shadow-md border px-1.5 py-0.5 rounded text-[8px] font-bold whitespace-nowrap z-10 left-1/2 -translate-x-1/2">
-                              {load.value}→{load.value2}N/mm [{load.start}-{load.end}mm]
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
+                    if (load.type === 'point') {
+                      const x = 50 + (load.position! / length) * 900;
+                      const h = getScale(load.value);
+                      return (
+                        <g 
+                          key={load.id} 
+                          className="group cursor-help"
+                          onMouseEnter={handleMouseEnter}
+                          onMouseMove={handleMouseMove}
+                          onMouseLeave={() => setHoveredLoad(null)}
+                        >
+                          {/* Invisible wider hit area */}
+                          <line x1={x} y1={120 - h - 10} x2={x} y2={125} stroke="transparent" strokeWidth="20" />
+                          
+                          <line x1={x} y1={120 - h} x2={x} y2={115} stroke={color} strokeWidth="3" strokeLinecap="round" className="transition-all group-hover:stroke-blue-400" />
+                          <path d={`M ${x-5},${115} L ${x},120 L ${x+5},${115}`} fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" className="transition-all group-hover:stroke-blue-400" />
+                          <circle cx={x} cy={120-h} r="4" fill={color} className="transition-all group-hover:r-6 group-hover:fill-blue-400" />
+                        </g>
+                      );
+                    } else if (load.type === 'udl') {
+                      const h = getScale(load.value);
+                      return (
+                        <g 
+                          key={load.id} 
+                          className="group cursor-help"
+                          onMouseEnter={handleMouseEnter}
+                          onMouseMove={handleMouseMove}
+                          onMouseLeave={() => setHoveredLoad(null)}
+                        >
+                          <rect x="50" y={120 - h} width="900" height={h} fill={fillColor} stroke={color} strokeWidth="1.5" strokeDasharray={isSeismic ? "4 2" : "none"} className="transition-all group-hover:fill-blue-400/20 group-hover:stroke-blue-400" />
+                          {/* Arrows for UDL */}
+                          {[...Array(11)].map((_, i) => {
+                            const ax = 50 + (i * 90);
+                            return (
+                              <path key={i} d={`M ${ax-3},${115} L ${ax},120 L ${ax+3},${115}`} fill="none" stroke={color} strokeWidth="1.5" className="transition-all group-hover:stroke-blue-400" />
+                            );
+                          })}
+                        </g>
+                      );
+                    } else {
+                      const h1 = getScale(load.value);
+                      const h2 = getScale(load.value2 ?? load.value);
+                      const x1 = 50 + (load.start! / length) * 900;
+                      const x2 = 50 + (load.end! / length) * 900;
+                      return (
+                        <g 
+                          key={load.id} 
+                          className="group cursor-help"
+                          onMouseEnter={handleMouseEnter}
+                          onMouseMove={handleMouseMove}
+                          onMouseLeave={() => setHoveredLoad(null)}
+                        >
+                          <path 
+                            d={`M ${x1},120 L ${x1},${120-h1} L ${x2},${120-h2} L ${x2},120 Z`} 
+                            fill={fillColor} 
+                            stroke={color} 
+                            strokeWidth="1.5" 
+                            className="transition-all group-hover:fill-blue-400/20 group-hover:stroke-blue-400"
+                          />
+                        </g>
+                      );
+                    }
                   });
                 })()}
-              </div>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-mono text-slate-400">
-                L = {length} mm
-              </div>
+
+                {/* Dimension Line */}
+                <g transform="translate(0, 190)">
+                  <line x1="50" y1="0" x2="950" y2="0" stroke="#94a3b8" strokeWidth="1" />
+                  <line x1="50" y1="-5" x2="50" y2="5" stroke="#94a3b8" strokeWidth="1" />
+                  <line x1="950" y1="-5" x2="950" y2="5" stroke="#94a3b8" strokeWidth="1" />
+                  <text x="500" y="20" textAnchor="middle" fill="#64748b" className="text-[14px] font-mono font-bold">
+                    L = {length} mm
+                  </text>
+                </g>
+              </svg>
             </CardContent>
             <CardFooter className="bg-slate-50 border-t px-6 py-4">
               <div className="w-full space-y-3">
@@ -1179,6 +1504,105 @@ export function App() {
           </Card>
         </div>
       </main>
+
+      {/* Floating Tooltip */}
+      <AnimatePresence>
+        {hoveredLoad && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="fixed z-[100] pointer-events-none bg-slate-900/95 text-white p-3 rounded-lg shadow-xl border border-slate-700/50 backdrop-blur-sm min-w-[180px]"
+            style={{ 
+              left: Math.min(mousePos.x + 15, window.innerWidth - 200), 
+              top: Math.max(mousePos.y - 120, 20) 
+            }}
+          >
+            <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-2 h-2 rounded-full" 
+                  style={{ backgroundColor: hoveredLoad.category === 'seismic' ? '#ef4444' : '#3b82f6' }} 
+                />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {LOAD_CATEGORIES[hoveredLoad.category].name}
+                </span>
+              </div>
+              <span className="text-[9px] font-mono text-slate-500">#{hoveredLoad.id.slice(0, 4)}</span>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <div className="text-[9px] uppercase text-slate-500 mb-0.5">Characteristic Value</div>
+                <div className="text-sm font-bold flex items-baseline gap-1">
+                  {hoveredLoad.type === 'trapezoidal' ? (
+                    <>
+                      <span>{hoveredLoad.value}</span>
+                      <span className="text-xs font-normal text-slate-400">→</span>
+                      <span>{hoveredLoad.value2}</span>
+                      <span className="text-[10px] font-normal text-slate-400 ml-1">N/mm</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{hoveredLoad.value}</span>
+                      <span className="text-[10px] font-normal text-slate-400 ml-1">
+                        {hoveredLoad.type === 'point' ? 'N' : 'N/mm'}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {activeCombination.factors[hoveredLoad.category] !== 1 && (
+                <div>
+                  <div className="text-[9px] uppercase text-blue-400 mb-0.5 flex items-center gap-1">
+                    Factored Value <span className="text-[8px] opacity-70">(×{activeCombination.factors[hoveredLoad.category]})</span>
+                  </div>
+                  <div className="text-sm font-bold text-blue-300 flex items-baseline gap-1">
+                    {(hoveredLoad as any).factoredValue !== undefined && (
+                      hoveredLoad.type === 'trapezoidal' ? (
+                        <>
+                          <span>{(hoveredLoad as any).factoredValue.toFixed(2)}</span>
+                          <span className="text-xs font-normal opacity-50">→</span>
+                          <span>{(hoveredLoad as any).factoredValue2.toFixed(2)}</span>
+                          <span className="text-[10px] font-normal opacity-50 ml-1">N/mm</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{(hoveredLoad as any).factoredValue.toFixed(2)}</span>
+                          <span className="text-[10px] font-normal opacity-50 ml-1">
+                            {hoveredLoad.type === 'point' ? 'N' : 'N/mm'}
+                          </span>
+                        </>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-white/5 flex items-center gap-3">
+                <div className="flex flex-col">
+                  <span className="text-[8px] uppercase text-slate-500">Position</span>
+                  <div className="text-[10px] font-medium text-slate-300 flex items-center gap-1">
+                    <Maximize2 className="w-2.5 h-2.5" />
+                    {hoveredLoad.type === 'point' ? (
+                      <span>{hoveredLoad.position} mm</span>
+                    ) : hoveredLoad.type === 'udl' ? (
+                      <span>0 - {length} mm</span>
+                    ) : (
+                      <span>{hoveredLoad.start} - {hoveredLoad.end} mm</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[8px] uppercase text-slate-500">Type</span>
+                  <span className="text-[10px] font-medium text-slate-300 uppercase">{hoveredLoad.type}</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1205,7 +1629,7 @@ function SummaryCard({ label, value, subValue, icon, status }: {
         {subValue && (
           <div className={cn(
             "text-[9px] sm:text-[10px] font-medium mt-1 truncate",
-            status === 'fail' ? "text-rose-600" : status === 'pass' ? "text-emerald-600" : "text-slate-400"
+            status === 'fail' ? "text-red-600" : status === 'pass' ? "text-green-600" : "text-slate-400"
           )}>
             {subValue}
           </div>
@@ -1249,7 +1673,7 @@ function ChartContainer({ data, dataKey, color, unit, label, invert = false, for
           tickLine={false}
           tickFormatter={(v) => formatter ? formatter(v) : v.toFixed(1)}
         />
-        <Tooltip 
+        <ChartTooltip 
           contentStyle={{ 
             backgroundColor: '#FFF', 
             border: '1px solid #E2E8F0', 

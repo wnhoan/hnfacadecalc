@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FacadeCalc Portable</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f8f9fa; font-family: system-ui, -apple-system, sans-serif; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 1rem; }
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 0.25rem; }
+        input, select { width: 100%; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.875rem; }
+        .result-val { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
+        .status-pass { color: #10b981; }
+        .status-fail { color: #ef4444; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-8 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">FacadeCalc Portable</h1>
+                <p class="text-slate-500 text-sm">Standalone Structural Analysis Tool</p>
+            </div>
+            <div id="status-badge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                Status: Ready
+            </div>
+        </header>
+
+        <div class="grid md:grid-cols-2 gap-8">
+            <!-- Inputs -->
+            <div>
+                <div class="card">
+                    <h2 class="text-lg font-bold mb-4 border-b pb-2">Beam Properties</h2>
+                    <div class="input-group">
+                        <label>Span Length (mm)</label>
+                        <input type="number" id="length" value="3000" oninput="calculate()">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label>Width (mm)</label>
+                            <input type="number" id="width" value="50" oninput="calculate()">
+                        </div>
+                        <div class="input-group">
+                            <label>Height (mm)</label>
+                            <input type="number" id="height" value="100" oninput="calculate()">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Material E (MPa)</label>
+                        <input type="number" id="modulus" value="70000" oninput="calculate()">
+                    </div>
+                    <div class="input-group">
+                        <label>Yield Strength (MPa)</label>
+                        <input type="number" id="yield" value="160" oninput="calculate()">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="text-lg font-bold mb-4 border-b pb-2">Loading (UDL)</h2>
+                    <div class="input-group">
+                        <label>UDL Value (N/mm)</label>
+                        <input type="number" id="udl" value="0.5" step="0.1" oninput="calculate()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div>
+                <div class="card">
+                    <h2 class="text-lg font-bold mb-4 border-b pb-2">Analysis Results</h2>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label>Max Deflection</label>
+                            <div id="res-defl" class="result-val">0.00 mm</div>
+                            <div id="res-ratio" class="text-xs text-slate-400">L/---</div>
+                        </div>
+                        <div>
+                            <label>Max Stress</label>
+                            <div id="res-stress" class="result-val">0.0 MPa</div>
+                            <div id="res-yield" class="text-xs text-slate-400">Yield: 160 MPa</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card bg-slate-900 text-white">
+                    <h2 class="text-lg font-bold mb-4 border-b border-slate-700 pb-2">Summary</h2>
+                    <p class="text-sm text-slate-400 mb-4">Calculated based on simply supported beam theory.</p>
+                    <div id="final-verdict" class="text-xl font-bold text-center py-4 border-2 border-dashed border-slate-700 rounded-lg">
+                        ---
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function calculate() {
+            const L = parseFloat(document.getElementById('length').value) || 0;
+            const W = parseFloat(document.getElementById('width').value) || 0;
+            const H = parseFloat(document.getElementById('height').value) || 0;
+            const E = parseFloat(document.getElementById('modulus').value) || 0;
+            const Fy = parseFloat(document.getElementById('yield').value) || 0;
+            const w = parseFloat(document.getElementById('udl').value) || 0;
+
+            if (L <= 0 || W <= 0 || H <= 0 || E <= 0) return;
+
+            // Section Props (Solid Rectangular)
+            const I = (W * Math.pow(H, 3)) / 12;
+            const Z = I / (H / 2);
+
+            // Max Deflection: 5wL^4 / 384EI
+            const defl = (5 * w * Math.pow(L, 4)) / (384 * E * I);
+            const ratio = L / defl;
+
+            // Max Moment: wL^2 / 8
+            const M = (w * Math.pow(L, 2)) / 8;
+            const stress = M / Z;
+
+            // Update UI
+            document.getElementById('res-defl').innerText = defl.toFixed(2) + ' mm';
+            document.getElementById('res-ratio').innerText = ratio > 100000 ? 'L/---' : 'L/' + Math.round(ratio);
+            document.getElementById('res-stress').innerText = stress.toFixed(1) + ' MPa';
+            document.getElementById('res-yield').innerText = 'Yield: ' + Fy + ' MPa';
+
+            const isSafe = stress <= Fy && ratio >= 175;
+            const verdict = document.getElementById('final-verdict');
+            const badge = document.getElementById('status-badge');
+
+            if (isSafe) {
+                verdict.innerText = 'PASS';
+                verdict.className = 'text-xl font-bold text-center py-4 border-2 border-dashed border-emerald-500 text-emerald-500 rounded-lg';
+                badge.className = 'px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700';
+                badge.innerText = 'Status: Safe';
+            } else {
+                verdict.innerText = 'FAIL';
+                verdict.className = 'text-xl font-bold text-center py-4 border-2 border-dashed border-rose-500 text-rose-500 rounded-lg';
+                badge.className = 'px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-100 text-rose-700';
+                badge.innerText = 'Status: Unsafe';
+            }
+        }
+
+        // Initial calc
+        calculate();
+    </script>
+</body>
+</html>
