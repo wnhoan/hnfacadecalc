@@ -105,6 +105,8 @@ function ErrorFallback() {
 
 const MATERIALS = {
   aluminum_6063_t6: { name: 'Aluminum 6063-T6 (Extrusion)', e: 70000, yield: 160 },
+  aluminum_6063_t5: { name: 'Aluminum 6063-T5', e: 70000, yield: 110 },
+  aluminum_6061_t6: { name: 'Aluminum 6061-T6 (High Strength)', e: 70000, yield: 240 },
   aluminum_3003_h14: { name: 'Aluminum 3003-H14 (Cladding)', e: 70000, yield: 145 },
   aluminum_5005_h34: { name: 'Aluminum 5005-H34 (Anodized)', e: 70000, yield: 135 },
   aluminum_5754_h22: { name: 'Aluminum 5754-H22 (High Strength)', e: 70000, yield: 190 },
@@ -353,6 +355,8 @@ export function App() {
     { id: 'c4', name: 'Seismic Dominant (D + E)', factors: { dead: 1.0, live: 0.5, wind: 0, snow: 0, seismic: 1.0 } },
   ]);
   const [activeCombinationId, setActiveCombinationId] = useState('c1');
+  const [activeTab, setActiveTab] = useState('deflection');
+  const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [lang, setLang] = useState<keyof typeof TRANSLATIONS>('en');
   const t = TRANSLATIONS[lang];
 
@@ -436,12 +440,14 @@ export function App() {
     return loads
       .filter(l => l.category === 'dead')
       .reduce((sum, l) => {
-        if (l.type === 'udl') return sum + (l.value * length);
-        if (l.type === 'point') return sum + l.value;
+        const v1 = safeParseNumber(l.value, 0);
+        const v2 = safeParseNumber(l.value2 ?? l.value, v1);
+        if (l.type === 'udl') return sum + (v1 * length);
+        if (l.type === 'point') return sum + v1;
         if (l.type === 'trapezoidal') {
-          const x1 = l.start ?? 0;
-          const x2 = l.end ?? length;
-          return sum + (0.5 * (l.value + (l.value2 ?? l.value)) * (x2 - x1));
+          const x1 = safeParseNumber(l.start ?? 0, 0);
+          const x2 = safeParseNumber(l.end ?? length, length);
+          return sum + (0.5 * (v1 + v2) * Math.max(0, x2 - x1));
         }
         return sum;
       }, 0);
@@ -1205,33 +1211,58 @@ export function App() {
               value={`${results.summary.maxDeflection.toFixed(2)} mm`} 
               subValue={results.summary.deflectionRatio}
               icon={<Maximize2 className="w-4 h-4 text-blue-500" />}
-              status={results.summary.deflectionRatio.includes('L/') && parseInt(results.summary.deflectionRatio.split('/')[1]) < 175 ? 'fail' : 'pass'}
+              status={results.summary.maxDeflection > (length / 175) ? 'fail' : 'pass'}
+              onClick={() => setActiveTab('deflection')}
+              active={activeTab === 'deflection'}
             />
             <SummaryCard 
               label="Max Stress" 
               value={`${results.summary.maxStress.toFixed(1)} MPa`} 
               subValue={`Yield: ${MATERIALS[material].yield} MPa`}
               icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
-              status={results.summary.maxStress > (MATERIALS[material].yield / safetyFactor) ? 'fail' : 'pass'}
+              status={results.summary.maxStress > (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) ? 'fail' : 'pass'}
+              onClick={() => setActiveTab('stress')}
+              active={activeTab === 'stress'}
             />
             <SummaryCard 
               label="Max Moment" 
               value={`${(results.summary.maxMoment / 1000000).toFixed(2)} kNm`} 
               icon={<Layout className="w-4 h-4 text-purple-500" />}
+              onClick={() => setActiveTab('moment')}
+              active={activeTab === 'moment'}
             />
             <SummaryCard 
               label="Max Shear" 
               value={`${(results.summary.maxShear / 1000).toFixed(2)} kN`} 
               icon={<ChevronRight className="w-4 h-4 text-green-500" />}
+              onClick={() => setActiveTab('shear')}
+              active={activeTab === 'shear'}
             />
           </div>
 
           {/* Charts */}
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-0">
-              <Tabs defaultValue="deflection" className="w-full">
+          <Card className={cn(
+            "shadow-sm border-slate-200 transition-all duration-300",
+            isChartExpanded ? "fixed inset-0 z-[100] bg-white rounded-none border-none" : ""
+          )}>
+            <CardHeader className={cn("pb-0", isChartExpanded ? "p-6" : "")}>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-                  <CardTitle className="text-lg">{t.results}</CardTitle>
+                  <div className="flex items-center gap-3">
+                    <CardTitle className="text-lg">{t.results}</CardTitle>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className={cn(
+                        "h-8 w-8 transition-colors",
+                        isChartExpanded ? "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100" : "text-slate-400 hover:text-blue-600"
+                      )}
+                      onClick={() => setIsChartExpanded(!isChartExpanded)}
+                      title={isChartExpanded ? "Collapse" : "Expand"}
+                    >
+                      {isChartExpanded ? <Maximize2 className="w-4 h-4 rotate-180" /> : <Maximize2 className="w-4 h-4" />}
+                    </Button>
+                  </div>
                   <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:flex">
                     <TabsTrigger value="deflection" className="text-[10px] sm:text-xs">{t.deflection}</TabsTrigger>
                     <TabsTrigger value="moment" className="text-[10px] sm:text-xs">{t.moment}</TabsTrigger>
@@ -1240,7 +1271,7 @@ export function App() {
                   </TabsList>
                 </div>
                 
-                <TabsContent value="deflection" className="h-[300px] sm:h-[400px] mt-0">
+                <TabsContent value="deflection" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
                   <ChartContainer 
                     data={results.points} 
                     dataKey="deflection" 
@@ -1250,7 +1281,7 @@ export function App() {
                     invert
                   />
                 </TabsContent>
-                <TabsContent value="moment" className="h-[300px] sm:h-[400px] mt-0">
+                <TabsContent value="moment" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
                   <ChartContainer 
                     data={results.points} 
                     dataKey="moment" 
@@ -1260,7 +1291,7 @@ export function App() {
                     formatter={(v) => (v / 1000000).toFixed(2) + ' kNm'}
                   />
                 </TabsContent>
-                <TabsContent value="shear" className="h-[300px] sm:h-[400px] mt-0">
+                <TabsContent value="shear" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
                   <ChartContainer 
                     data={results.points} 
                     dataKey="shear" 
@@ -1270,7 +1301,7 @@ export function App() {
                     formatter={(v) => (v / 1000).toFixed(2) + ' kN'}
                   />
                 </TabsContent>
-                <TabsContent value="stress" className="h-[300px] sm:h-[400px] mt-0">
+                <TabsContent value="stress" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
                   <ChartContainer 
                     data={results.points} 
                     dataKey="stress" 
@@ -1443,17 +1474,29 @@ export function App() {
             </CardContent>
             <CardFooter className="bg-slate-50 border-t px-6 py-4">
               <div className="w-full space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">{t.adjustSpan}</Label>
-                  <span className="text-sm font-mono font-bold text-blue-600">{length} mm</span>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      type="number"
+                      value={length}
+                      onChange={(e) => setLength(Math.max(0, safeParseNumber(e.target.value, length)))}
+                      className="h-8 w-24 text-right font-mono font-bold text-blue-600 bg-white"
+                    />
+                    <span className="text-xs font-bold text-slate-400">mm</span>
+                  </div>
                 </div>
                 <Slider 
                   value={[length ?? 3000]} 
                   onValueChange={(vals) => setLength(vals[0] ?? 3000)} 
                   min={500} 
-                  max={10000} 
+                  max={30000} 
                   step={50}
                 />
+                <div className="flex justify-between text-[10px] text-slate-400 font-medium px-1">
+                  <span>500 mm</span>
+                  <span>30,000 mm</span>
+                </div>
               </div>
             </CardFooter>
           </Card>
@@ -1611,19 +1654,33 @@ export default function Root() {
   return <App />;
 }
 
-function SummaryCard({ label, value, subValue, icon, status }: { 
+function SummaryCard({ label, value, subValue, icon, status, onClick, active }: { 
   label: string; 
   value: string; 
   subValue?: string; 
   icon: React.ReactNode;
   status?: 'pass' | 'fail';
+  onClick?: () => void;
+  active?: boolean;
 }) {
   return (
-    <Card className="shadow-sm border-slate-200 overflow-hidden">
+    <Card 
+      className={cn(
+        "shadow-sm border-slate-200 overflow-hidden cursor-pointer transition-all duration-200 group",
+        active ? "ring-2 ring-blue-500 border-transparent" : "hover:border-blue-300 hover:shadow-md"
+      )}
+      onClick={onClick}
+    >
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate mr-1">{label}</span>
-          <div className="shrink-0">{icon}</div>
+          <span className={cn(
+            "text-[9px] sm:text-[10px] font-bold uppercase tracking-wider truncate mr-1 transition-colors",
+            active ? "text-blue-600" : "text-slate-500 group-hover:text-blue-500"
+          )}>{label}</span>
+          <div className={cn(
+            "shrink-0 transition-transform duration-300",
+            active ? "scale-110" : "group-hover:scale-110"
+          )}>{icon}</div>
         </div>
         <div className="text-sm sm:text-lg font-bold tracking-tight truncate">{value}</div>
         {subValue && (

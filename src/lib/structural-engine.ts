@@ -43,7 +43,7 @@ export interface SummaryResults {
 export function calculateBeam(
   props: BeamProperties,
   loads: Load[],
-  steps: number = 100
+  steps: number = 200
 ): { points: CalculationResult[]; summary: SummaryResults } {
   const { length, elasticModulus, momentOfInertia, sectionModulus, yieldStrength } = props;
   
@@ -93,16 +93,21 @@ export function calculateBeam(
       const w2 = load.value2 ?? load.value;
       const x1 = load.start ?? 0;
       const x2 = load.end ?? length;
-      const L_load = x2 - x1;
+      const L_load = Math.max(0, x2 - x1);
       
-      // Area of trapezoid
-      const W = 0.5 * (w1 + w2) * L_load;
-      // Centroid of trapezoid relative to x1
-      const x_c_rel = (L_load / 3) * ((w1 + 2 * w2) / (w1 + w2));
-      const x_c = x1 + x_c_rel;
-      
-      totalLoadMagnitude += W;
-      totalMomentAboutR1 += W * x_c;
+      if (L_load > 0) {
+        // Area of trapezoid
+        const W = 0.5 * (w1 + w2) * L_load;
+        // Centroid of trapezoid relative to x1
+        // Avoid division by zero if w1 + w2 is zero
+        const x_c_rel = (w1 + w2) !== 0 
+          ? (L_load / 3) * ((w1 + 2 * w2) / (w1 + w2))
+          : L_load / 2;
+        const x_c = x1 + x_c_rel;
+        
+        totalLoadMagnitude += W;
+        totalMomentAboutR1 += W * x_c;
+      }
     }
   });
 
@@ -138,16 +143,19 @@ export function calculateBeam(
         const w2 = load.value2 ?? load.value;
         const x1 = load.start ?? 0;
         const x2 = load.end ?? length;
+        const L_total = x2 - x1;
         
-        if (x > x1) {
+        if (x > x1 && L_total > 0) {
           const curr_x = Math.min(x, x2);
           const L_seg = curr_x - x1;
-          const w_at_x = w1 + (w2 - w1) * (L_seg / (x2 - x1));
+          const w_at_x = w1 + (w2 - w1) * (L_seg / L_total);
           
           // Load of the segment from x1 to curr_x
           const W_seg = 0.5 * (w1 + w_at_x) * L_seg;
           // Centroid of the segment relative to x1
-          const x_c_seg_rel = (L_seg / 3) * ((w1 + 2 * w_at_x) / (w1 + w_at_x));
+          const x_c_seg_rel = (w1 + w_at_x) !== 0
+            ? (L_seg / 3) * ((w1 + 2 * w_at_x) / (w1 + w_at_x))
+            : L_seg / 2;
           
           shear -= W_seg;
           moment -= W_seg * (x - (x1 + x_c_seg_rel));
