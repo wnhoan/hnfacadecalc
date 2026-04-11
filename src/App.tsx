@@ -338,7 +338,7 @@ export function App() {
   const [height, setHeight] = useState(100);
   const [thickness, setThickness] = useState(3);
   const [safetyFactor, setSafetyFactor] = useState(1.5);
-  const [selectedCodeId, setSelectedCodeId] = useState<string>('Eurocodes (EU)');
+  const [selectedCodeId, setSelectedCodeId] = useState<string>('China (National)');
   const [hoveredLoad, setHoveredLoad] = useState<Load | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
