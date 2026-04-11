@@ -21,7 +21,8 @@ import {
   Layers,
   PlusCircle,
   Globe,
-  BookOpen
+  BookOpen,
+  Activity
 } from 'lucide-react';
 import { 
   Card, 
@@ -106,6 +107,15 @@ const LOAD_CATEGORIES = {
   live: { name: 'Live Load (L)', color: 'text-blue-500', bg: 'bg-blue-100' },
   wind: { name: 'Wind Load (W)', color: 'text-emerald-500', bg: 'bg-emerald-100' },
   snow: { name: 'Snow Load (S)', color: 'text-cyan-500', bg: 'bg-cyan-100' },
+  seismic: { name: 'Seismic Load (E)', color: 'text-rose-500', bg: 'bg-rose-100' },
+};
+
+const SEISMIC_REGIONS = {
+  china: { name: 'China (GB 50011)', coeff: 0.16, desc: 'Intensity 7, αmax=0.16' },
+  eurocode: { name: 'Eurocode (EN 1998)', coeff: 0.15, desc: 'ag=0.15g, S=1.2' },
+  hongkong: { name: 'Hong Kong (CoP)', coeff: 0.12, desc: 'ag=0.12g' },
+  thailand: { name: 'Thailand (DPT)', coeff: 0.10, desc: 'Zone 1' },
+  malaysia: { name: 'Malaysia (MS EN)', coeff: 0.07, desc: 'ag=0.07g' },
 };
 
 const TRANSLATIONS = {
@@ -140,6 +150,10 @@ const TRANSLATIONS = {
     limits: 'Design Limits',
     materialProps: 'Material Properties',
     adjustSpan: 'Adjust Span Length',
+    seismic: 'Seismic Analysis',
+    seismicRegion: 'Seismic Region',
+    seismicCoeff: 'Seismic Coeff (Cs)',
+    applySeismic: 'Apply Seismic Load',
   },
   zh: {
     title: '幕墙结构计算',
@@ -172,6 +186,10 @@ const TRANSLATIONS = {
     limits: '设计限值',
     materialProps: '材料属性',
     adjustSpan: '调整跨度',
+    seismic: '地震分析',
+    seismicRegion: '地震区域',
+    seismicCoeff: '地震系数 (Cs)',
+    applySeismic: '应用地震荷载',
   },
   th: {
     title: 'FacadeCalc',
@@ -204,6 +222,10 @@ const TRANSLATIONS = {
     limits: 'ขีดจำกัดการออกแบบ',
     materialProps: 'คุณสมบัติวัสดุ',
     adjustSpan: 'ปรับความยาวช่วง',
+    seismic: 'การวิเคราะห์แผ่นดินไหว',
+    seismicRegion: 'ภูมิภาคแผ่นดินไหว',
+    seismicCoeff: 'สัมประสิทธิ์แผ่นดินไหว (Cs)',
+    applySeismic: 'ใช้น้ำหนักบรรทุกแผ่นดินไหว',
   },
   ms: {
     title: 'FacadeCalc',
@@ -236,19 +258,23 @@ const TRANSLATIONS = {
     limits: 'Had Reka Bentuk',
     materialProps: 'Sifat Bahan',
     adjustSpan: 'Laraskan Panjang Rentang',
+    seismic: 'Analisis Seismik',
+    seismicRegion: 'Wilayah Seismik',
+    seismicCoeff: 'Pekali Seismik (Cs)',
+    applySeismic: 'Gunakan Beban Seismik',
   }
 };
 
 const CODES_OF_PRACTICE = [
-  { country: 'Eurocodes (EU)', codes: ['EN 1990 (Basis of Design)', 'EN 1991 (Actions on Structures)', 'EN 1993 (Steel Design)', 'EN 1999 (Aluminum Design)', 'EN 16612 (Glass Strength)'] },
-  { country: 'China (National)', codes: ['GB 50009-2012 (Load Code)', 'JGJ 102-2003 (Glass Curtain Wall)', 'GB 50017 (Steel Structure)'] },
-  { country: 'Hong Kong', codes: ['CoP for Structural Use of Glass 2018', 'CoP on Wind Effects in HK 2019', 'CoP for Structural Use of Steel 2011'] },
-  { country: 'Shanghai', codes: ['DGJ08-56 (Curtain Wall Engineering)', 'DGJ08-11 (Building Loads)', 'DGJ08-9 (Steel Structures)'] },
-  { country: 'Shenzhen', codes: ['SZJG 48 (Glass Curtain Wall)', 'SZJG 54 (Metal/Stone Curtain Wall)', 'SJG 15 (Wind Loads)'] },
-  { country: 'Guangzhou', codes: ['DBJ/T 15-30 (Curtain Wall Engineering)', 'DBJ 15-101 (Wind Load on Buildings)', 'GZJG (Municipal Guidelines)'] },
-  { country: 'England', codes: ['BS EN 1991 (Eurocode 1: Actions)', 'BS EN 1999 (Eurocode 9: Aluminum)', 'BS EN 1993 (Eurocode 3: Steel)'] },
-  { country: 'Thailand', codes: ['EIT Standard 1011-46 (Steel)', 'DPT Standard 1311-50 (Wind Load)', 'EIT 1015-40 (Aluminum)'] },
-  { country: 'Malaysia', codes: ['MS 1553:2002 (Wind Load)', 'MS EN 1991 (Eurocode 1)', 'MS EN 1999 (Eurocode 9)'] },
+  { country: 'Eurocodes (EU)', codes: ['EN 1990 (Basis of Design)', 'EN 1991 (Actions)', 'EN 1993 (Steel)', 'EN 1999 (Aluminum)', 'EN 1998 (Seismic)'] },
+  { country: 'China (National)', codes: ['GB 50009 (Loads)', 'JGJ 102 (Curtain Wall)', 'GB 50011 (Seismic)', 'GB 50017 (Steel)'] },
+  { country: 'Hong Kong', codes: ['CoP for Glass 2018', 'CoP on Wind 2019', 'CoP for Seismic Design 2024'] },
+  { country: 'Shanghai', codes: ['DGJ08-56 (Curtain Wall)', 'DGJ08-11 (Loads)', 'DGJ08-9 (Steel)'] },
+  { country: 'Shenzhen', codes: ['SZJG 48 (Glass)', 'SZJG 54 (Metal/Stone)', 'SJG 15 (Wind)'] },
+  { country: 'Guangzhou', codes: ['DBJ/T 15-30 (Curtain Wall)', 'DBJ 15-101 (Wind)', 'GZJG (Guidelines)'] },
+  { country: 'England', codes: ['BS EN 1991 (Actions)', 'BS EN 1999 (Aluminum)', 'BS EN 1998 (Seismic)'] },
+  { country: 'Thailand', codes: ['EIT 1011-46 (Steel)', 'DPT 1311-50 (Wind)', 'DPT 1301/1302 (Seismic)'] },
+  { country: 'Malaysia', codes: ['MS 1553 (Wind)', 'MS EN 1991 (EC1)', 'MS EN 1998 (Seismic)'] },
 ];
 
 interface Combination {
@@ -274,13 +300,18 @@ export function App() {
 
   // Combinations State
   const [combinations, setCombinations] = useState<Combination[]>([
-    { id: 'c1', name: 'Serviceability (D+L)', factors: { dead: 1.0, live: 1.0, wind: 0, snow: 0 } },
-    { id: 'c2', name: 'Ultimate (1.2D + 1.6L)', factors: { dead: 1.2, live: 1.6, wind: 0, snow: 0 } },
-    { id: 'c3', name: 'Wind Dominant (D + W)', factors: { dead: 1.0, live: 0, wind: 1.0, snow: 0 } },
+    { id: 'c1', name: 'Serviceability (D+L)', factors: { dead: 1.0, live: 1.0, wind: 0, snow: 0, seismic: 0 } },
+    { id: 'c2', name: 'Ultimate (1.2D + 1.6L)', factors: { dead: 1.2, live: 1.6, wind: 0, snow: 0, seismic: 0 } },
+    { id: 'c3', name: 'Wind Dominant (D + W)', factors: { dead: 1.0, live: 0, wind: 1.0, snow: 0, seismic: 0 } },
+    { id: 'c4', name: 'Seismic Dominant (D + E)', factors: { dead: 1.0, live: 0.5, wind: 0, snow: 0, seismic: 1.0 } },
   ]);
   const [activeCombinationId, setActiveCombinationId] = useState('c1');
   const [lang, setLang] = useState<keyof typeof TRANSLATIONS>('en');
   const t = TRANSLATIONS[lang];
+
+  // Seismic State
+  const [seismicRegion, setSeismicRegion] = useState<keyof typeof SEISMIC_REGIONS>('china');
+  const [seismicCoeff, setSeismicCoeff] = useState(SEISMIC_REGIONS.china.coeff);
 
   // Calculations
   const sectionProps = useMemo(() => {
@@ -291,7 +322,7 @@ export function App() {
   }, [width, height, thickness, sectionType]);
 
   const activeCombination = useMemo(() => 
-    combinations.find(c => c.id === activeCombinationId) || combinations[0] || { id: 'default', name: 'Default', factors: { dead: 1, live: 0, wind: 0, snow: 0 } }
+    combinations.find(c => c.id === activeCombinationId) || combinations[0] || { id: 'default', name: 'Default', factors: { dead: 1, live: 0, wind: 0, snow: 0, seismic: 0 } }
   , [combinations, activeCombinationId]);
 
   const factoredLoads = useMemo(() => {
@@ -313,18 +344,39 @@ export function App() {
 
   const results = useMemo(() => calculateBeam(beamProps, factoredLoads), [beamProps, factoredLoads]);
 
-  const addLoad = (type: Load['type'] = 'point') => {
+  const addLoad = (type: Load['type'] = 'point', category: Load['category'] = 'dead', value?: number) => {
     const newLoad: Load = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      category: 'dead',
-      value: type === 'point' ? 1000 : 0.5,
+      category,
+      value: value ?? (type === 'point' ? 1000 : 0.5),
       position: type === 'point' ? length / 2 : undefined,
       value2: type === 'trapezoidal' ? 0.5 : undefined,
       start: type === 'trapezoidal' ? 0 : undefined,
       end: type === 'trapezoidal' ? length : undefined,
     };
     setLoads([...loads, newLoad]);
+  };
+
+  const totalDeadMagnitude = useMemo(() => {
+    return loads
+      .filter(l => l.category === 'dead')
+      .reduce((sum, l) => {
+        if (l.type === 'udl') return sum + (l.value * length);
+        if (l.type === 'point') return sum + l.value;
+        if (l.type === 'trapezoidal') {
+          const x1 = l.start ?? 0;
+          const x2 = l.end ?? length;
+          return sum + (0.5 * (l.value + (l.value2 ?? l.value)) * (x2 - x1));
+        }
+        return sum;
+      }, 0);
+  }, [loads, length]);
+
+  const applySeismicLoad = () => {
+    // Seismic load as UDL: Fs = (Dead * Cs) / L
+    const seismicValue = (totalDeadMagnitude * seismicCoeff) / Math.max(1, length);
+    addLoad('udl', 'seismic', Number(seismicValue.toFixed(4)));
   };
 
   const removeLoad = (id: string) => {
@@ -339,7 +391,7 @@ export function App() {
     const newComb: Combination = {
       id: Math.random().toString(36).substr(2, 9),
       name: 'New Combination',
-      factors: { dead: 1.0, live: 0, wind: 0, snow: 0 }
+      factors: { dead: 1.0, live: 0, wind: 0, snow: 0, seismic: 0 }
     };
     setCombinations([...combinations, newComb]);
     setActiveCombinationId(newComb.id);
@@ -485,7 +537,7 @@ export function App() {
                         </Button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                       {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
                         <div key={key} className="space-y-1">
                           <Label className="text-[9px] uppercase text-slate-400 block text-center">{key[0].toUpperCase()}</Label>
@@ -658,6 +710,68 @@ export function App() {
                   </ul>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          {/* Seismic Analysis */}
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2 text-rose-600 mb-1">
+                <Activity className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase tracking-widest">{t.seismic}</span>
+              </div>
+              <CardTitle className="text-lg">{t.seismic}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2">
+                <Label>{t.seismicRegion}</Label>
+                <Select 
+                  value={seismicRegion} 
+                  onValueChange={(v: any) => {
+                    setSeismicRegion(v);
+                    setSeismicCoeff(SEISMIC_REGIONS[v as keyof typeof SEISMIC_REGIONS].coeff);
+                  }}
+                >
+                  <SelectTrigger className="bg-slate-50/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(SEISMIC_REGIONS).map(([key, region]) => (
+                      <SelectItem key={key} value={key}>{region.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-slate-400 italic">
+                  {SEISMIC_REGIONS[seismicRegion].desc}
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>{t.seismicCoeff}</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="number" 
+                    step="0.01"
+                    min="0"
+                    value={seismicCoeff} 
+                    onChange={(e) => setSeismicCoeff(Number(e.target.value))}
+                    className="bg-slate-50/50"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="shrink-0 gap-2 h-10 border-rose-200 text-rose-600 hover:bg-rose-50"
+                    onClick={applySeismicLoad}
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    {t.applySeismic}
+                  </Button>
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400 font-medium px-1">
+                  <span>Total Dead Load:</span>
+                  <span>{(totalDeadMagnitude / 1000).toFixed(2)} kN</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -920,57 +1034,83 @@ export function App() {
                 <div className="absolute -bottom-4 right-0 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-b-[15px] border-b-slate-600" />
                 
                 {/* Loads Visualization */}
-                {loads.map((load) => {
-                  const left = load.type === 'udl' ? 0 : 
-                             load.type === 'point' ? (load.position! / length) * 100 :
-                             (load.start! / length) * 100;
-                  const width_pct = load.type === 'udl' ? 100 :
-                                   load.type === 'point' ? 0 :
-                                   ((load.end! - load.start!) / length) * 100;
+                {(() => {
+                  const maxLoadVal = Math.max(...loads.map(l => Math.max(l.value, l.value2 ?? 0, 1)), 1);
+                  const getScale = (val: number) => Math.min(Math.max((val / maxLoadVal) * 40, 10), 60);
 
-                  return (
-                    <div 
-                      key={load.id} 
-                      className="absolute bottom-1"
-                      style={{ 
-                        left: `${left}%`,
-                        width: load.type === 'point' ? 'auto' : `${width_pct}%`,
-                        transform: load.type === 'point' ? 'translateX(-50%)' : 'none'
-                      }}
-                    >
-                      {load.type === 'point' ? (
-                        <div className="flex flex-col items-center">
-                          <ChevronRight className="w-4 h-4 rotate-90 text-rose-500" />
-                          <span className="text-[10px] font-bold text-rose-600">{load.value}N</span>
-                        </div>
-                      ) : load.type === 'udl' ? (
-                        <div className="w-full flex flex-col items-center">
-                          <div className="w-full h-4 border-t-2 border-x-2 border-rose-400/30 bg-rose-400/10 flex justify-around items-start pt-1">
-                            {[...Array(10)].map((_, i) => (
-                              <ChevronRight key={i} className="w-2 h-2 rotate-90 text-rose-400" />
-                            ))}
+                  return loads.map((load) => {
+                    const left = load.type === 'udl' ? 0 : 
+                               load.type === 'point' ? (load.position! / length) * 100 :
+                               (load.start! / length) * 100;
+                    const width_pct = load.type === 'udl' ? 100 :
+                                     load.type === 'point' ? 0 :
+                                     ((load.end! - load.start!) / length) * 100;
+                    
+                    const isSeismic = load.category === 'seismic';
+                    const colorClass = isSeismic ? "rose-500" : "blue-500";
+                    const bgColorClass = isSeismic ? "bg-rose-500/10" : "bg-blue-500/10";
+                    const strokeColorClass = isSeismic ? "stroke-rose-500/40" : "stroke-blue-500/40";
+
+                    return (
+                      <div 
+                        key={load.id} 
+                        className="absolute bottom-1 group"
+                        style={{ 
+                          left: `${left}%`,
+                          width: load.type === 'point' ? 'auto' : `${width_pct}%`,
+                          transform: load.type === 'point' ? 'translateX(-50%)' : 'none'
+                        }}
+                      >
+                        {load.type === 'point' ? (
+                          <div className="flex flex-col items-center">
+                            <div 
+                              className={cn("w-0.5 mb-0.5", isSeismic ? "bg-rose-500" : "bg-blue-500")} 
+                              style={{ height: `${getScale(load.value)}px` }} 
+                            />
+                            <ChevronRight className={cn("w-3 h-3 rotate-90 -mt-2", isSeismic ? "text-rose-500" : "text-blue-500")} />
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-white shadow-md border px-1.5 py-0.5 rounded text-[8px] font-bold whitespace-nowrap z-10">
+                              {load.value}N @ {load.position}mm
+                            </div>
                           </div>
-                          <span className="text-[10px] font-bold text-rose-600 mt-1">{load.value}N/mm</span>
-                        </div>
-                      ) : (
-                        <div className="w-full flex flex-col items-center">
-                          <div className="w-full h-8 relative">
-                            <svg className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                              <polygon 
-                                points={`0,32 0,${32 - (load.value * 10)} ${100},${32 - ((load.value2 ?? load.value) * 10)} 100,32`}
-                                className="fill-rose-400/10 stroke-rose-400/30 stroke-2"
-                                vectorEffect="non-scaling-stroke"
-                              />
-                            </svg>
+                        ) : load.type === 'udl' ? (
+                          <div className="w-full flex flex-col items-center">
+                            <div 
+                              className={cn("w-full border-t-2 border-x relative", bgColorClass, isSeismic ? "border-rose-500/40" : "border-blue-500/40")}
+                              style={{ height: `${getScale(load.value)}px` }}
+                            >
+                              <div className="absolute inset-0 flex justify-around items-end pb-0.5">
+                                {[...Array(Math.max(2, Math.floor(width_pct / 5)))].map((_, i) => (
+                                  <ChevronRight key={i} className={cn("w-2 h-2 rotate-90", isSeismic ? "text-rose-500/50" : "text-blue-500/50")} />
+                                ))}
+                              </div>
+                              {isSeismic && (
+                                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 4px)', color: 'inherit' }} />
+                              )}
+                            </div>
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-white shadow-md border px-1.5 py-0.5 rounded text-[8px] font-bold whitespace-nowrap z-10 left-1/2 -translate-x-1/2">
+                              {load.value}N/mm (Full Span)
+                            </div>
                           </div>
-                          <span className="text-[10px] font-bold text-rose-600 mt-1">
-                            {load.value} → {load.value2 ?? load.value} N/mm
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        ) : (
+                          <div className="w-full flex flex-col items-center">
+                            <div className="w-full relative" style={{ height: `${Math.max(getScale(load.value), getScale(load.value2 ?? load.value))}px` }}>
+                              <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
+                                <polygon 
+                                  points={`0,100 0,${100 - (load.value / maxLoadVal * 100)} 100,${100 - ((load.value2 ?? load.value) / maxLoadVal * 100)} 100,100`}
+                                  className={cn(isSeismic ? "fill-rose-500/10 stroke-rose-500/40" : "fill-blue-500/10 stroke-blue-500/40", "stroke-2")}
+                                  vectorEffect="non-scaling-stroke"
+                                />
+                              </svg>
+                            </div>
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-white shadow-md border px-1.5 py-0.5 rounded text-[8px] font-bold whitespace-nowrap z-10 left-1/2 -translate-x-1/2">
+                              {load.value}→{load.value2}N/mm [{load.start}-{load.end}mm]
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-mono text-slate-400">
                 L = {length} mm
@@ -1020,7 +1160,8 @@ export function App() {
                   <ul className="list-disc list-inside space-y-1 ml-2">
                     <li>Deflection limit: L/175 (Facade standard).</li>
                     <li>Stress limit: Yield strength / Safety Factor (γ).</li>
-                    <li>Supported Loads: Dead (D), Live (L), Wind (W), Snow (S).</li>
+                    <li>Supported Loads: D, L, W, S, Seismic (E).</li>
+                    <li>Seismic load (E) is calculated as Cs × Total Dead Load.</li>
                     <li>Self-weight is not automatically included (add as UDL).</li>
                   </ul>
                 </div>
