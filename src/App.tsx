@@ -37,7 +37,10 @@ import {
   Languages,
   Menu,
   X,
-  HelpCircle
+  HelpCircle,
+  Scale,
+  FileCode,
+  ArrowDown
 } from 'lucide-react';
 import { 
   Card, 
@@ -208,6 +211,18 @@ const TRANSLATIONS = {
     projectSaved: 'Project saved to local storage',
     projectLoaded: 'Project loaded successfully',
     noProject: 'No saved project found',
+    navIntro: 'Introduction',
+    navCalculator: 'Calculator',
+    navDocs: 'Documentation',
+    heroTitle: 'Professional Facade Structural Analysis',
+    heroDesc: 'A powerful, web-based tool for engineers to analyze and validate facade beam designs with real-time 3D visualization.',
+    getStarted: 'Start Analysis',
+    howItWorks: 'How it Works',
+    features: 'Key Features',
+    footerRights: 'All rights reserved.',
+    unitSystem: 'Unit System',
+    metric: 'Metric (mm, MPa)',
+    imperial: 'Imperial (in, psi)',
   },
   zh: {
     title: '幕墙结构计算',
@@ -250,6 +265,18 @@ const TRANSLATIONS = {
     projectSaved: '项目已保存到本地存储',
     projectLoaded: '项目加载成功',
     noProject: '未找到保存的项目',
+    navIntro: '介绍',
+    navCalculator: '计算器',
+    navDocs: '文档',
+    heroTitle: '专业幕墙结构分析',
+    heroDesc: '功能强大的网页版工具，为工程师提供实时 3D 可视化的幕墙梁设计分析与验证。',
+    getStarted: '开始分析',
+    howItWorks: '工作原理',
+    features: '核心功能',
+    footerRights: '版权所有。',
+    unitSystem: '单位制',
+    metric: '公制 (mm, MPa)',
+    imperial: '英制 (in, psi)',
   },
   th: {
     title: 'FacadeCalc',
@@ -292,6 +319,18 @@ const TRANSLATIONS = {
     projectSaved: 'บันทึกโครงการลงในที่เก็บข้อมูลในตัวเครื่องแล้ว',
     projectLoaded: 'โหลดโครงการสำเร็จแล้ว',
     noProject: 'ไม่พบโครงการที่บันทึกไว้',
+    navIntro: 'บทนำ',
+    navCalculator: 'เครื่องคำนวณ',
+    navDocs: 'เอกสาร',
+    heroTitle: 'การวิเคราะห์โครงสร้างฟาซาดระดับมืออาชีพ',
+    heroDesc: 'เครื่องมือบนเว็บที่ทรงพลังสำหรับวิศวกรในการวิเคราะห์และตรวจสอบการออกแบบคานฟาซาดพร้อมการแสดงภาพ 3 มิติแบบเรียลไทม์',
+    getStarted: 'เริ่มการวิเคราะห์',
+    howItWorks: 'วิธีการทำงาน',
+    features: 'คุณสมบัติหลัก',
+    footerRights: 'สงวนลิขสิทธิ์.',
+    unitSystem: 'ระบบหน่วย',
+    metric: 'เมตริก (mm, MPa)',
+    imperial: 'อิมพีเรียล (in, psi)',
   },
   ms: {
     title: 'FacadeCalc',
@@ -334,6 +373,18 @@ const TRANSLATIONS = {
     projectSaved: 'Projek disimpan ke storan tempatan',
     projectLoaded: 'Projek berjaya dimuatkan',
     noProject: 'Tiada projek yang disimpan ditemui',
+    navIntro: 'Pengenalan',
+    navCalculator: 'Kalkulator',
+    navDocs: 'Dokumentasi',
+    heroTitle: 'Analisis Struktur Fasad Profesional',
+    heroDesc: 'Alat berasaskan web yang berkuasa untuk jurutera menganalisisและ mengesahkan reka bentuk rasuk fasad dengan visualisasi 3D masa nyata.',
+    getStarted: 'Mula Analisis',
+    howItWorks: 'Cara Ia Berfungsi',
+    features: 'Ciri Utama',
+    footerRights: 'Hak cipta terpelihara.',
+    unitSystem: 'Sistem Unit',
+    metric: 'Metrik (mm, MPa)',
+    imperial: 'Imperial (in, psi)',
   }
 };
 
@@ -348,6 +399,44 @@ const CODES_OF_PRACTICE = [
   { country: 'Thailand', codes: ['EIT 1011-46 (Steel)', 'DPT 1311-50 (Wind)', 'DPT 1301/1302 (Seismic)'] },
   { country: 'Malaysia', codes: ['MS 1553 (Wind)', 'MS EN 1991 (EC1)', 'MS EN 1998 (Seismic)'] },
 ];
+
+const UNITS = {
+  metric: {
+    length: 'mm',
+    stress: 'MPa',
+    force: 'N',
+    udl: 'N/mm',
+    moment: 'Nmm',
+    momentDisplay: 'kNm',
+    forceDisplay: 'kN',
+  },
+  imperial: {
+    length: 'in',
+    stress: 'psi',
+    force: 'lbf',
+    udl: 'lb/in',
+    moment: 'lb-in',
+    momentDisplay: 'lb-ft',
+    forceDisplay: 'kip',
+  }
+};
+
+const CONVERSION = {
+  mm_to_in: 1 / 25.4,
+  in_to_mm: 25.4,
+  mpa_to_psi: 145.0377,
+  psi_to_mpa: 1 / 145.0377,
+  n_to_lbf: 1 / 4.44822,
+  lbf_to_n: 4.44822,
+  n_per_mm_to_lb_per_in: 5.710147,
+  lb_per_in_to_n_per_mm: 1 / 5.710147,
+  nmm_to_lbin: 1 / 112.985,
+  lbin_to_nmm: 112.985,
+  lbin_to_lbft: 1 / 12,
+  lbft_to_lbin: 12,
+  n_to_kn: 1 / 1000,
+  lbf_to_kip: 1 / 1000,
+};
 
 interface Combination {
   id: string;
@@ -491,7 +580,37 @@ export function App() {
   const [activeTab, setActiveTab] = useState('deflection');
   const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [lang, setLang] = useState<keyof typeof TRANSLATIONS>('en');
+  const [view, setView] = useState<'home' | 'calculator' | 'docs'>('home');
+  const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('metric');
   const t = TRANSLATIONS[lang];
+  const u = UNITS[unitSystem];
+
+  // Unit Conversion Helpers
+  const toDisplay = (val: number, type: keyof typeof UNITS.metric): number => {
+    if (unitSystem === 'metric') return val;
+    switch (type) {
+      case 'length': return val * CONVERSION.mm_to_in;
+      case 'stress': return val * CONVERSION.mpa_to_psi;
+      case 'force': return val * CONVERSION.n_to_lbf;
+      case 'udl': return val * CONVERSION.n_per_mm_to_lb_per_in;
+      case 'moment': return val * CONVERSION.nmm_to_lbin;
+      case 'momentDisplay': return val * CONVERSION.nmm_to_lbin * CONVERSION.lbin_to_lbft;
+      case 'forceDisplay': return val * CONVERSION.n_to_lbf * CONVERSION.lbf_to_kip;
+      default: return val;
+    }
+  };
+
+  const fromDisplay = (val: number, type: keyof typeof UNITS.metric): number => {
+    if (unitSystem === 'metric') return val;
+    switch (type) {
+      case 'length': return val * CONVERSION.in_to_mm;
+      case 'stress': return val * CONVERSION.psi_to_mpa;
+      case 'force': return val * CONVERSION.lbf_to_n;
+      case 'udl': return val * CONVERSION.lb_per_in_to_n_per_mm;
+      case 'moment': return val * CONVERSION.lbin_to_nmm;
+      default: return val;
+    }
+  };
 
   // Seismic State
   const [seismicRegion, setSeismicRegion] = useState<keyof typeof SEISMIC_REGIONS>(() => {
@@ -629,13 +748,19 @@ export function App() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Distance (mm)', 'Deflection (mm)', 'Moment (Nmm)', 'Shear (N)', 'Stress (MPa)'];
+    const headers = [
+      `Distance (${u.length})`, 
+      `Deflection (${u.length})`, 
+      `Moment (${u.moment})`, 
+      `Shear (${u.force})`, 
+      `Stress (${u.stress})`
+    ];
     const rows = results.points.map(p => [
-      p.x.toFixed(2),
-      p.deflection.toFixed(4),
-      p.moment.toFixed(2),
-      p.shear.toFixed(2),
-      p.stress.toFixed(4)
+      toDisplay(p.x, 'length').toFixed(2),
+      toDisplay(p.deflection, 'length').toFixed(4),
+      toDisplay(p.moment, 'moment').toFixed(2),
+      toDisplay(p.shear, 'force').toFixed(2),
+      toDisplay(p.stress, 'stress').toFixed(4)
     ]);
     
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
@@ -774,181 +899,268 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100">
+    <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100 flex flex-col">
       {/* Header */}
       <header className="border-b bg-white sticky top-0 z-50 print:hidden">
-        <div className="max-w-7xl mx-auto px-4 min-h-16 py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center justify-between w-full md:w-auto">
-            <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('home')}>
               <div className="bg-blue-600 p-1.5 rounded-lg">
                 <Calculator className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="font-bold text-lg md:text-xl tracking-tight">{t.title}</h1>
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider hidden sm:block">{t.subtitle}</p>
-              </div>
-            </div>
-            <div className={cn(
-              "flex md:hidden items-center gap-2 px-2.5 py-1 rounded-full text-[10px] font-bold border",
-              results.summary.status === 'pass' 
-                ? "bg-green-50 text-green-700 border-green-200" 
-                : "bg-red-50 text-red-700 border-red-200"
-            )}>
-              {results.summary.status === 'pass' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-              {results.summary.status === 'pass' ? t.valid.split(' ')[1].toUpperCase() : t.fail.split(' ')[1].toUpperCase()}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={saveProject}
-                className="gap-2 h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{t.saveProject}</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={loadProject}
-                className="gap-2 h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
-              >
-                <FolderOpen className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{t.loadProject}</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => {
-                  if (confirm('Reset to factory defaults? This will clear all saved data.')) {
-                    localStorage.removeItem('facadecalc_project');
-                    window.location.reload();
-                  }
-                }}
-                className="gap-2 h-8 text-xs border-slate-200 text-slate-500 hover:bg-slate-50"
-                title="Reset to factory defaults"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Reset</span>
-              </Button>
+              <h1 className="font-bold text-xl tracking-tight">{t.title}</h1>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border flex-1 md:flex-none">
+            <nav className="hidden md:flex items-center gap-6">
+              <button 
+                onClick={() => setView('home')}
+                className={cn(
+                  "text-sm font-medium transition-colors hover:text-blue-600",
+                  view === 'home' ? "text-blue-600" : "text-slate-500"
+                )}
+              >
+                {t.navIntro}
+              </button>
+              <button 
+                onClick={() => setView('calculator')}
+                className={cn(
+                  "text-sm font-medium transition-colors hover:text-blue-600",
+                  view === 'calculator' ? "text-blue-600" : "text-slate-500"
+                )}
+              >
+                {t.navCalculator}
+              </button>
+              <button 
+                onClick={() => setView('docs')}
+                className={cn(
+                  "text-sm font-medium transition-colors hover:text-blue-600",
+                  view === 'docs' ? "text-blue-600" : "text-slate-500"
+                )}
+              >
+                {t.navDocs}
+              </button>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 bg-slate-100 p-1 rounded-lg border">
+              <Settings2 className="w-3.5 h-3.5 text-slate-500 ml-1" />
+              <Select value={unitSystem} onValueChange={(v: any) => setUnitSystem(v)}>
+                <SelectTrigger className="h-7 border-none bg-white shadow-none focus:ring-0 w-[90px] text-[10px] font-bold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="metric">Metric</SelectItem>
+                  <SelectItem value="imperial">Imperial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2 bg-slate-100 p-1 rounded-lg border">
               <Globe className="w-3.5 h-3.5 text-slate-500 ml-1" />
               <Select value={lang} onValueChange={(v: any) => setLang(v)}>
-                <SelectTrigger className="h-8 border-none bg-white shadow-none focus:ring-0 w-full md:w-[100px] text-xs">
+                <SelectTrigger className="h-7 border-none bg-white shadow-none focus:ring-0 w-[80px] text-[10px] font-bold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="zh">中文</SelectItem>
-                  <SelectItem value="th">ไทย</SelectItem>
-                  <SelectItem value="ms">Melayu</SelectItem>
+                  <SelectItem value="en">EN</SelectItem>
+                  <SelectItem value="zh">ZH</SelectItem>
+                  <SelectItem value="th">TH</SelectItem>
+                  <SelectItem value="ms">MS</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border flex-1 md:flex-none">
-              <span className="text-[10px] font-bold uppercase px-2 text-slate-500 hidden lg:block">{t.activeCase}:</span>
-              <Select value={activeCombinationId} onValueChange={setActiveCombinationId}>
-                <SelectTrigger className="h-8 border-none bg-white shadow-none focus:ring-0 w-full md:min-w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {combinations.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger render={
-                <Button variant="outline" size="sm" className="gap-2 h-8 text-xs flex-1 md:flex-none border-blue-200 text-blue-700 hover:bg-blue-50">
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{t.print}</span>
+            
+            {view !== 'calculator' ? (
+              <Button size="sm" onClick={() => setView('calculator')} className="bg-blue-600 hover:bg-blue-700">
+                {t.getStarted}
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={saveProject} className="h-8 text-xs gap-2">
+                  <Save className="w-3.5 h-3.5" />
+                  <span className="hidden lg:inline">{t.saveProject}</span>
                 </Button>
-              } />
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => window.print()} className="gap-2">
-                    <Printer className="w-4 h-4 text-slate-500" />
-                    <span>Print / Save as PDF</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportToCSV} className="gap-2">
-                    <FileSpreadsheet className="w-4 h-4 text-green-500" />
-                    <span>Export Data (CSV)</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportToJSON} className="gap-2">
-                    <FileJson className="w-4 h-4 text-amber-500" />
-                    <span>Export Report (JSON)</span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <div className={cn(
-              "hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border",
-              results.summary.status === 'pass' 
-                ? "bg-green-50 text-green-700 border-green-200" 
-                : "bg-red-50 text-red-700 border-red-200"
-            )}>
-              {results.summary.status === 'pass' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-              {results.summary.status === 'pass' ? t.valid : t.fail}
-            </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={
+                    <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
+                      <Download className="w-3.5 h-3.5" />
+                      <span className="hidden lg:inline">{t.print}</span>
+                    </Button>
+                  } />
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={() => window.print()} className="gap-2">
+                      <Printer className="w-4 h-4 text-slate-500" />
+                      <span>Print / PDF</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportToCSV} className="gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-green-500" />
+                      <span>CSV</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Notification Toast */}
-      <AnimatePresence>
-        {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, x: '-50%' }}
-            animate={{ opacity: 1, y: 20, x: '-50%' }}
-            exit={{ opacity: 0, y: -20, x: '-50%' }}
-            className={cn(
-              "fixed top-16 left-1/2 z-[100] px-4 py-2 rounded-full shadow-lg border text-xs font-bold flex items-center gap-2",
-              notification.type === 'success' 
-                ? "bg-green-50 text-green-700 border-green-200" 
-                : "bg-red-50 text-red-700 border-red-200"
-            )}
-          >
-            {notification.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-            {notification.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 print:block">
-        
-        {/* Print Only Header */}
-        <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
-              <p className="text-slate-500 font-medium">{t.subtitle}</p>
-              <div className="mt-6 grid grid-cols-2 gap-x-16 gap-y-3 text-sm">
-                <div className="flex gap-2"><span className="font-bold text-slate-700">Date:</span> <span>{new Date().toLocaleDateString()}</span></div>
-                <div className="flex gap-2"><span className="font-bold text-slate-700">Design Code:</span> <span className="text-blue-700 font-bold">{selectedCodeId}</span></div>
-                <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
-                <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{MATERIALS[material].name}</span></div>
-                <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{length} mm</span></div>
-                <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{sectionType === 'hollow' ? `${width}x${height}x${thickness}mm` : `${width}x${height}mm`}</span></div>
+      <main className="flex-1">
+        <AnimatePresence mode="wait">
+          {view === 'home' && (
+            <motion.div
+              key="home"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-7xl mx-auto px-4 py-16 md:py-24"
+            >
+              <div className="grid lg:grid-cols-2 gap-12 items-center">
+                <div className="space-y-8">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold uppercase tracking-wider">
+                    <Activity className="w-3 h-3" />
+                    v1.0.0 Now Live
+                  </div>
+                  <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 leading-[1.1]">
+                    {t.heroTitle}
+                  </h2>
+                  <p className="text-lg text-slate-600 leading-relaxed max-w-xl">
+                    {t.heroDesc}
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    <Button size="lg" onClick={() => setView('calculator')} className="h-14 px-8 text-lg bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200">
+                      {t.getStarted}
+                      <ChevronRight className="ml-2 w-5 h-5" />
+                    </Button>
+                    <Button size="lg" variant="outline" onClick={() => setView('docs')} className="h-14 px-8 text-lg border-slate-200">
+                      {t.howItWorks}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-6 pt-4">
+                    <div className="flex -space-x-3">
+                      {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 overflow-hidden">
+                          <img src={`https://picsum.photos/seed/user${i}/100/100`} alt="User" referrerPolicy="no-referrer" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-sm">
+                      <div className="font-bold text-slate-900">Trusted by 500+ Engineers</div>
+                      <div className="text-slate-500">Worldwide facade design teams</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="absolute -inset-4 bg-blue-600/5 rounded-[2rem] blur-3xl" />
+                  <Card className="relative border-slate-200 shadow-2xl overflow-hidden rounded-[2rem]">
+                    <div className="aspect-video bg-slate-900 flex items-center justify-center">
+                      <BeamVisualizer3D 
+                        length={3500}
+                        width={65}
+                        height={150}
+                        thickness={3.5}
+                        sectionType="hollow"
+                      />
+                    </div>
+                    <CardContent className="p-6 bg-white">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Preview</div>
+                          <div className="text-lg font-bold text-slate-900">Interactive 3D Structural Model</div>
+                        </div>
+                        <div className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-100 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Validated
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
-            </div>
-            <div className={cn(
-              "px-6 py-4 rounded-xl border-4 font-black text-2xl tracking-tighter",
-              results.summary.status === 'pass' ? "border-green-500 text-green-600 bg-green-50" : "border-red-500 text-red-600 bg-red-50"
-            )}>
-              {results.summary.status === 'pass' ? "PASS" : "FAIL"}
-            </div>
-          </div>
-        </div>
 
-        {/* Left Column: Inputs */}
-        <div className="lg:col-span-4 space-y-6 print:hidden">
+              <div className="mt-32 grid md:grid-cols-3 gap-8">
+                <div className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
+                    <Box className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">3D Visualization</h3>
+                  <p className="text-slate-600 text-sm leading-relaxed">
+                    Real-time 3D rendering of your beam sections and applied loads for better spatial understanding.
+                  </p>
+                </div>
+                <div className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-600 mb-6">
+                    <Activity className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">Seismic Analysis</h3>
+                  <p className="text-slate-600 text-sm leading-relaxed">
+                    Integrated seismic coefficient calculator supporting major international design codes.
+                  </p>
+                </div>
+                <div className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center text-green-600 mb-6">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">Professional Reports</h3>
+                  <p className="text-slate-600 text-sm leading-relaxed">
+                    Export high-quality PDF reports, CSV data, and JSON project files for your documentation.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {view === 'calculator' && (
+            <motion.div
+              key="calculator"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 print:block"
+            >
+              {/* Print Only Header */}
+              <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-6 col-span-12">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
+                    <p className="text-slate-500 font-medium">{t.subtitle}</p>
+                    <div className="mt-6 grid grid-cols-2 gap-x-16 gap-y-3 text-sm">
+                      <div className="flex gap-2"><span className="font-bold text-slate-700">Date:</span> <span>{new Date().toLocaleDateString()}</span></div>
+                      <div className="flex gap-2"><span className="font-bold text-slate-700">Design Code:</span> <span className="text-blue-700 font-bold">{selectedCodeId}</span></div>
+                      <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
+                      <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{MATERIALS[material].name}</span></div>
+                      <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{toDisplay(length, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}</span></div>
+                      <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{sectionType === 'hollow' ? `${toDisplay(width, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(thickness, 'length').toFixed(unitSystem === 'metric' ? 1 : 3)}${u.length}` : `${toDisplay(width, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}${u.length}`}</span></div>
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "px-6 py-4 rounded-xl border-4 font-black text-2xl tracking-tighter",
+                    results.summary.status === 'pass' ? "border-green-500 text-green-600 bg-green-50" : "border-red-500 text-red-600 bg-red-50"
+                  )}>
+                    {results.summary.status === 'pass' ? "PASS" : "FAIL"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Left Column: Inputs */}
+              <div className="lg:col-span-4 space-y-6 print:hidden">
+                
+                {/* Active Combination Selector for Mobile/Quick Access */}
+                <Card className="shadow-sm border-slate-200 lg:hidden">
+                  <CardContent className="p-4">
+                    <Label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">{t.activeCase}</Label>
+                    <Select value={activeCombinationId} onValueChange={setActiveCombinationId}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {combinations.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </CardContent>
+                </Card>
           
           {/* Combinations Manager */}
           <Card className="shadow-sm border-slate-200">
@@ -1147,14 +1359,14 @@ export function App() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-2">
-                <Label htmlFor="length">{t.span} (mm)</Label>
+                <Label htmlFor="length">{t.span} ({u.length})</Label>
                 <Input 
                   id="length" 
                   type="number" 
-                  min="100"
-                  max="50000"
-                  value={length ?? 0} 
-                  onChange={(e) => setLength(safeParseNumber(e.target.value, length, 0, 50000))}
+                  min={toDisplay(100, 'length')}
+                  max={toDisplay(50000, 'length')}
+                  value={Number(toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                  onChange={(e) => setLength(fromDisplay(safeParseNumber(e.target.value, toDisplay(length, 'length'), 0, toDisplay(50000, 'length')), 'length'))}
                   className="bg-slate-50/50"
                 />
               </div>
@@ -1201,26 +1413,26 @@ export function App() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="width">{t.width} (mm)</Label>
+                  <Label htmlFor="width">{t.width} ({u.length})</Label>
                   <Input 
                     id="width" 
                     type="number" 
-                    min="1"
-                    max="5000"
-                    value={width ?? 0} 
-                    onChange={(e) => setWidth(safeParseNumber(e.target.value, width, 1, 5000))}
+                    min={toDisplay(1, 'length')}
+                    max={toDisplay(5000, 'length')}
+                    value={Number(toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
+                    onChange={(e) => setWidth(fromDisplay(safeParseNumber(e.target.value, toDisplay(width, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
                     className="bg-slate-50/50"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="height">{t.height} (mm)</Label>
+                  <Label htmlFor="height">{t.height} ({u.length})</Label>
                   <Input 
                     id="height" 
                     type="number" 
-                    min="1"
-                    max="5000"
-                    value={height ?? 0} 
-                    onChange={(e) => setHeight(safeParseNumber(e.target.value, height, 1, 5000))}
+                    min={toDisplay(1, 'length')}
+                    max={toDisplay(5000, 'length')}
+                    value={Number(toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
+                    onChange={(e) => setHeight(fromDisplay(safeParseNumber(e.target.value, toDisplay(height, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
                     className="bg-slate-50/50"
                   />
                 </div>
@@ -1228,15 +1440,15 @@ export function App() {
 
               {sectionType === 'hollow' && (
                 <div className="grid gap-2">
-                  <Label htmlFor="thickness">{t.thickness} (mm)</Label>
+                  <Label htmlFor="thickness">{t.thickness} ({u.length})</Label>
                   <Input 
                     id="thickness" 
                     type="number" 
-                    min="0.1"
-                    max={Math.min(width, height) / 2.1}
-                    step="0.1"
-                    value={thickness ?? 0} 
-                    onChange={(e) => setThickness(safeParseNumber(e.target.value, thickness, 0.1, Math.min(width, height) / 2.1))}
+                    min={toDisplay(0.1, 'length')}
+                    max={toDisplay(Math.min(width, height) / 2.1, 'length')}
+                    step={unitSystem === 'metric' ? "0.1" : "0.01"}
+                    value={Number(toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 1 : 3))} 
+                    onChange={(e) => setThickness(fromDisplay(safeParseNumber(e.target.value, toDisplay(thickness, 'length'), 0.1, toDisplay(Math.min(width, height) / 2.1, 'length')), 'length'))}
                     className="bg-slate-50/50"
                   />
                 </div>
@@ -1382,7 +1594,7 @@ export function App() {
                 </div>
                 <div className="flex justify-between text-[10px] text-slate-400 font-medium px-1">
                   <span>Total Dead Load:</span>
-                  <span>{(totalDeadMagnitude / 1000).toFixed(2)} kN</span>
+                  <span>{unitSystem === 'metric' ? (totalDeadMagnitude / 1000).toFixed(2) + ' kN' : (toDisplay(totalDeadMagnitude, 'force') / 1000).toFixed(2) + ' kip'}</span>
                 </div>
               </div>
             </CardContent>
@@ -1412,32 +1624,43 @@ export function App() {
             </CardHeader>
             <CardContent className="space-y-4">
               {loads.map((load, idx) => (
-                <div key={load.id} className="p-3 border rounded-lg bg-white space-y-3 relative group hover:border-blue-200 transition-colors min-h-[140px] flex flex-col justify-between">
-                  <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div key={load.id} className="relative overflow-hidden rounded-lg border bg-white group hover:border-blue-200 transition-colors">
+                  {/* Swipe Action Background */}
+                  <div className="absolute inset-0 bg-rose-500 flex items-center justify-end pr-2">
                     <Button 
                       variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                      onClick={() => {
-                        const newLoad = { ...load, id: Math.random().toString(36).substr(2, 9) };
-                        setLoads([...loads, newLoad]);
-                      }}
-                      title="Duplicate Load"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 text-slate-400 hover:text-rose-500 hover:bg-rose-50"
+                      size="sm" 
+                      className="text-white hover:bg-rose-600 font-bold gap-2 px-4 h-full rounded-none"
                       onClick={() => removeLoad(load.id)}
-                      title="Delete Load"
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="w-4 h-4" />
+                      Confirm
                     </Button>
                   </div>
-                  
-                  <div className="flex items-center gap-3">
+
+                  <motion.div 
+                    drag="x"
+                    dragConstraints={{ left: -100, right: 0 }}
+                    dragElastic={0.1}
+                    dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
+                    className="p-3 bg-white space-y-3 relative min-h-[140px] flex flex-col justify-between z-10"
+                  >
+                    <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                        onClick={() => {
+                          const newLoad = { ...load, id: Math.random().toString(36).substr(2, 9) };
+                          setLoads([...loads, newLoad]);
+                        }}
+                        title="Duplicate Load"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 flex-1">
                       <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#{idx + 1}</span>
                       <Select 
@@ -1453,8 +1676,8 @@ export function App() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="udl">UDL (N/mm)</SelectItem>
-                          <SelectItem value="point">Point (N)</SelectItem>
+                          <SelectItem value="udl">UDL ({u.udl})</SelectItem>
+                          <SelectItem value="point">Point ({u.force})</SelectItem>
                           <SelectItem value="trapezoidal">Trapezoidal</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1483,33 +1706,33 @@ export function App() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-[9px] uppercase font-bold text-slate-400">
-                          {load.type === 'trapezoidal' ? 'w1 (N/mm)' : 'Value'}
+                          {load.type === 'trapezoidal' ? `w1 (${u.udl})` : `Value (${load.type === 'point' ? u.force : u.udl})`}
                         </Label>
                         <Input 
                           type="number" 
-                          value={load.value ?? 0} 
-                          onChange={(e) => updateLoad(load.id, { value: safeParseNumber(e.target.value, load.value, -1000000, 1000000) })}
+                          value={Number(toDisplay(load.value ?? 0, load.type === 'point' ? 'force' : 'udl').toFixed(unitSystem === 'metric' ? 2 : 4))} 
+                          onChange={(e) => updateLoad(load.id, { value: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.value, load.type === 'point' ? 'force' : 'udl'), -1000000, 1000000), load.type === 'point' ? 'force' : 'udl') })}
                           className="h-8 text-sm bg-white"
                         />
                       </div>
                       {load.type === 'point' && (
                         <div className="space-y-1">
-                          <Label className="text-[9px] uppercase font-bold text-slate-400">Pos (mm)</Label>
+                          <Label className="text-[9px] uppercase font-bold text-slate-400">Pos ({u.length})</Label>
                           <Input 
                             type="number" 
-                            value={load.position ?? 0} 
-                            onChange={(e) => updateLoad(load.id, { position: safeParseNumber(e.target.value, load.position ?? 0, 0, length) })}
+                            value={Number(toDisplay(load.position ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                            onChange={(e) => updateLoad(load.id, { position: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.position ?? 0, 'length'), 0, toDisplay(length, 'length')), 'length') })}
                             className="h-8 text-sm bg-white"
                           />
                         </div>
                       )}
                       {load.type === 'trapezoidal' && (
                         <div className="space-y-1">
-                          <Label className="text-[9px] uppercase font-bold text-slate-400">w2 (N/mm)</Label>
+                          <Label className="text-[9px] uppercase font-bold text-slate-400">w2 ({u.udl})</Label>
                           <Input 
                             type="number" 
-                            value={load.value2 ?? load.value} 
-                            onChange={(e) => updateLoad(load.id, { value2: safeParseNumber(e.target.value, load.value2 ?? load.value, -1000000, 1000000) })}
+                            value={Number(toDisplay(load.value2 ?? load.value, 'udl').toFixed(unitSystem === 'metric' ? 2 : 4))} 
+                            onChange={(e) => updateLoad(load.id, { value2: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.value2 ?? load.value, 'udl'), -1000000, 1000000), 'udl') })}
                             className="h-8 text-sm bg-white"
                           />
                         </div>
@@ -1519,28 +1742,29 @@ export function App() {
                     {load.type === 'trapezoidal' && (
                       <div className="grid grid-cols-2 gap-3 mt-2">
                         <div className="space-y-1">
-                          <Label className="text-[9px] uppercase font-bold text-slate-400">Start (mm)</Label>
+                          <Label className="text-[9px] uppercase font-bold text-slate-400">Start ({u.length})</Label>
                           <Input 
                             type="number" 
-                            value={load.start ?? 0} 
-                            onChange={(e) => updateLoad(load.id, { start: safeParseNumber(e.target.value, load.start ?? 0, 0, length) })}
+                            value={Number(toDisplay(load.start ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                            onChange={(e) => updateLoad(load.id, { start: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.start ?? 0, 'length'), 0, toDisplay(length, 'length')), 'length') })}
                             className="h-8 text-sm bg-white"
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[9px] uppercase font-bold text-slate-400">End (mm)</Label>
+                          <Label className="text-[9px] uppercase font-bold text-slate-400">End ({u.length})</Label>
                           <Input 
                             type="number" 
-                            value={load.end ?? length} 
-                            onChange={(e) => updateLoad(load.id, { end: safeParseNumber(e.target.value, load.end ?? length, 0, length) })}
+                            value={Number(toDisplay(load.end ?? length, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                            onChange={(e) => updateLoad(load.id, { end: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.end ?? length, 'length'), 0, toDisplay(length, 'length')), 'length') })}
                             className="h-8 text-sm bg-white"
                           />
                         </div>
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
+                </motion.div>
+              </div>
+            ))}
               {loads.length === 0 && (
                 <div className="text-center py-8 text-slate-400 border-2 border-dashed rounded-lg">
                   <p className="text-sm">No loads applied</p>
@@ -1557,7 +1781,7 @@ export function App() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <SummaryCard 
               label="Max Deflection" 
-              value={`${results.summary.maxDeflection.toFixed(2)} mm`} 
+              value={`${toDisplay(results.summary.maxDeflection, 'length').toFixed(2)} ${u.length}`} 
               subValue={results.summary.deflectionRatio}
               icon={<Maximize2 className="w-4 h-4 text-blue-500" />}
               status={results.summary.maxDeflection > (length / 175) ? 'fail' : 'pass'}
@@ -1566,8 +1790,8 @@ export function App() {
             />
             <SummaryCard 
               label="Max Stress" 
-              value={`${results.summary.maxStress.toFixed(1)} MPa`} 
-              subValue={`Yield: ${MATERIALS[material].yield} MPa`}
+              value={`${toDisplay(results.summary.maxStress, 'stress').toFixed(unitSystem === 'metric' ? 1 : 0)} ${u.stress}`} 
+              subValue={`Yield: ${toDisplay(MATERIALS[material].yield, 'stress').toFixed(0)} ${u.stress}`}
               icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
               status={results.summary.maxStress > (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) ? 'fail' : 'pass'}
               onClick={() => setActiveTab('stress')}
@@ -1575,14 +1799,18 @@ export function App() {
             />
             <SummaryCard 
               label="Max Moment" 
-              value={`${(results.summary.maxMoment / 1000000).toFixed(2)} kNm`} 
+              value={unitSystem === 'metric' 
+                ? `${(results.summary.maxMoment / 1000000).toFixed(2)} kNm` 
+                : `${(toDisplay(results.summary.maxMoment, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1)} lb-ft`} 
               icon={<Layout className="w-4 h-4 text-purple-500" />}
               onClick={() => setActiveTab('moment')}
               active={activeTab === 'moment'}
             />
             <SummaryCard 
               label="Max Shear" 
-              value={`${(results.summary.maxShear / 1000).toFixed(2)} kN`} 
+              value={unitSystem === 'metric'
+                ? `${(results.summary.maxShear / 1000).toFixed(2)} kN`
+                : `${(toDisplay(results.summary.maxShear, 'force') / 1000).toFixed(2)} kip`} 
               icon={<ChevronRight className="w-4 h-4 text-green-500" />}
               onClick={() => setActiveTab('shear')}
               active={activeTab === 'shear'}
@@ -1632,42 +1860,50 @@ export function App() {
                 </TabsContent>
                 <TabsContent value="deflection" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
                   <ChartContainer 
-                    data={results.points} 
+                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), deflection: toDisplay(p.deflection, 'length') }))} 
                     dataKey="deflection" 
                     color="#3B82F6" 
-                    unit="mm" 
+                    unit={u.length} 
                     label="Deflection"
                     invert
+                    unitSystem={unitSystem}
+                    u={u}
                   />
                 </TabsContent>
                 <TabsContent value="moment" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
                   <ChartContainer 
-                    data={results.points} 
+                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), moment: toDisplay(p.moment, 'moment') }))} 
                     dataKey="moment" 
                     color="#8B5CF6" 
-                    unit="Nmm" 
+                    unit={u.moment} 
                     label="Bending Moment"
-                    formatter={(v) => (v / 1000000).toFixed(2) + ' kNm'}
+                    formatter={(v) => unitSystem === 'metric' ? (v / 1000000).toFixed(2) + ' kNm' : (v * CONVERSION.lbin_to_lbft).toFixed(1) + ' lb-ft'}
+                    unitSystem={unitSystem}
+                    u={u}
                   />
                 </TabsContent>
                 <TabsContent value="shear" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
                   <ChartContainer 
-                    data={results.points} 
+                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), shear: toDisplay(p.shear, 'force') }))} 
                     dataKey="shear" 
                     color="#10B981" 
-                    unit="kN" 
+                    unit={u.force} 
                     label="Shear Force"
-                    formatter={(v) => (v / 1000).toFixed(2) + ' kN'}
+                    formatter={(v) => unitSystem === 'metric' ? (v / 1000).toFixed(2) + ' kN' : (v / 1000).toFixed(2) + ' kip'}
+                    unitSystem={unitSystem}
+                    u={u}
                   />
                 </TabsContent>
                 <TabsContent value="stress" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
                   <ChartContainer 
-                    data={results.points} 
+                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), stress: toDisplay(p.stress, 'stress') }))} 
                     dataKey="stress" 
                     color="#F59E0B" 
-                    unit="MPa" 
+                    unit={u.stress} 
                     label="Bending Stress"
-                    formatter={(v) => v.toFixed(1) + ' MPa'}
+                    formatter={(v) => v.toFixed(unitSystem === 'metric' ? 1 : 0) + ' ' + u.stress}
+                    unitSystem={unitSystem}
+                    u={u}
                   />
                 </TabsContent>
               </Tabs>
@@ -1676,7 +1912,7 @@ export function App() {
               <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span>X-Axis: Distance from Left Support (mm)</span>
+                  <span>X-Axis: Distance from Left Support ({u.length})</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Info className="w-3 h-3" />
@@ -1826,7 +2062,7 @@ export function App() {
                   <line x1="50" y1="-5" x2="50" y2="5" stroke="#94a3b8" strokeWidth="1" />
                   <line x1="950" y1="-5" x2="950" y2="5" stroke="#94a3b8" strokeWidth="1" />
                   <text x="500" y="20" textAnchor="middle" fill="#64748b" className="text-[14px] font-mono font-bold">
-                    L = {length} mm
+                    L = {toDisplay(length, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}
                   </text>
                 </g>
               </svg>
@@ -1838,13 +2074,13 @@ export function App() {
                   <div className="flex items-center gap-2">
                     <Input 
                       type="number"
-                      min="100"
-                      max="50000"
-                      value={length}
-                      onChange={(e) => setLength(safeParseNumber(e.target.value, length, 100, 50000))}
+                      min={toDisplay(100, 'length')}
+                      max={toDisplay(50000, 'length')}
+                      value={Number(toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                      onChange={(e) => setLength(fromDisplay(safeParseNumber(e.target.value, toDisplay(length, 'length'), 0, toDisplay(50000, 'length')), 'length'))}
                       className="h-8 w-24 text-right font-mono font-bold text-blue-600 bg-white"
                     />
-                    <span className="text-xs font-bold text-slate-400">mm</span>
+                    <span className="text-xs font-bold text-slate-400">{u.length}</span>
                   </div>
                 </div>
                 <Slider 
@@ -1855,8 +2091,8 @@ export function App() {
                   step={50}
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 font-medium px-1">
-                  <span>500 mm</span>
-                  <span>30,000 mm</span>
+                  <span>{toDisplay(500, 'length').toFixed(0)} {u.length}</span>
+                  <span>{toDisplay(30000, 'length').toFixed(0)} {u.length}</span>
                 </div>
               </div>
             </CardFooter>
@@ -1902,16 +2138,16 @@ export function App() {
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1.5">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-slate-500">Elastic Modulus (E)</span>
-                      <span className="text-[10px] font-mono font-bold text-blue-600">{MATERIALS[material].e.toLocaleString()} MPa</span>
+                      <span className="text-[10px] font-mono font-bold text-blue-600">{toDisplay(MATERIALS[material].e, 'stress').toLocaleString()} {u.stress}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-slate-500">Yield Strength (fy)</span>
-                      <span className="text-[10px] font-mono font-bold text-blue-600">{MATERIALS[material].yield} MPa</span>
+                      <span className="text-[10px] font-mono font-bold text-blue-600">{toDisplay(MATERIALS[material].yield, 'stress').toFixed(0)} {u.stress}</span>
                     </div>
                     <div className="flex justify-between items-center pt-1 border-t border-slate-200">
                       <span className="text-[10px] text-slate-500">Allowable Stress</span>
                       <span className="text-[10px] font-mono font-bold text-green-600">
-                        {(MATERIALS[material].yield / safetyFactor).toFixed(1)} MPa
+                        {toDisplay(MATERIALS[material].yield / safetyFactor, 'stress').toFixed(unitSystem === 'metric' ? 1 : 0)} {u.stress}
                       </span>
                     </div>
                   </div>
@@ -1929,7 +2165,128 @@ export function App() {
             </CardContent>
           </Card>
         </div>
+            </motion.div>
+          )}
+
+          {view === 'docs' && (
+            <motion.div
+              key="docs"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-4xl mx-auto px-4 py-16"
+            >
+              <div className="space-y-12">
+                <div className="space-y-4 text-center">
+                  <h2 className="text-4xl font-black tracking-tight text-slate-900">{t.navDocs}</h2>
+                  <p className="text-slate-500 max-w-2xl mx-auto">
+                    Technical documentation and engineering assumptions used in FacadeCalc structural engine.
+                  </p>
+                </div>
+
+                <div className="grid gap-8">
+                  <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm">
+                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-blue-600" />
+                      {t.assumptions}
+                    </h3>
+                    <ul className="space-y-3 text-slate-600 text-sm list-disc pl-5">
+                      <li>Simply supported beam model (pin-pin connection).</li>
+                      <li>Euler-Bernoulli beam theory for small deflections.</li>
+                      <li>Linear elastic material behavior within yield limits.</li>
+                      <li>Shear deformation is neglected (valid for high span-to-depth ratios).</li>
+                      <li>Self-weight is automatically included based on material density.</li>
+                    </ul>
+                  </section>
+
+                  <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm">
+                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                      <Scale className="w-5 h-5 text-amber-600" />
+                      {t.limits}
+                    </h3>
+                    <div className="grid sm:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <div className="text-xs font-bold text-slate-400 uppercase">Deflection Limit</div>
+                        <div className="text-sm font-medium text-slate-700">L/175 or 20mm (whichever is less)</div>
+                        <p className="text-xs text-slate-500">Standard industry limit for glass support members.</p>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="text-xs font-bold text-slate-400 uppercase">Stress Limit</div>
+                        <div className="text-sm font-medium text-slate-700">Yield Strength / Safety Factor</div>
+                        <p className="text-xs text-slate-500">Allowable stress design (ASD) approach.</p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm">
+                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                      <FileCode className="w-5 h-5 text-green-600" />
+                      {t.codes}
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="text-sm font-bold">China (National)</span>
+                        <span className="text-xs text-slate-500">GB 50009, GB/T 5237</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="text-sm font-bold">Eurocode</span>
+                        <span className="text-xs text-slate-500">EN 1991, EN 1999</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="text-sm font-bold">ASCE / AA</span>
+                        <span className="text-xs text-slate-500">ASCE 7-22, ADM 2020</span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-white border-t py-12 print:hidden">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid md:grid-cols-4 gap-12 mb-12">
+            <div className="col-span-2 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-600 p-1.5 rounded-lg">
+                  <Calculator className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="font-bold text-xl tracking-tight">{t.title}</h2>
+              </div>
+              <p className="text-slate-500 text-sm max-w-sm">
+                Professional structural analysis for facade engineering. Built for precision, speed, and reliability.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <h4 className="font-bold text-sm uppercase tracking-widest text-slate-900">Product</h4>
+              <ul className="space-y-2 text-sm text-slate-500">
+                <li><button onClick={() => setView('calculator')} className="hover:text-blue-600 transition-colors">Calculator</button></li>
+                <li><button onClick={() => setView('docs')} className="hover:text-blue-600 transition-colors">Documentation</button></li>
+                <li><a href="#" className="hover:text-blue-600 transition-colors">Release Notes</a></li>
+              </ul>
+            </div>
+            <div className="space-y-4">
+              <h4 className="font-bold text-sm uppercase tracking-widest text-slate-900">Support</h4>
+              <ul className="space-y-2 text-sm text-slate-500">
+                <li><a href="#" className="hover:text-blue-600 transition-colors">Help Center</a></li>
+                <li><a href="#" className="hover:text-blue-600 transition-colors">API Reference</a></li>
+                <li><a href="#" className="hover:text-blue-600 transition-colors">Contact Us</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400 font-medium">
+            <div>© {new Date().getFullYear()} {t.title}. {t.footerRights}</div>
+            <div className="flex items-center gap-6">
+              <a href="#" className="hover:text-slate-600 transition-colors">Privacy Policy</a>
+              <a href="#" className="hover:text-slate-600 transition-colors">Terms of Service</a>
+              <a href="#" className="hover:text-slate-600 transition-colors">Cookie Settings</a>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* Floating Tooltip */}
       <AnimatePresence>
@@ -2079,7 +2436,7 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active }: 
   );
 }
 
-function ChartContainer({ data, dataKey, color, unit, label, invert = false, formatter }: { 
+function ChartContainer({ data, dataKey, color, unit, label, invert = false, formatter, unitSystem, u }: { 
   data: any[]; 
   dataKey: string; 
   color: string; 
@@ -2087,6 +2444,8 @@ function ChartContainer({ data, dataKey, color, unit, label, invert = false, for
   label: string;
   invert?: boolean;
   formatter?: (v: number) => string;
+  unitSystem: 'metric' | 'imperial';
+  u: any;
 }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -2122,7 +2481,7 @@ function ChartContainer({ data, dataKey, color, unit, label, invert = false, for
             boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
           }}
           formatter={(v: number) => [formatter ? formatter(v) : `${v.toFixed(2)} ${unit}`, label]}
-          labelFormatter={(v) => `Pos: ${v.toFixed(0)} mm`}
+          labelFormatter={(v) => `Pos: ${v.toFixed(unitSystem === 'metric' ? 0 : 2)} ${u.length}`}
         />
         <Area 
           type="monotone" 
