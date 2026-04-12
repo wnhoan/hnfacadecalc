@@ -21,6 +21,7 @@ import {
   Layers,
   PlusCircle,
   Globe,
+  Box,
   BookOpen,
   Activity,
   Download,
@@ -29,7 +30,14 @@ import {
   FileText,
   Printer,
   Save,
-  FolderOpen
+  FolderOpen,
+  Copy,
+  RotateCcw,
+  Settings,
+  Languages,
+  Menu,
+  X,
+  HelpCircle
 } from 'lucide-react';
 import { 
   Card, 
@@ -49,6 +57,23 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,6 +97,7 @@ import {
   Area
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
+import { BeamVisualizer3D } from './components/BeamVisualizer3D';
 import { 
   calculateBeam, 
   calculateRectangularProperties, 
@@ -105,12 +131,15 @@ function ErrorFallback() {
 
 const MATERIALS = {
   aluminum_6063_t6: { name: 'Aluminum 6063-T6 (Extrusion)', e: 70000, yield: 160 },
+  aluminum_6063_t66: { name: 'Aluminum 6063-T66 (High Strength Extrusion)', e: 70000, yield: 200 },
   aluminum_6063_t5: { name: 'Aluminum 6063-T5', e: 70000, yield: 110 },
-  aluminum_6061_t6: { name: 'Aluminum 6061-T6 (High Strength)', e: 70000, yield: 240 },
+  aluminum_6061_t6: { name: 'Aluminum 6061-T6 (Structural)', e: 70000, yield: 240 },
+  aluminum_6082_t6: { name: 'Aluminum 6082-T6 (Structural)', e: 70000, yield: 250 },
   aluminum_3003_h14: { name: 'Aluminum 3003-H14 (Cladding)', e: 70000, yield: 145 },
   aluminum_5005_h34: { name: 'Aluminum 5005-H34 (Anodized)', e: 70000, yield: 135 },
   aluminum_5754_h22: { name: 'Aluminum 5754-H22 (High Strength)', e: 70000, yield: 190 },
   steel_s235: { name: 'Steel S235', e: 210000, yield: 235 },
+  steel_s275: { name: 'Steel S275', e: 210000, yield: 275 },
   steel_s355: { name: 'Steel S355', e: 210000, yield: 355 },
   stainless_304: { name: 'Stainless Steel 304', e: 193000, yield: 205 },
   stainless_316: { name: 'Stainless Steel 316', e: 200000, yield: 215 },
@@ -162,6 +191,7 @@ const TRANSLATIONS = {
     moment: 'Moment',
     shear: 'Shear',
     stress: 'Stress',
+    model3d: '3D Model',
     structuralModel: 'Structural Model',
     notes: 'Calculation Notes',
     codes: 'Codes of Practice',
@@ -203,6 +233,7 @@ const TRANSLATIONS = {
     moment: '弯矩',
     shear: '剪力',
     stress: '应力',
+    model3d: '3D 模型',
     structuralModel: '结构模型',
     notes: '计算说明',
     codes: '规范参考',
@@ -244,6 +275,7 @@ const TRANSLATIONS = {
     moment: 'โมเมนต์',
     shear: 'แรงเฉือน',
     stress: 'หน่วยแรง',
+    model3d: 'โมเดล 3 มิติ',
     structuralModel: 'แบบจำลองโครงสร้าง',
     notes: 'บันทึกการคำนวณ',
     codes: 'มาตรฐานการออกแบบ',
@@ -285,6 +317,7 @@ const TRANSLATIONS = {
     moment: 'Momen',
     shear: ' ricih',
     stress: 'Tegasan',
+    model3d: 'Model 3D',
     structuralModel: 'Model Struktur',
     notes: 'Nota Pengiraan',
     codes: 'Kod Amalan',
@@ -322,48 +355,176 @@ interface Combination {
   factors: Record<keyof typeof LOAD_CATEGORIES, number>;
 }
 
-// Helper for robust number parsing
-const safeParseNumber = (val: string | number, fallback: number = 0): number => {
-  if (typeof val === 'number') return isNaN(val) ? fallback : val;
-  const parsed = parseFloat(val);
-  return isNaN(parsed) ? fallback : parsed;
+const DEFAULT_COMBINATIONS: Combination[] = [
+  { id: 'c1', name: 'Serviceability (D+L)', factors: { dead: 1.0, live: 1.0, wind: 0, snow: 0, seismic: 0 } },
+  { id: 'c2', name: 'Ultimate (1.2D + 1.6L)', factors: { dead: 1.2, live: 1.6, wind: 0, snow: 0, seismic: 0 } },
+  { id: 'c3', name: 'Wind Dominant (D + W)', factors: { dead: 1.0, live: 0, wind: 1.0, snow: 0, seismic: 0 } },
+  { id: 'c4', name: 'Seismic Dominant (D + E)', factors: { dead: 1.0, live: 0.5, wind: 0, snow: 0, seismic: 1.0 } },
+];
+
+// Helper for robust number parsing with clamping
+const safeParseNumber = (val: string | number, fallback: number = 0, min: number = -Infinity, max: number = Infinity): number => {
+  const num = typeof val === 'number' ? val : parseFloat(val);
+  if (isNaN(num)) return fallback;
+  return Math.min(Math.max(num, min), max);
 };
 
 export function App() {
   // Beam State
-  const [length, setLength] = useState(3000); // mm
-  const [material, setMaterial] = useState<keyof typeof MATERIALS>('aluminum_6063_t6');
-  const [sectionType, setSectionType] = useState<'solid' | 'hollow'>('hollow');
-  const [width, setWidth] = useState(50);
-  const [height, setHeight] = useState(100);
-  const [thickness, setThickness] = useState(3);
-  const [safetyFactor, setSafetyFactor] = useState(1.5);
-  const [selectedCodeId, setSelectedCodeId] = useState<string>('China (National)');
+  const [length, setLength] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.length ?? 3500;
+      } catch (e) { return 3500; }
+    }
+    return 3500;
+  });
+  const [material, setMaterial] = useState<keyof typeof MATERIALS>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.material ?? 'aluminum_6063_t66';
+      } catch (e) { return 'aluminum_6063_t66'; }
+    }
+    return 'aluminum_6063_t66';
+  });
+  const [sectionType, setSectionType] = useState<'solid' | 'hollow'>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.sectionType ?? 'hollow';
+      } catch (e) { return 'hollow'; }
+    }
+    return 'hollow';
+  });
+  const [width, setWidth] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.width ?? 65;
+      } catch (e) { return 65; }
+    }
+    return 65;
+  });
+  const [height, setHeight] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.height ?? 150;
+      } catch (e) { return 150; }
+    }
+    return 150;
+  });
+  const [thickness, setThickness] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.thickness ?? 3.5;
+      } catch (e) { return 3.5; }
+    }
+    return 3.5;
+  });
+  const [safetyFactor, setSafetyFactor] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.safetyFactor ?? 1.5;
+      } catch (e) { return 1.5; }
+    }
+    return 1.5;
+  });
+  const [selectedCodeId, setSelectedCodeId] = useState<string>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.selectedCodeId ?? 'China (National)';
+      } catch (e) { return 'China (National)'; }
+    }
+    return 'China (National)';
+  });
   const [hoveredLoad, setHoveredLoad] = useState<Load | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   // Loads State
-  const [loads, setLoads] = useState<Load[]>([
-    { id: '1', type: 'udl', category: 'dead', value: 0.5 },
-  ]);
+  const [loads, setLoads] = useState<Load[]>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.loads ?? [{ id: '1', type: 'udl', category: 'dead', value: 0.5 }];
+      } catch (e) { return [{ id: '1', type: 'udl', category: 'dead', value: 0.5 }]; }
+    }
+    return [{ id: '1', type: 'udl', category: 'dead', value: 0.5 }];
+  });
 
   // Combinations State
-  const [combinations, setCombinations] = useState<Combination[]>([
-    { id: 'c1', name: 'Serviceability (D+L)', factors: { dead: 1.0, live: 1.0, wind: 0, snow: 0, seismic: 0 } },
-    { id: 'c2', name: 'Ultimate (1.2D + 1.6L)', factors: { dead: 1.2, live: 1.6, wind: 0, snow: 0, seismic: 0 } },
-    { id: 'c3', name: 'Wind Dominant (D + W)', factors: { dead: 1.0, live: 0, wind: 1.0, snow: 0, seismic: 0 } },
-    { id: 'c4', name: 'Seismic Dominant (D + E)', factors: { dead: 1.0, live: 0.5, wind: 0, snow: 0, seismic: 1.0 } },
-  ]);
-  const [activeCombinationId, setActiveCombinationId] = useState('c1');
+  const [combinations, setCombinations] = useState<Combination[]>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.combinations ?? DEFAULT_COMBINATIONS;
+      } catch (e) { return DEFAULT_COMBINATIONS; }
+    }
+    return DEFAULT_COMBINATIONS;
+  });
+  const [activeCombinationId, setActiveCombinationId] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.activeCombinationId ?? 'c1';
+      } catch (e) { return 'c1'; }
+    }
+    return 'c1';
+  });
+  const [isCombinationManagerOpen, setIsCombinationManagerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('deflection');
   const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [lang, setLang] = useState<keyof typeof TRANSLATIONS>('en');
   const t = TRANSLATIONS[lang];
 
   // Seismic State
-  const [seismicRegion, setSeismicRegion] = useState<keyof typeof SEISMIC_REGIONS>('china');
-  const [seismicCoeff, setSeismicCoeff] = useState(SEISMIC_REGIONS.china.coeff);
+  const [seismicRegion, setSeismicRegion] = useState<keyof typeof SEISMIC_REGIONS>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.seismicRegion ?? 'china';
+      } catch (e) { return 'china'; }
+    }
+    return 'china';
+  });
+  const [seismicCoeff, setSeismicCoeff] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.seismicCoeff ?? SEISMIC_REGIONS.china.coeff;
+      } catch (e) { return SEISMIC_REGIONS.china.coeff; }
+    }
+    return SEISMIC_REGIONS.china.coeff;
+  });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  
+  // Ensure thickness is valid relative to dimensions to prevent geometric errors
+  React.useEffect(() => {
+    if (sectionType === 'hollow') {
+      const maxT = Math.min(width, height) / 2.1;
+      if (thickness > maxT) {
+        setThickness(Number(maxT.toFixed(1)));
+      }
+    }
+  }, [width, height, sectionType, thickness]);
 
   // Auto-clear notification
   React.useEffect(() => {
@@ -547,6 +708,23 @@ export function App() {
     if (activeCombinationId === id) setActiveCombinationId(newCombs[0].id);
   };
 
+  const duplicateCombination = (id: string) => {
+    const comb = combinations.find(c => c.id === id);
+    if (!comb) return;
+    const newComb: Combination = {
+      ...comb,
+      id: Math.random().toString(36).substr(2, 9),
+      name: `${comb.name} (Copy)`
+    };
+    setCombinations([...combinations, newComb]);
+    setActiveCombinationId(newComb.id);
+  };
+
+  const resetCombinations = () => {
+    setCombinations(DEFAULT_COMBINATIONS);
+    setActiveCombinationId(DEFAULT_COMBINATIONS[0].id);
+  };
+
   const saveProject = () => {
     const projectData = {
       length,
@@ -639,6 +817,21 @@ export function App() {
               >
                 <FolderOpen className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{t.loadProject}</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  if (confirm('Reset to factory defaults? This will clear all saved data.')) {
+                    localStorage.removeItem('facadecalc_project');
+                    window.location.reload();
+                  }
+                }}
+                className="gap-2 h-8 text-xs border-slate-200 text-slate-500 hover:bg-slate-50"
+                title="Reset to factory defaults"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Reset</span>
               </Button>
             </div>
 
@@ -767,54 +960,173 @@ export function App() {
                 </div>
                 <CardTitle className="text-lg">{t.combinations.split(' ')[1]}</CardTitle>
               </div>
-              <Button size="icon" variant="outline" onClick={addCombination} className="h-8 w-8">
-                <PlusCircle className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Dialog open={isCombinationManagerOpen} onOpenChange={setIsCombinationManagerOpen}>
+                  <DialogTrigger render={<Button size="icon" variant="outline" className="h-8 w-8" />}>
+                    <Settings className="h-4 w-4" />
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>{t.combinations}</DialogTitle>
+                      <DialogDescription>
+                        Manage load factors for different analysis cases.
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Button onClick={addCombination} size="sm" className="gap-2">
+                            <PlusCircle className="h-4 w-4" />
+                            Add Combination
+                          </Button>
+                          <Button onClick={resetCombinations} variant="outline" size="sm" className="gap-2">
+                            <RotateCcw className="h-4 w-4" />
+                            Reset to Defaults
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-slate-50">
+                              <TableHead className="w-[250px]">Name</TableHead>
+                              {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
+                                <TableHead key={key} className="text-center px-2">
+                                  <div className="text-[10px] uppercase text-slate-400">{key}</div>
+                                  <div className="text-[10px] font-bold">{cat.name.split(' ')[0]}</div>
+                                </TableHead>
+                              ))}
+                              <TableHead className="w-[100px] text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {combinations.map((comb) => (
+                              <TableRow key={comb.id} className={cn(activeCombinationId === comb.id && "bg-blue-50/50")}>
+                                <TableCell>
+                                  <Input 
+                                    value={comb.name} 
+                                    onChange={(e) => updateCombinationName(comb.id, e.target.value)}
+                                    className="h-8 font-medium"
+                                  />
+                                </TableCell>
+                                {Object.keys(LOAD_CATEGORIES).map((key) => (
+                                  <TableCell key={key} className="px-1">
+                                    <Input 
+                                      type="number" 
+                                      step="0.1"
+                                      min="-10"
+                                      max="10"
+                                      value={comb.factors[key as keyof typeof LOAD_CATEGORIES] ?? 0} 
+                                      onChange={(e) => updateCombinationFactor(comb.id, key as keyof typeof LOAD_CATEGORIES, safeParseNumber(e.target.value, comb.factors[key as keyof typeof LOAD_CATEGORIES] ?? 0, -10, 10))}
+                                      className="h-8 text-center w-16 mx-auto"
+                                    />
+                                  </TableCell>
+                                ))}
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-slate-400 hover:text-blue-600"
+                                      onClick={() => duplicateCombination(comb.id)}
+                                      title="Duplicate"
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-slate-400 hover:text-rose-500"
+                                      onClick={() => removeCombination(comb.id)}
+                                      disabled={combinations.length <= 1}
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                    
+                    <DialogFooter>
+                      <Button onClick={() => setIsCombinationManagerOpen(false)}>Close</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                <Button size="icon" variant="outline" onClick={addCombination} className="h-8 w-8">
+                  <PlusCircle className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
+            <CardContent className="space-y-2 px-3 pb-3">
+              <div className="space-y-1.5">
                 {combinations.map(comb => (
                   <div key={comb.id} className={cn(
-                    "p-3 border rounded-lg transition-all",
-                    activeCombinationId === comb.id ? "border-blue-500 bg-blue-50/30 ring-1 ring-blue-500" : "bg-white"
+                    "p-2 border rounded-lg transition-all group relative",
+                    activeCombinationId === comb.id 
+                      ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/30 shadow-sm" 
+                      : "bg-white hover:border-slate-300 hover:bg-slate-50/30"
                   )}>
-                    <div className="flex items-center justify-between mb-2">
-                      <Input 
-                        value={comb.name ?? ''} 
-                        onChange={(e) => updateCombinationName(comb.id, e.target.value)}
-                        className="h-7 text-xs font-bold border-none bg-transparent p-0 focus-visible:ring-0"
-                      />
-                      <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex-1 min-w-0 mr-1.5">
+                        <Input 
+                          value={comb.name ?? ''} 
+                          onChange={(e) => updateCombinationName(comb.id, e.target.value)}
+                          className="h-5 text-[10px] font-bold border-none bg-transparent p-0 focus-visible:ring-0 truncate text-slate-700 placeholder:text-slate-300"
+                          placeholder="Combination Name"
+                        />
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-6 w-6 text-slate-400 hover:text-rose-500"
-                          onClick={() => removeCombination(comb.id)}
-                          disabled={combinations.length <= 1}
+                          className="h-5 w-5 text-slate-400 hover:text-blue-600 hover:bg-blue-100/50"
+                          onClick={() => duplicateCombination(comb.id)}
+                          title="Duplicate"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Copy className="h-2.5 w-2.5" />
                         </Button>
                         <Button 
-                          variant={activeCombinationId === comb.id ? "default" : "ghost"} 
-                          size="sm" 
-                          className="h-6 text-[10px] px-2"
-                          onClick={() => setActiveCombinationId(comb.id)}
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-5 w-5 text-slate-400 hover:text-rose-500 hover:bg-rose-100/50"
+                          onClick={() => removeCombination(comb.id)}
+                          disabled={combinations.length <= 1}
+                          title="Delete"
                         >
-                          Select
+                          <Trash2 className="h-2.5 w-2.5" />
                         </Button>
+                        <div className="ml-1">
+                          <Button 
+                            variant={activeCombinationId === comb.id ? "default" : "outline"} 
+                            size="sm" 
+                            className={cn(
+                              "h-5 text-[8px] px-1.5 font-black uppercase tracking-tighter",
+                              activeCombinationId === comb.id ? "bg-blue-600 hover:bg-blue-700" : "text-slate-400 border-slate-200"
+                            )}
+                            onClick={() => setActiveCombinationId(comb.id)}
+                          >
+                            {activeCombinationId === comb.id ? "Active" : "Select"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <div className="grid grid-cols-5 gap-0.5 bg-slate-100/80 rounded-sm p-0.5">
                       {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
-                        <div key={key} className="space-y-1">
-                          <Label className="text-[9px] uppercase text-slate-400 block text-center">{key[0].toUpperCase()}</Label>
-                          <Input 
-                            type="number" 
-                            step="0.1"
-                            value={comb.factors[key as keyof typeof LOAD_CATEGORIES] ?? 0} 
-                            onChange={(e) => updateCombinationFactor(comb.id, key as keyof typeof LOAD_CATEGORIES, Number(e.target.value))}
-                            className="h-6 text-[10px] text-center p-0"
-                          />
+                        <div key={key} className="text-center border-r border-slate-200/50 last:border-none">
+                          <div className="text-[6px] uppercase text-slate-500 font-black leading-none mb-0.5">{key[0]}</div>
+                          <div className={cn(
+                            "text-[9px] font-mono font-bold leading-none",
+                            comb.factors[key as keyof typeof LOAD_CATEGORIES] > 0 ? "text-blue-600" : "text-slate-400"
+                          )}>
+                            {comb.factors[key as keyof typeof LOAD_CATEGORIES]}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -839,9 +1151,10 @@ export function App() {
                 <Input 
                   id="length" 
                   type="number" 
-                  min="0"
+                  min="100"
+                  max="50000"
                   value={length ?? 0} 
-                  onChange={(e) => setLength(Math.max(0, safeParseNumber(e.target.value, length)))}
+                  onChange={(e) => setLength(safeParseNumber(e.target.value, length, 0, 50000))}
                   className="bg-slate-50/50"
                 />
               </div>
@@ -866,8 +1179,10 @@ export function App() {
                   id="safetyFactor" 
                   type="number" 
                   step="0.1"
+                  min="1"
+                  max="20"
                   value={safetyFactor ?? 1} 
-                  onChange={(e) => setSafetyFactor(Math.max(0.1, safeParseNumber(e.target.value, safetyFactor)))}
+                  onChange={(e) => setSafetyFactor(safeParseNumber(e.target.value, safetyFactor, 1, 20))}
                   className="bg-slate-50/50"
                 />
               </div>
@@ -890,9 +1205,10 @@ export function App() {
                   <Input 
                     id="width" 
                     type="number" 
-                    min="0"
+                    min="1"
+                    max="5000"
                     value={width ?? 0} 
-                    onChange={(e) => setWidth(Math.max(0, safeParseNumber(e.target.value, width)))}
+                    onChange={(e) => setWidth(safeParseNumber(e.target.value, width, 1, 5000))}
                     className="bg-slate-50/50"
                   />
                 </div>
@@ -901,9 +1217,10 @@ export function App() {
                   <Input 
                     id="height" 
                     type="number" 
-                    min="0"
+                    min="1"
+                    max="5000"
                     value={height ?? 0} 
-                    onChange={(e) => setHeight(Math.max(0, safeParseNumber(e.target.value, height)))}
+                    onChange={(e) => setHeight(safeParseNumber(e.target.value, height, 1, 5000))}
                     className="bg-slate-50/50"
                   />
                 </div>
@@ -915,8 +1232,11 @@ export function App() {
                   <Input 
                     id="thickness" 
                     type="number" 
+                    min="0.1"
+                    max={Math.min(width, height) / 2.1}
+                    step="0.1"
                     value={thickness ?? 0} 
-                    onChange={(e) => setThickness(Math.max(0, safeParseNumber(e.target.value, thickness)))}
+                    onChange={(e) => setThickness(safeParseNumber(e.target.value, thickness, 0.1, Math.min(width, height) / 2.1))}
                     className="bg-slate-50/50"
                   />
                 </div>
@@ -1030,14 +1350,26 @@ export function App() {
               <div className="grid gap-2">
                 <Label>{t.seismicCoeff}</Label>
                 <div className="flex items-center gap-2">
-                  <Input 
-                    type="number" 
-                    step="0.01"
-                    min="0"
-                    value={seismicCoeff} 
-                    onChange={(e) => setSeismicCoeff(Number(e.target.value))}
-                    className="bg-slate-50/50"
-                  />
+                  <div className="relative flex-1">
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      min="0"
+                      max="10"
+                      value={seismicCoeff} 
+                      onChange={(e) => setSeismicCoeff(safeParseNumber(e.target.value, seismicCoeff, 0, 10))}
+                      className="bg-slate-50/50 pr-8"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 hover:text-blue-600"
+                      onClick={() => setSeismicCoeff(SEISMIC_REGIONS[seismicRegion].coeff)}
+                      title="Reset to region default"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                  </div>
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -1080,18 +1412,33 @@ export function App() {
             </CardHeader>
             <CardContent className="space-y-4">
               {loads.map((load, idx) => (
-                <div key={load.id} className="p-3 border rounded-lg bg-white space-y-3 relative group">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-rose-500"
-                    onClick={() => removeLoad(load.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                <div key={load.id} className="p-3 border rounded-lg bg-white space-y-3 relative group hover:border-blue-200 transition-colors min-h-[140px] flex flex-col justify-between">
+                  <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                      onClick={() => {
+                        const newLoad = { ...load, id: Math.random().toString(36).substr(2, 9) };
+                        setLoads([...loads, newLoad]);
+                      }}
+                      title="Duplicate Load"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 text-slate-400 hover:text-rose-500 hover:bg-rose-50"
+                      onClick={() => removeLoad(load.id)}
+                      title="Delete Load"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                   
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-1">
                       <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#{idx + 1}</span>
                       <Select 
                         value={load.type} 
@@ -1102,7 +1449,7 @@ export function App() {
                           end: v === 'trapezoidal' ? length : undefined
                         })}
                       >
-                        <SelectTrigger className="h-7 text-xs border-none bg-transparent p-0 w-fit gap-1 focus:ring-0">
+                        <SelectTrigger className="h-7 text-xs border-slate-200 bg-slate-50/50 px-2 w-[110px] focus:ring-1 focus:ring-blue-500">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1118,7 +1465,7 @@ export function App() {
                       onValueChange={(v: any) => updateLoad(load.id, { category: v })}
                     >
                       <SelectTrigger className={cn(
-                        "h-6 text-[10px] font-bold px-2 rounded-full border-none focus:ring-0 w-fit",
+                        "h-7 text-[10px] font-bold px-3 rounded-full border-none focus:ring-0 w-fit shadow-sm",
                         LOAD_CATEGORIES[load.category].bg,
                         LOAD_CATEGORIES[load.category].color
                       )}>
@@ -1132,64 +1479,66 @@ export function App() {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] uppercase text-slate-400">
-                        {load.type === 'trapezoidal' ? 'w1 (N/mm)' : 'Value'}
-                      </Label>
-                      <Input 
-                        type="number" 
-                        value={load.value ?? 0} 
-                        onChange={(e) => updateLoad(load.id, { value: safeParseNumber(e.target.value, load.value) })}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    {load.type === 'point' && (
+                  <div className="bg-slate-50/50 p-2 rounded-md border border-slate-100 flex-1 flex flex-col justify-center">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-slate-400">Pos (mm)</Label>
+                        <Label className="text-[9px] uppercase font-bold text-slate-400">
+                          {load.type === 'trapezoidal' ? 'w1 (N/mm)' : 'Value'}
+                        </Label>
                         <Input 
                           type="number" 
-                          value={load.position ?? 0} 
-                          onChange={(e) => updateLoad(load.id, { position: safeParseNumber(e.target.value, load.position ?? 0) })}
-                          className="h-8 text-sm"
+                          value={load.value ?? 0} 
+                          onChange={(e) => updateLoad(load.id, { value: safeParseNumber(e.target.value, load.value, -1000000, 1000000) })}
+                          className="h-8 text-sm bg-white"
                         />
                       </div>
-                    )}
+                      {load.type === 'point' && (
+                        <div className="space-y-1">
+                          <Label className="text-[9px] uppercase font-bold text-slate-400">Pos (mm)</Label>
+                          <Input 
+                            type="number" 
+                            value={load.position ?? 0} 
+                            onChange={(e) => updateLoad(load.id, { position: safeParseNumber(e.target.value, load.position ?? 0, 0, length) })}
+                            className="h-8 text-sm bg-white"
+                          />
+                        </div>
+                      )}
+                      {load.type === 'trapezoidal' && (
+                        <div className="space-y-1">
+                          <Label className="text-[9px] uppercase font-bold text-slate-400">w2 (N/mm)</Label>
+                          <Input 
+                            type="number" 
+                            value={load.value2 ?? load.value} 
+                            onChange={(e) => updateLoad(load.id, { value2: safeParseNumber(e.target.value, load.value2 ?? load.value, -1000000, 1000000) })}
+                            className="h-8 text-sm bg-white"
+                          />
+                        </div>
+                      )}
+                    </div>
+
                     {load.type === 'trapezoidal' && (
-                      <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-slate-400">w2 (N/mm)</Label>
-                        <Input 
-                          type="number" 
-                          value={load.value2 ?? load.value} 
-                          onChange={(e) => updateLoad(load.id, { value2: safeParseNumber(e.target.value, load.value2 ?? load.value) })}
-                          className="h-8 text-sm"
-                        />
+                      <div className="grid grid-cols-2 gap-3 mt-2">
+                        <div className="space-y-1">
+                          <Label className="text-[9px] uppercase font-bold text-slate-400">Start (mm)</Label>
+                          <Input 
+                            type="number" 
+                            value={load.start ?? 0} 
+                            onChange={(e) => updateLoad(load.id, { start: safeParseNumber(e.target.value, load.start ?? 0, 0, length) })}
+                            className="h-8 text-sm bg-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[9px] uppercase font-bold text-slate-400">End (mm)</Label>
+                          <Input 
+                            type="number" 
+                            value={load.end ?? length} 
+                            onChange={(e) => updateLoad(load.id, { end: safeParseNumber(e.target.value, load.end ?? length, 0, length) })}
+                            className="h-8 text-sm bg-white"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  {load.type === 'trapezoidal' && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-slate-400">Start (mm)</Label>
-                        <Input 
-                          type="number" 
-                          value={load.start ?? 0} 
-                          onChange={(e) => updateLoad(load.id, { start: safeParseNumber(e.target.value, load.start ?? 0) })}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-slate-400">End (mm)</Label>
-                        <Input 
-                          type="number" 
-                          value={load.end ?? length} 
-                          onChange={(e) => updateLoad(load.id, { end: safeParseNumber(e.target.value, load.end ?? length) })}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
               {loads.length === 0 && (
@@ -1263,14 +1612,24 @@ export function App() {
                       {isChartExpanded ? <Maximize2 className="w-4 h-4 rotate-180" /> : <Maximize2 className="w-4 h-4" />}
                     </Button>
                   </div>
-                  <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:flex">
+                  <TabsList className="w-full sm:w-auto grid grid-cols-5 sm:flex">
                     <TabsTrigger value="deflection" className="text-[10px] sm:text-xs">{t.deflection}</TabsTrigger>
                     <TabsTrigger value="moment" className="text-[10px] sm:text-xs">{t.moment}</TabsTrigger>
                     <TabsTrigger value="shear" className="text-[10px] sm:text-xs">{t.shear}</TabsTrigger>
                     <TabsTrigger value="stress" className="text-[10px] sm:text-xs">{t.stress}</TabsTrigger>
+                    <TabsTrigger value="3d" className="text-[10px] sm:text-xs">{t.model3d}</TabsTrigger>
                   </TabsList>
                 </div>
                 
+                <TabsContent value="3d" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
+                  <BeamVisualizer3D 
+                    length={length}
+                    width={width}
+                    height={height}
+                    thickness={thickness}
+                    sectionType={sectionType}
+                  />
+                </TabsContent>
                 <TabsContent value="deflection" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
                   <ChartContainer 
                     data={results.points} 
@@ -1479,8 +1838,10 @@ export function App() {
                   <div className="flex items-center gap-2">
                     <Input 
                       type="number"
+                      min="100"
+                      max="50000"
                       value={length}
-                      onChange={(e) => setLength(Math.max(0, safeParseNumber(e.target.value, length)))}
+                      onChange={(e) => setLength(safeParseNumber(e.target.value, length, 100, 50000))}
                       className="h-8 w-24 text-right font-mono font-bold text-blue-600 bg-white"
                     />
                     <span className="text-xs font-bold text-slate-400">mm</span>
@@ -1506,18 +1867,18 @@ export function App() {
               <CardTitle className="text-lg">{t.notes}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-slate-600">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <h4 className="font-bold text-slate-900 flex items-center gap-2">
                     <div className="w-1.5 h-4 bg-blue-500 rounded-full" />
                     {t.assumptions}
                   </h4>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
+                  <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
                     <li>Euler-Bernoulli beam theory applied.</li>
-                    <li>Simply supported boundary conditions at both ends.</li>
+                    <li>Simply supported boundary conditions.</li>
                     <li>Linear elastic material behavior.</li>
                     <li>Small deflection theory (y &lt;&lt; L).</li>
-                    <li>Shear deformation (Timoshenko) is neglected.</li>
+                    <li>Shear deformation is neglected.</li>
                   </ul>
                 </div>
                 <div className="space-y-2">
@@ -1525,13 +1886,35 @@ export function App() {
                     <div className="w-1.5 h-4 bg-blue-500 rounded-full" />
                     {t.limits}
                   </h4>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>Deflection limit: L/175 (Facade standard).</li>
-                    <li>Stress limit: Yield strength / Safety Factor (γ).</li>
-                    <li>Supported Loads: D, L, W, S, Seismic (E).</li>
-                    <li>Seismic load (E) is calculated as Cs × Total Dead Load.</li>
-                    <li>Self-weight is not automatically included (add as UDL).</li>
+                  <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+                    <li>Deflection limit: L/175 (Facade).</li>
+                    <li>Stress limit: fy / Safety Factor (γ).</li>
+                    <li>Supported Loads: D, L, W, S, E.</li>
+                    <li>Seismic: Cs × Total Dead Load.</li>
+                    <li>Self-weight: Add manually as UDL.</li>
                   </ul>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                    <div className="w-1.5 h-4 bg-blue-500 rounded-full" />
+                    {t.materialProps}
+                  </h4>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-500">Elastic Modulus (E)</span>
+                      <span className="text-[10px] font-mono font-bold text-blue-600">{MATERIALS[material].e.toLocaleString()} MPa</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-500">Yield Strength (fy)</span>
+                      <span className="text-[10px] font-mono font-bold text-blue-600">{MATERIALS[material].yield} MPa</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                      <span className="text-[10px] text-slate-500">Allowable Stress</span>
+                      <span className="text-[10px] font-mono font-bold text-green-600">
+                        {(MATERIALS[material].yield / safetyFactor).toFixed(1)} MPa
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
               <Separator />

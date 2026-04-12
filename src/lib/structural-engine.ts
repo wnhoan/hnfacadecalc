@@ -21,6 +21,8 @@ export interface Load {
   position?: number; // mm from left support (for point load)
   start?: number; // mm from left support (for trapezoidal)
   end?: number; // mm from left support (for trapezoidal)
+  factoredValue?: number; // UI only
+  factoredValue2?: number; // UI only
 }
 
 export interface CalculationResult {
