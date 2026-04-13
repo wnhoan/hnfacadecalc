@@ -40,7 +40,9 @@ import {
   HelpCircle,
   Scale,
   FileCode,
-  ArrowDown
+  ArrowDown,
+  Undo2,
+  Redo2
 } from 'lucide-react';
 import { 
   Card, 
@@ -512,6 +514,27 @@ const safeParseNumber = (val: string | number, fallback: number = 0, min: number
   return Math.min(Math.max(num, min), max);
 };
 
+interface HistoryState {
+  projectTitle: string;
+  projectLocation: string;
+  projectDescription: string;
+  projectDate: string;
+  length: number;
+  material: keyof typeof MATERIALS;
+  sectionType: 'solid' | 'hollow';
+  width: number;
+  height: number;
+  thickness: number;
+  supportCondition: 'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned';
+  safetyFactor: number;
+  selectedCodeId: string;
+  loads: Load[];
+  combinations: Combination[];
+  activeCombinationId: string;
+  seismicRegion: keyof typeof SEISMIC_REGIONS;
+  seismicCoeff: number;
+}
+
 export function App() {
   // Beam State
   const [length, setLength] = useState(() => {
@@ -646,6 +669,49 @@ export function App() {
   const [lang, setLang] = useState<keyof typeof TRANSLATIONS>('en');
   const [view, setView] = useState<'home' | 'calculator' | 'docs'>('home');
   const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('metric');
+  
+  // Project Info State
+  const [projectTitle, setProjectTitle] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.projectTitle ?? 'Untitled Project';
+      } catch (e) { return 'Untitled Project'; }
+    }
+    return 'Untitled Project';
+  });
+  const [projectLocation, setProjectLocation] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.projectLocation ?? '';
+      } catch (e) { return ''; }
+    }
+    return '';
+  });
+  const [projectDescription, setProjectDescription] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.projectDescription ?? '';
+      } catch (e) { return ''; }
+    }
+    return '';
+  });
+  const [projectDate, setProjectDate] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.projectDate ?? new Date().toISOString().split('T')[0];
+      } catch (e) { return new Date().toISOString().split('T')[0]; }
+    }
+    return new Date().toISOString().split('T')[0];
+  });
+
   const t = TRANSLATIONS[lang];
   const u = UNITS[unitSystem];
 
@@ -699,6 +765,128 @@ export function App() {
   });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
+  // History State for Undo/Redo
+  const [past, setPast] = useState<HistoryState[]>([]);
+  const [future, setFuture] = useState<HistoryState[]>([]);
+  const isHistoryAction = React.useRef(false);
+
+  const getCurrentState = (): HistoryState => ({
+    projectTitle,
+    projectLocation,
+    projectDescription,
+    projectDate,
+    length,
+    material,
+    sectionType,
+    width,
+    height,
+    thickness,
+    supportCondition,
+    safetyFactor,
+    selectedCodeId,
+    loads,
+    combinations,
+    activeCombinationId,
+    seismicRegion,
+    seismicCoeff
+  });
+
+  const applyState = (state: HistoryState) => {
+    isHistoryAction.current = true;
+    setProjectTitle(state.projectTitle);
+    setProjectLocation(state.projectLocation);
+    setProjectDescription(state.projectDescription);
+    setProjectDate(state.projectDate);
+    setLength(state.length);
+    setMaterial(state.material);
+    setSectionType(state.sectionType);
+    setWidth(state.width);
+    setHeight(state.height);
+    setThickness(state.thickness);
+    setSupportCondition(state.supportCondition);
+    setSafetyFactor(state.safetyFactor);
+    setSelectedCodeId(state.selectedCodeId);
+    setLoads(state.loads);
+    setCombinations(state.combinations);
+    setActiveCombinationId(state.activeCombinationId);
+    setSeismicRegion(state.seismicRegion);
+    setSeismicCoeff(state.seismicCoeff);
+  };
+
+  const undo = () => {
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+    
+    setFuture([getCurrentState(), ...future]);
+    setPast(newPast);
+    applyState(previous);
+  };
+
+  const redo = () => {
+    if (future.length === 0) return;
+    const next = future[0];
+    const newFuture = future.slice(1);
+    
+    setPast([...past, getCurrentState()]);
+    setFuture(newFuture);
+    applyState(next);
+  };
+
+  // Effect to track changes and push to history with debounce
+  const lastStateRef = React.useRef<HistoryState | null>(null);
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  
+  React.useEffect(() => {
+    if (isHistoryAction.current) {
+      isHistoryAction.current = false;
+      lastStateRef.current = getCurrentState(); // Update last state to avoid immediate push after undo/redo
+      return;
+    }
+    
+    const currentState = getCurrentState();
+    const hasChanged = !lastStateRef.current || JSON.stringify(lastStateRef.current) !== JSON.stringify(currentState);
+    
+    if (hasChanged) {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      
+      debounceTimerRef.current = setTimeout(() => {
+        if (lastStateRef.current) {
+          setPast(prev => [...prev.slice(-49), lastStateRef.current!]); // Keep last 50 actions
+          setFuture([]);
+        }
+        lastStateRef.current = currentState;
+      }, 500); // 500ms debounce
+    }
+    
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [
+    projectTitle, projectLocation, projectDescription, projectDate,
+    length, material, sectionType, width, height, thickness,
+    supportCondition, safetyFactor, selectedCodeId,
+    loads, combinations, activeCombinationId,
+    seismicRegion, seismicCoeff
+  ]);
+
+  // Keyboard shortcuts for Undo/Redo
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [past, future, projectTitle, projectLocation, projectDescription, projectDate, length, material, sectionType, width, height, thickness, supportCondition, safetyFactor, selectedCodeId, loads, combinations, activeCombinationId, seismicRegion, seismicCoeff]);
+
   // Ensure thickness is valid relative to dimensions to prevent geometric errors
   React.useEffect(() => {
     if (sectionType === 'hollow') {
@@ -918,6 +1106,10 @@ export function App() {
 
   const saveProject = () => {
     const projectData = {
+      projectTitle,
+      projectLocation,
+      projectDescription,
+      projectDate,
       length,
       material,
       sectionType,
@@ -942,6 +1134,10 @@ export function App() {
     if (saved) {
       try {
         const data = JSON.parse(saved);
+        if (data.projectTitle !== undefined) setProjectTitle(data.projectTitle);
+        if (data.projectLocation !== undefined) setProjectLocation(data.projectLocation);
+        if (data.projectDescription !== undefined) setProjectDescription(data.projectDescription);
+        if (data.projectDate !== undefined) setProjectDate(data.projectDate);
         if (data.length !== undefined) setLength(data.length);
         if (data.material) setMaterial(data.material);
         if (data.sectionType) setSectionType(data.sectionType);
@@ -1061,6 +1257,28 @@ export function App() {
               </Button>
             ) : (
               <div className="flex items-center gap-2">
+                <div className="flex items-center bg-slate-100 rounded-md p-0.5 mr-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={undo} 
+                    disabled={past.length === 0}
+                    className="h-7 w-7 text-slate-500 hover:text-blue-600 disabled:opacity-30"
+                    title="Undo (Ctrl+Z)"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={redo} 
+                    disabled={future.length === 0}
+                    className="h-7 w-7 text-slate-500 hover:text-blue-600 disabled:opacity-30"
+                    title="Redo (Ctrl+Y)"
+                  >
+                    <Redo2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
                 <Button variant="outline" size="sm" onClick={saveProject} className="h-8 text-xs gap-2">
                   <Save className="w-3.5 h-3.5" />
                   <span className="hidden lg:inline">{t.saveProject}</span>
@@ -1207,10 +1425,11 @@ export function App() {
               <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-6 col-span-12">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h1 className="text-3xl font-bold text-slate-900">{t.title}</h1>
-                    <p className="text-slate-500 font-medium">{t.subtitle}</p>
+                    <h1 className="text-3xl font-bold text-slate-900">{projectTitle || t.title}</h1>
+                    <p className="text-slate-500 font-medium">{projectLocation || t.subtitle}</p>
                     <div className="mt-6 grid grid-cols-2 gap-x-16 gap-y-3 text-sm">
-                      <div className="flex gap-2"><span className="font-bold text-slate-700">Date:</span> <span>{new Date().toLocaleDateString()}</span></div>
+                      <div className="flex gap-2"><span className="font-bold text-slate-700">Date:</span> <span>{projectDate}</span></div>
+                      <div className="flex gap-2"><span className="font-bold text-slate-700">Description:</span> <span className="truncate max-w-[200px]">{projectDescription || 'N/A'}</span></div>
                       <div className="flex gap-2"><span className="font-bold text-slate-700">Design Code:</span> <span className="text-blue-700 font-bold">{selectedCodeId}</span></div>
                       <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
                       <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{MATERIALS[material].name}</span></div>
@@ -1230,6 +1449,59 @@ export function App() {
               {/* Left Column: Inputs */}
               <div className="lg:col-span-4 space-y-6 print:hidden">
                 
+                {/* Project Information */}
+                <Card className="shadow-sm border-slate-200">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-2 text-blue-600 mb-1">
+                      <FileText className="w-4 h-4" />
+                      <span className="text-xs font-bold uppercase tracking-widest">Project Info</span>
+                    </div>
+                    <CardTitle className="text-lg">General Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="proj-title">Project Title</Label>
+                      <Input 
+                        id="proj-title"
+                        value={projectTitle}
+                        onChange={(e) => setProjectTitle(e.target.value)}
+                        placeholder="Enter project name..."
+                        className="bg-slate-50/50"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="proj-loc">Location</Label>
+                      <Input 
+                        id="proj-loc"
+                        value={projectLocation}
+                        onChange={(e) => setProjectLocation(e.target.value)}
+                        placeholder="City, Country..."
+                        className="bg-slate-50/50"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="proj-date">Date</Label>
+                      <Input 
+                        id="proj-date"
+                        type="date"
+                        value={projectDate}
+                        onChange={(e) => setProjectDate(e.target.value)}
+                        className="bg-slate-50/50"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="proj-desc">Description</Label>
+                      <textarea 
+                        id="proj-desc"
+                        value={projectDescription}
+                        onChange={(e) => setProjectDescription(e.target.value)}
+                        placeholder="Project details..."
+                        className="flex min-h-[80px] w-full rounded-md border border-input bg-slate-50/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Active Combination Selector for Mobile/Quick Access */}
                 <Card className="shadow-sm border-slate-200 lg:hidden">
                   <CardContent className="p-4">
