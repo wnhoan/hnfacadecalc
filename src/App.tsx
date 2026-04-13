@@ -529,10 +529,10 @@ export function App() {
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        return data.material ?? 'aluminum_6063_t66';
-      } catch (e) { return 'aluminum_6063_t66'; }
+        return data.material ?? 'aluminum_6061_t6';
+      } catch (e) { return 'aluminum_6061_t6'; }
     }
-    return 'aluminum_6063_t66';
+    return 'aluminum_6061_t6';
   });
   const [sectionType, setSectionType] = useState<'solid' | 'hollow'>(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -774,9 +774,9 @@ export function App() {
       category,
       value: value ?? (type === 'point' ? 1000 : 0.5),
       position: type === 'point' ? length / 2 : undefined,
-      value2: type === 'trapezoidal' ? 0.5 : undefined,
-      start: type === 'trapezoidal' ? 0 : undefined,
-      end: type === 'trapezoidal' ? length : undefined,
+      value2: type === 'trapezoidal' ? 1.5 : undefined,
+      start: type === 'trapezoidal' ? length * 0.25 : undefined,
+      end: type === 'trapezoidal' ? length * 0.75 : undefined,
     };
     setLoads([...loads, newLoad]);
   };
@@ -978,7 +978,11 @@ export function App() {
               </div>
               <h1 className="font-bold text-xl tracking-tight">{t.title}</h1>
               {view === 'calculator' && (
-                <div 
+                <motion.div 
+                  animate={results.summary.status === 'fail' ? { 
+                    scale: [1, 1.05, 1],
+                    transition: { repeat: Infinity, duration: 2 }
+                  } : {}}
                   className={cn(
                     "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm transition-all duration-500",
                     results.summary.status === 'pass' 
@@ -987,7 +991,7 @@ export function App() {
                   )}
                 >
                   {results.summary.status === 'pass' ? 'PASS' : 'FAIL'}
-                </div>
+                </motion.div>
               )}
             </div>
 
@@ -1886,6 +1890,67 @@ export function App() {
         {/* Right Column: Results & Visuals */}
         <div className="lg:col-span-8 space-y-6">
           
+          {/* Utilization Overview */}
+          <Card 
+            className="shadow-sm border-slate-200 overflow-hidden cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group"
+            onClick={() => setActiveTab('utilization')}
+          >
+            <div className={cn(
+              "h-1.5 w-full",
+              results.summary.status === 'pass' ? "bg-green-500" : "bg-red-500"
+            )} />
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner transition-colors duration-500",
+                    results.summary.status === 'pass' ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+                  )}>
+                    {results.summary.status === 'pass' ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black tracking-tight text-slate-900 leading-none mb-1">
+                      {results.summary.status === 'pass' ? "Design Valid" : "Design Fails"}
+                    </h3>
+                    <p className="text-slate-500 text-sm font-medium">
+                      {results.summary.status === 'pass' 
+                        ? "The current configuration meets all structural requirements." 
+                        : `Structural limits exceeded. Governed by ${results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) > results.summary.maxDeflection / (length / 175) ? 'Stress' : 'Deflection'}.`}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-8">
+                  <div className="text-center relative">
+                    {results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) >= results.summary.maxDeflection / (length / 175) && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-black bg-slate-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Governing</div>
+                    )}
+                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-widest">Stress Util.</div>
+                    <div className={cn(
+                      "text-xl font-black tabular-nums",
+                      (results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor))) > 1 ? "text-red-600" : "text-slate-900"
+                    )}>
+                      {Math.round((results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor))) * 100)}%
+                    </div>
+                  </div>
+                  <div className="w-px h-10 bg-slate-100 hidden md:block" />
+                  <div className="text-center relative">
+                    {results.summary.maxDeflection / (length / 175) > results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-black bg-slate-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Governing</div>
+                    )}
+                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-widest">Defl. Util.</div>
+                    <div className={cn(
+                      "text-xl font-black tabular-nums",
+                      (results.summary.maxDeflection / (length / 175)) > 1 ? "text-red-600" : "text-slate-900"
+                    )}>
+                      {Math.round((results.summary.maxDeflection / (length / 175)) * 100)}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <SummaryCard 
@@ -1894,15 +1959,17 @@ export function App() {
               subValue={results.summary.deflectionRatio}
               icon={<Maximize2 className="w-4 h-4 text-blue-500" />}
               status={results.summary.maxDeflection > (length / 175) ? 'fail' : 'pass'}
+              progress={results.summary.maxDeflection / (length / 175)}
               onClick={() => setActiveTab('deflection')}
               active={activeTab === 'deflection'}
             />
             <SummaryCard 
               label="Max Stress" 
               value={`${toDisplay(results.summary.maxStress, 'stress').toFixed(unitSystem === 'metric' ? 1 : 0)} ${u.stress}`} 
-              subValue={`Yield: ${toDisplay(MATERIALS[material].yield, 'stress').toFixed(0)} ${u.stress}`}
+              subValue={`Limit: ${toDisplay(MATERIALS[material].yield / Math.max(0.1, safetyFactor), 'stress').toFixed(0)} ${u.stress}`}
               icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
               status={results.summary.maxStress > (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) ? 'fail' : 'pass'}
+              progress={results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor))}
               onClick={() => setActiveTab('stress')}
               active={activeTab === 'stress'}
             />
@@ -1949,11 +2016,12 @@ export function App() {
                       {isChartExpanded ? <Maximize2 className="w-4 h-4 rotate-180" /> : <Maximize2 className="w-4 h-4" />}
                     </Button>
                   </div>
-                  <TabsList className="w-full sm:w-auto grid grid-cols-5 sm:flex">
+                  <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:grid-cols-6 sm:flex">
                     <TabsTrigger value="deflection" className="text-[10px] sm:text-xs">{t.deflection}</TabsTrigger>
                     <TabsTrigger value="moment" className="text-[10px] sm:text-xs">{t.moment}</TabsTrigger>
                     <TabsTrigger value="shear" className="text-[10px] sm:text-xs">{t.shear}</TabsTrigger>
                     <TabsTrigger value="stress" className="text-[10px] sm:text-xs">{t.stress}</TabsTrigger>
+                    <TabsTrigger value="utilization" className="text-[10px] sm:text-xs">Utilization</TabsTrigger>
                     <TabsTrigger value="3d" className="text-[10px] sm:text-xs">{t.model3d}</TabsTrigger>
                   </TabsList>
                 </div>
@@ -2012,6 +2080,18 @@ export function App() {
                     unit={u.stress} 
                     label="Bending Stress"
                     formatter={(v) => v.toFixed(unitSystem === 'metric' ? 1 : 0) + ' ' + u.stress}
+                    unitSystem={unitSystem}
+                    u={u}
+                  />
+                </TabsContent>
+                <TabsContent value="utilization" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
+                  <ChartContainer 
+                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), utilization: Math.max(p.utilizationStress, p.utilizationDeflection) * 100 }))} 
+                    dataKey="utilization" 
+                    color="#EF4444" 
+                    unit="%" 
+                    label="Total Utilization"
+                    formatter={(v) => v.toFixed(1) + '%'}
                     unitSystem={unitSystem}
                     u={u}
                   />
@@ -2527,7 +2607,7 @@ export default function Root() {
   return <App />;
 }
 
-function SummaryCard({ label, value, subValue, icon, status, onClick, active }: { 
+function SummaryCard({ label, value, subValue, icon, status, onClick, active, progress }: { 
   label: string; 
   value: string; 
   subValue?: string; 
@@ -2535,11 +2615,12 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active }: 
   status?: 'pass' | 'fail';
   onClick?: () => void;
   active?: boolean;
+  progress?: number;
 }) {
   return (
     <Card 
       className={cn(
-        "shadow-sm border-slate-200 overflow-hidden cursor-pointer transition-all duration-200 group",
+        "shadow-sm border-slate-200 overflow-hidden cursor-pointer transition-all duration-200 group relative",
         active ? "ring-2 ring-blue-500 border-transparent" : "hover:border-blue-300 hover:shadow-md"
       )}
       onClick={onClick}
@@ -2564,7 +2645,25 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active }: 
             {subValue}
           </div>
         )}
+        {progress !== undefined && (
+          <div className="mt-3 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(100, progress * 100)}%` }}
+              className={cn(
+                "h-full transition-colors duration-500",
+                progress > 1 ? "bg-red-500" : progress > 0.8 ? "bg-amber-500" : "bg-blue-500"
+              )}
+            />
+          </div>
+        )}
       </CardContent>
+      {status && (
+        <div className={cn(
+          "absolute top-0 right-0 w-1 h-full",
+          status === 'pass' ? "bg-green-500" : "bg-red-500"
+        )} />
+      )}
     </Card>
   );
 }

@@ -32,6 +32,8 @@ export interface CalculationResult {
   moment: number;
   shear: number;
   stress: number;
+  utilizationStress: number;
+  utilizationDeflection: number;
 }
 
 export interface SummaryResults {
@@ -58,7 +60,9 @@ export function calculateBeam(
         deflection: 0,
         moment: 0,
         shear: 0,
-        stress: 0
+        stress: 0,
+        utilizationStress: 0,
+        utilizationDeflection: 0
       })),
       summary: {
         maxDeflection: 0,
@@ -247,10 +251,17 @@ export function calculateBeam(
 
     const v1 = getVL(0);
     const v2 = getVL(sumP);
-    const RL = v1 / (v1 - v2) * sumP;
     
-    R0 = sumP - RL;
-    M0 = sumPa - RL * length;
+    if (Math.abs(v1 - v2) > 1e-20) {
+      const RL = (v1 / (v1 - v2)) * sumP;
+      R0 = sumP - RL;
+      M0 = sumPa - RL * length;
+    } else {
+      // Fallback to simply supported if solver fails
+      const R_L = sumPa / length;
+      R0 = sumP - R_L;
+      M0 = 0;
+    }
     v0 = 0;
     theta0 = 0;
   } else if (supportCondition === 'fixed_fixed') {
@@ -319,6 +330,9 @@ export function calculateBeam(
   const finalForces = getInternalForces(R0, M0);
   const finalDeflections = getDeflection(finalForces, v0, theta0);
 
+  const allowableStress = yieldStrength / Math.max(0.1, props.safetyFactor);
+  const deflectionLimit = length / 175;
+
   for (let i = 0; i <= steps; i++) {
     const x = finalForces[i].x;
     const stress = sectionModulus > 0 ? Math.abs(finalForces[i].moment) / sectionModulus : 0;
@@ -329,6 +343,8 @@ export function calculateBeam(
       moment: finalForces[i].moment,
       shear: finalForces[i].shear,
       stress,
+      utilizationStress: allowableStress > 0 ? stress / allowableStress : 0,
+      utilizationDeflection: deflectionLimit > 0 ? Math.abs(finalDeflections[i]) / deflectionLimit : 0,
     });
   }
 
@@ -340,7 +356,6 @@ export function calculateBeam(
   const deflectionRatioValue = maxDeflection > 0.0001 ? length / maxDeflection : Infinity;
   const deflectionRatio = deflectionRatioValue < 100000 ? `L/${Math.round(deflectionRatioValue)}` : 'N/A';
 
-  const allowableStress = yieldStrength / Math.max(0.1, props.safetyFactor);
   const status = maxStress <= allowableStress && deflectionRatioValue >= 175 ? 'pass' : 'fail';
 
   return {
