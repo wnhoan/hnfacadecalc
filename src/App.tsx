@@ -535,6 +535,310 @@ interface HistoryState {
   seismicCoeff: number;
 }
 
+interface Project extends HistoryState {
+  id: string;
+}
+
+const createNewProject = (id: string, title: string): Project => ({
+  id,
+  projectTitle: title,
+  projectLocation: '',
+  projectDescription: '',
+  projectDate: new Date().toISOString().split('T')[0],
+  length: 3500,
+  material: 'aluminum_6061_t6',
+  sectionType: 'hollow',
+  width: 65,
+  height: 150,
+  thickness: 3.5,
+  supportCondition: 'simply_supported',
+  safetyFactor: 1.5,
+  selectedCodeId: 'China (National)',
+  loads: [{ id: '1', type: 'udl', category: 'dead', value: 0.5 }],
+  combinations: DEFAULT_COMBINATIONS,
+  activeCombinationId: 'c1',
+  seismicRegion: 'china',
+  seismicCoeff: SEISMIC_REGIONS.china.coeff
+});
+
+const getProjectResults = (project: Project) => {
+  const sectionProps = project.sectionType === 'solid' 
+    ? calculateRectangularProperties(project.width, project.height)
+    : calculateHollowRectangularProperties(project.width, project.height, project.thickness);
+
+  const activeCombination = project.combinations.find(c => c.id === project.activeCombinationId) || project.combinations[0];
+  
+  const factoredLoads = project.loads.map(load => ({
+    ...load,
+    value: load.value * (activeCombination.factors[load.category] || 0),
+    value2: load.value2 !== undefined ? load.value2 * (activeCombination.factors[load.category] || 0) : undefined,
+  }));
+
+  const beamProps: BeamProperties = {
+    length: project.length,
+    elasticModulus: MATERIALS[project.material].e,
+    momentOfInertia: sectionProps.momentOfInertia,
+    sectionModulus: sectionProps.sectionModulus,
+    yieldStrength: MATERIALS[project.material].yield,
+    safetyFactor: project.safetyFactor,
+    supportCondition: project.supportCondition,
+  };
+
+  try {
+    return calculateBeam(beamProps, factoredLoads);
+  } catch (error) {
+    return {
+      points: [],
+      summary: {
+        maxDeflection: 0,
+        maxMoment: 0,
+        maxShear: 0,
+        maxStress: 0,
+        deflectionRatio: 'N/A',
+        status: 'fail' as const,
+        utilizationStress: 0,
+        utilizationDeflection: 0
+      }
+    };
+  }
+};
+
+const ProjectResultsView = ({ 
+  project, 
+  results, 
+  unitSystem, 
+  t, 
+  u, 
+  toDisplay, 
+  activeTab, 
+  setActiveTab,
+  isChartExpanded,
+  setIsChartExpanded
+}: { 
+  project: Project; 
+  results: any; 
+  unitSystem: string; 
+  t: any; 
+  u: any; 
+  toDisplay: any;
+  activeTab: string;
+  setActiveTab: (v: string) => void;
+  isChartExpanded: boolean;
+  setIsChartExpanded: (v: boolean) => void;
+}) => {
+  const governingCriteria = results.summary.utilizationStress >= results.summary.utilizationDeflection ? 'Stress' : 'Deflection';
+  const maxUtilization = Math.max(results.summary.utilizationStress, results.summary.utilizationDeflection);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">{project.projectTitle}</h3>
+        <div className={cn(
+          "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+          results.summary.status === 'pass' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+        )}>
+          {results.summary.status === 'pass' ? "Design Valid" : "Design Fails"}
+        </div>
+      </div>
+
+      {/* Utilization Overview */}
+      <Card 
+        className={cn(
+          "shadow-sm border-slate-200 cursor-pointer transition-all hover:ring-2 hover:ring-blue-100",
+          results.summary.status === 'pass' ? "bg-gradient-to-br from-white to-green-50/30" : "bg-gradient-to-br from-white to-red-50/30"
+        )}
+        onClick={() => setActiveTab('utilization')}
+      >
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-black tracking-tighter text-slate-900">
+                  {(maxUtilization * 100).toFixed(1)}%
+                </span>
+                <span className="text-xs font-bold text-slate-400 uppercase">Utilization</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider",
+                  results.summary.status === 'pass' ? "bg-green-500 text-white" : "bg-red-500 text-white"
+                )}>
+                  {results.summary.status === 'pass' ? "Pass" : "Fail"}
+                </span>
+                <span className="text-[10px] font-medium text-slate-500">
+                  Governing: <span className="font-bold text-slate-700">{governingCriteria}</span>
+                </span>
+              </div>
+            </div>
+            <div className="h-12 w-12 rounded-full border-4 border-slate-100 flex items-center justify-center relative">
+              <svg className="h-full w-full -rotate-90">
+                <circle
+                  cx="24" cy="24" r="20"
+                  fill="transparent"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  className="text-slate-100"
+                />
+                <circle
+                  cx="24" cy="24" r="20"
+                  fill="transparent"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  strokeDasharray={125.6}
+                  strokeDashoffset={125.6 * (1 - Math.min(1, maxUtilization))}
+                  className={cn(
+                    "transition-all duration-1000",
+                    maxUtilization > 1 ? "text-red-500" : maxUtilization > 0.8 ? "text-amber-500" : "text-blue-500"
+                  )}
+                />
+              </svg>
+              <Activity className="w-4 h-4 absolute text-slate-300" />
+            </div>
+          </div>
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(100, maxUtilization * 100)}%` }}
+              className={cn(
+                "h-full rounded-full",
+                maxUtilization > 1 ? "bg-red-500" : maxUtilization > 0.8 ? "bg-amber-500" : "bg-blue-500"
+              )}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-4">
+        <SummaryCard 
+          label={t.maxDeflection} 
+          value={`${toDisplay(results.summary.maxDeflection, 'length').toFixed(unitSystem === 'metric' ? 2 : 4)} ${u.length}`} 
+          subValue={results.summary.deflectionRatio}
+          icon={<Maximize2 className="w-4 h-4 text-blue-500" />}
+          status={results.summary.utilizationDeflection > 1 ? 'fail' : 'pass'}
+          progress={results.summary.utilizationDeflection}
+        />
+        <SummaryCard 
+          label={t.maxStress} 
+          value={`${toDisplay(results.summary.maxStress, 'stress').toFixed(unitSystem === 'metric' ? 2 : 4)} ${u.stress}`} 
+          icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
+          status={results.summary.utilizationStress > 1 ? 'fail' : 'pass'}
+          progress={results.summary.utilizationStress}
+        />
+        <SummaryCard 
+          label={t.maxMoment} 
+          value={unitSystem === 'metric' 
+            ? `${(results.summary.maxMoment / 1000000).toFixed(2)} kNm` 
+            : `${(toDisplay(results.summary.maxMoment, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1)} lb-ft`} 
+          icon={<Layout className="w-4 h-4 text-purple-500" />}
+        />
+        <SummaryCard 
+          label={t.maxShear} 
+          value={unitSystem === 'metric'
+            ? `${(results.summary.maxShear / 1000).toFixed(2)} kN`
+            : `${(toDisplay(results.summary.maxShear, 'force') / 1000).toFixed(2)} kip`} 
+          icon={<ChevronRight className="w-4 h-4 text-green-500" />}
+        />
+      </div>
+
+      <Card className="shadow-sm border-slate-200 overflow-hidden">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="px-4 pt-4 border-b bg-slate-50/50 flex items-center justify-between">
+            <TabsList className="bg-transparent border-none h-auto p-0 gap-4">
+              <TabsTrigger value="deflection" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">{t.deflection}</TabsTrigger>
+              <TabsTrigger value="moment" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">{t.moment}</TabsTrigger>
+              <TabsTrigger value="shear" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">{t.shear}</TabsTrigger>
+              <TabsTrigger value="stress" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">{t.stress}</TabsTrigger>
+              <TabsTrigger value="utilization" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">Utilization</TabsTrigger>
+              <TabsTrigger value="3d" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">3D Model</TabsTrigger>
+            </TabsList>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-slate-400 hover:text-blue-600"
+              onClick={() => setIsChartExpanded(!isChartExpanded)}
+            >
+              <Maximize2 className="w-4 h-4" />
+            </Button>
+          </div>
+          
+          <div className={cn("p-4", isChartExpanded ? "h-[600px]" : "h-[350px]")}>
+            <TabsContent value="deflection" className="h-full m-0">
+              <ChartContainer 
+                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), deflection: toDisplay(p.deflection, 'length') }))} 
+                dataKey="deflection" 
+                color="#3B82F6" 
+                unit={u.length} 
+                label={t.deflection}
+                invert
+                unitSystem={unitSystem as any}
+                u={u}
+              />
+            </TabsContent>
+            <TabsContent value="moment" className="h-full m-0">
+              <ChartContainer 
+                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), moment: toDisplay(p.moment, 'moment') }))} 
+                dataKey="moment" 
+                color="#8B5CF6" 
+                unit={u.moment} 
+                label={t.moment}
+                formatter={(v) => unitSystem === 'metric' ? (v / 1000000).toFixed(2) + ' kNm' : (v * CONVERSION.lbin_to_lbft).toFixed(1) + ' lb-ft'}
+                unitSystem={unitSystem as any}
+                u={u}
+              />
+            </TabsContent>
+            <TabsContent value="shear" className="h-full m-0">
+              <ChartContainer 
+                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), shear: toDisplay(p.shear, 'force') }))} 
+                dataKey="shear" 
+                color="#10B981" 
+                unit={u.force} 
+                label={t.shear}
+                formatter={(v) => unitSystem === 'metric' ? (v / 1000).toFixed(2) + ' kN' : (v / 1000).toFixed(2) + ' kip'}
+                unitSystem={unitSystem as any}
+                u={u}
+              />
+            </TabsContent>
+            <TabsContent value="stress" className="h-full m-0">
+              <ChartContainer 
+                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), stress: toDisplay(p.stress, 'stress') }))} 
+                dataKey="stress" 
+                color="#F59E0B" 
+                unit={u.stress} 
+                label={t.stress}
+                formatter={(v) => v.toFixed(unitSystem === 'metric' ? 1 : 0) + ' ' + u.stress}
+                unitSystem={unitSystem as any}
+                u={u}
+              />
+            </TabsContent>
+            <TabsContent value="utilization" className="h-full m-0">
+              <ChartContainer 
+                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), utilization: Math.max(p.utilizationStress, p.utilizationDeflection) * 100 }))} 
+                dataKey="utilization" 
+                color="#EF4444" 
+                unit="%" 
+                label="Total Utilization"
+                formatter={(v) => v.toFixed(1) + '%'}
+                unitSystem={unitSystem as any}
+                u={u}
+              />
+            </TabsContent>
+            <TabsContent value="3d" className="h-full m-0">
+              <BeamVisualizer3D 
+                length={project.length} 
+                width={project.width} 
+                height={project.height} 
+                thickness={project.thickness} 
+                sectionType={project.sectionType} 
+                supportCondition={project.supportCondition}
+              />
+            </TabsContent>
+          </div>
+        </Tabs>
+      </Card>
+    </div>
+  );
+};
+
 export function App() {
   // Beam State
   const [length, setLength] = useState(() => {
@@ -670,6 +974,24 @@ export function App() {
   const [view, setView] = useState<'home' | 'calculator' | 'docs'>('home');
   const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('metric');
   
+  // Multi-Project State
+  const [projects, setProjects] = useState<Project[]>(() => {
+    const saved = localStorage.getItem('facadecalc_projects_list');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (Array.isArray(data) && data.length > 0) return data;
+      } catch (e) { console.error("Failed to load projects list", e); }
+    }
+    return [];
+  });
+  const [activeProjectId, setActiveProjectId] = useState<string>(() => {
+    const saved = localStorage.getItem('facadecalc_active_project_id');
+    return saved ?? 'p1';
+  });
+  const [comparisonProjectId, setComparisonProjectId] = useState<string | null>(null);
+  const [isBiViewMode, setIsBiViewMode] = useState(false);
+
   // Project Info State
   const [projectTitle, setProjectTitle] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -905,6 +1227,30 @@ export function App() {
     }
   }, [notification]);
 
+  // Initialize projects list if empty
+  React.useEffect(() => {
+    if (projects.length === 0) {
+      const initialProj = { ...getCurrentState(), id: activeProjectId };
+      setProjects([initialProj]);
+      localStorage.setItem('facadecalc_projects_list', JSON.stringify([initialProj]));
+    }
+  }, []);
+
+  // Sync current project to list periodically
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      const currentState = getCurrentState();
+      setProjects(prev => prev.map(p => p.id === activeProjectId ? { ...currentState, id: activeProjectId } : p));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [
+    projectTitle, projectLocation, projectDescription, projectDate,
+    length, material, sectionType, width, height, thickness,
+    supportCondition, safetyFactor, selectedCodeId,
+    loads, combinations, activeCombinationId,
+    seismicRegion, seismicCoeff
+  ]);
+
   // Calculations
   const sectionProps = useMemo(() => {
     if (sectionType === 'solid') {
@@ -1134,24 +1480,7 @@ export function App() {
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        if (data.projectTitle !== undefined) setProjectTitle(data.projectTitle);
-        if (data.projectLocation !== undefined) setProjectLocation(data.projectLocation);
-        if (data.projectDescription !== undefined) setProjectDescription(data.projectDescription);
-        if (data.projectDate !== undefined) setProjectDate(data.projectDate);
-        if (data.length !== undefined) setLength(data.length);
-        if (data.material) setMaterial(data.material);
-        if (data.sectionType) setSectionType(data.sectionType);
-        if (data.width !== undefined) setWidth(data.width);
-        if (data.height !== undefined) setHeight(data.height);
-        if (data.thickness !== undefined) setThickness(data.thickness);
-        if (data.safetyFactor !== undefined) setSafetyFactor(data.safetyFactor);
-        if (data.supportCondition) setSupportCondition(data.supportCondition);
-        if (data.selectedCodeId) setSelectedCodeId(data.selectedCodeId);
-        if (data.loads) setLoads(data.loads);
-        if (data.combinations) setCombinations(data.combinations);
-        if (data.activeCombinationId) setActiveCombinationId(data.activeCombinationId);
-        if (data.seismicRegion) setSeismicRegion(data.seismicRegion);
-        if (data.seismicCoeff !== undefined) setSeismicCoeff(data.seismicCoeff);
+        applyState(data);
         setNotification({ message: t.projectLoaded, type: 'success' });
       } catch (e) {
         console.error("Failed to load project", e);
@@ -1159,6 +1488,72 @@ export function App() {
       }
     } else {
       setNotification({ message: t.noProject, type: 'error' });
+    }
+  };
+
+  const switchProject = (id: string) => {
+    // Save current state to projects list first
+    const currentState = getCurrentState();
+    const updatedProjects = projects.map(p => p.id === activeProjectId ? { ...currentState, id: activeProjectId } : p);
+    
+    // If current project wasn't in list, add it (shouldn't happen with proper init)
+    if (!projects.find(p => p.id === activeProjectId)) {
+      updatedProjects.push({ ...currentState, id: activeProjectId });
+    }
+    
+    setProjects(updatedProjects);
+    localStorage.setItem('facadecalc_projects_list', JSON.stringify(updatedProjects));
+
+    // Load new project
+    const nextProject = updatedProjects.find(p => p.id === id);
+    if (nextProject) {
+      applyState(nextProject);
+      setActiveProjectId(id);
+      localStorage.setItem('facadecalc_active_project_id', id);
+    }
+  };
+
+  const addNewProject = () => {
+    const newId = Math.random().toString(36).substr(2, 9);
+    const newProj = createNewProject(newId, `Project ${projects.length + 1}`);
+    
+    // Save current before switching
+    const currentState = getCurrentState();
+    const updatedProjects = projects.map(p => p.id === activeProjectId ? { ...currentState, id: activeProjectId } : p);
+    if (!projects.find(p => p.id === activeProjectId)) {
+      updatedProjects.push({ ...currentState, id: activeProjectId });
+    }
+    
+    const finalProjects = [...updatedProjects, newProj];
+    setProjects(finalProjects);
+    localStorage.setItem('facadecalc_projects_list', JSON.stringify(finalProjects));
+    
+    applyState(newProj);
+    setActiveProjectId(newId);
+    localStorage.setItem('facadecalc_active_project_id', newId);
+    setNotification({ message: 'New project created', type: 'success' });
+  };
+
+  const deleteProject = (id: string) => {
+    if (projects.length <= 1) {
+      setNotification({ message: 'Cannot delete the only project', type: 'error' });
+      return;
+    }
+    
+    const updatedProjects = projects.filter(p => p.id !== id);
+    setProjects(updatedProjects);
+    localStorage.setItem('facadecalc_projects_list', JSON.stringify(updatedProjects));
+    
+    if (activeProjectId === id) {
+      const nextProj = updatedProjects[0];
+      applyState(nextProj);
+      setActiveProjectId(nextProj.id);
+      localStorage.setItem('facadecalc_active_project_id', nextProj.id);
+    }
+    
+    if (comparisonProjectId === id) {
+      setComparisonProjectId(null);
+      setIsBiViewMode(false);
     }
   };
 
@@ -1279,6 +1674,17 @@ export function App() {
                     <Redo2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
+
+                <Button 
+                  variant={isBiViewMode ? "default" : "outline"} 
+                  size="sm" 
+                  onClick={() => setIsBiViewMode(!isBiViewMode)}
+                  className={cn("h-8 text-xs gap-2", isBiViewMode && "bg-blue-600")}
+                >
+                  <Layout className="w-3.5 h-3.5" />
+                  <span className="hidden lg:inline">Bi-View</span>
+                </Button>
+
                 <Button variant="outline" size="sm" onClick={saveProject} className="h-8 text-xs gap-2">
                   <Save className="w-3.5 h-3.5" />
                   <span className="hidden lg:inline">{t.saveProject}</span>
@@ -1307,7 +1713,47 @@ export function App() {
         </div>
       </header>
 
-      <main className="flex-1">
+      {/* Project Tabs Bar */}
+      {view === 'calculator' && (
+        <div className="bg-white border-b px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar print:hidden">
+          {projects.map(p => (
+            <div 
+              key={p.id}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-md border transition-all cursor-pointer group shrink-0",
+                activeProjectId === p.id 
+                  ? "bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-200" 
+                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+              )}
+              onClick={() => activeProjectId !== p.id && switchProject(p.id)}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="text-xs font-bold truncate max-w-[120px]">{p.projectTitle}</span>
+              {projects.length > 1 && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteProject(p.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          ))}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={addNewProject}
+            className="h-8 w-8 p-0 rounded-full hover:bg-blue-50 hover:text-blue-600"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+
+      <main className="flex-1 overflow-y-auto">
         <AnimatePresence mode="wait">
           {view === 'home' && (
             <motion.div
@@ -2160,230 +2606,83 @@ export function App() {
         </div>
 
         {/* Right Column: Results & Visuals */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className={cn(
+          "space-y-6",
+          isBiViewMode ? "lg:col-span-12" : "lg:col-span-8"
+        )}>
+          {isBiViewMode ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <h2 className="text-lg font-bold text-slate-900">Primary Project</h2>
+                  <div className="px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider">Active</div>
+                </div>
+                <ProjectResultsView 
+                  project={{ ...getCurrentState(), id: activeProjectId }}
+                  results={results}
+                  unitSystem={unitSystem}
+                  t={t}
+                  u={u}
+                  toDisplay={toDisplay}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  isChartExpanded={isChartExpanded}
+                  setIsChartExpanded={setIsChartExpanded}
+                />
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <h2 className="text-lg font-bold text-slate-900">Comparison Project</h2>
+                  <Select 
+                    value={comparisonProjectId || ''} 
+                    onValueChange={setComparisonProjectId}
+                  >
+                    <SelectTrigger className="w-[200px] h-8 text-xs">
+                      <SelectValue placeholder="Select project..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.filter(p => p.id !== activeProjectId).map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.projectTitle}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {comparisonProjectId ? (
+                  <ProjectResultsView 
+                    project={projects.find(p => p.id === comparisonProjectId)!}
+                    results={getProjectResults(projects.find(p => p.id === comparisonProjectId)!)}
+                    unitSystem={unitSystem}
+                    t={t}
+                    u={u}
+                    toDisplay={toDisplay}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    isChartExpanded={isChartExpanded}
+                    setIsChartExpanded={setIsChartExpanded}
+                  />
+                ) : (
+                  <div className="h-[400px] flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-slate-50 text-slate-400">
+                    <Layout className="w-12 h-12 mb-4 opacity-20" />
+                    <p className="text-sm font-medium">Select a project to compare</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <ProjectResultsView 
+              project={{ ...getCurrentState(), id: activeProjectId }}
+              results={results}
+              unitSystem={unitSystem}
+              t={t}
+              u={u}
+              toDisplay={toDisplay}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              isChartExpanded={isChartExpanded}
+              setIsChartExpanded={setIsChartExpanded}
+            />
+          )}
           
-          {/* Utilization Overview */}
-          <Card 
-            className="shadow-sm border-slate-200 overflow-hidden cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group"
-            onClick={() => setActiveTab('utilization')}
-          >
-            <div className={cn(
-              "h-1.5 w-full",
-              results.summary.status === 'pass' ? "bg-green-500" : "bg-red-500"
-            )} />
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner transition-colors duration-500",
-                    results.summary.status === 'pass' ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
-                  )}>
-                    {results.summary.status === 'pass' ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black tracking-tight text-slate-900 leading-none mb-1">
-                      {results.summary.status === 'pass' ? "Design Valid" : "Design Fails"}
-                    </h3>
-                    <p className="text-slate-500 text-sm font-medium">
-                      {results.summary.status === 'pass' 
-                        ? "The current configuration meets all structural requirements." 
-                        : `Structural limits exceeded. Governed by ${results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) > results.summary.maxDeflection / (length / 175) ? 'Stress' : 'Deflection'}.`}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-8">
-                  <div className="text-center relative">
-                    {results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) >= results.summary.maxDeflection / (length / 175) && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-black bg-slate-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Governing</div>
-                    )}
-                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-widest">Stress Util.</div>
-                    <div className={cn(
-                      "text-xl font-black tabular-nums",
-                      (results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor))) > 1 ? "text-red-600" : "text-slate-900"
-                    )}>
-                      {Math.round((results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor))) * 100)}%
-                    </div>
-                  </div>
-                  <div className="w-px h-10 bg-slate-100 hidden md:block" />
-                  <div className="text-center relative">
-                    {results.summary.maxDeflection / (length / 175) > results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-black bg-slate-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Governing</div>
-                    )}
-                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1 tracking-widest">Defl. Util.</div>
-                    <div className={cn(
-                      "text-xl font-black tabular-nums",
-                      (results.summary.maxDeflection / (length / 175)) > 1 ? "text-red-600" : "text-slate-900"
-                    )}>
-                      {Math.round((results.summary.maxDeflection / (length / 175)) * 100)}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <SummaryCard 
-              label="Max Deflection" 
-              value={`${toDisplay(results.summary.maxDeflection, 'length').toFixed(2)} ${u.length}`} 
-              subValue={results.summary.deflectionRatio}
-              icon={<Maximize2 className="w-4 h-4 text-blue-500" />}
-              status={results.summary.maxDeflection > (length / 175) ? 'fail' : 'pass'}
-              progress={results.summary.maxDeflection / (length / 175)}
-              onClick={() => setActiveTab('deflection')}
-              active={activeTab === 'deflection'}
-            />
-            <SummaryCard 
-              label="Max Stress" 
-              value={`${toDisplay(results.summary.maxStress, 'stress').toFixed(unitSystem === 'metric' ? 1 : 0)} ${u.stress}`} 
-              subValue={`Limit: ${toDisplay(MATERIALS[material].yield / Math.max(0.1, safetyFactor), 'stress').toFixed(0)} ${u.stress}`}
-              icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
-              status={results.summary.maxStress > (MATERIALS[material].yield / Math.max(0.1, safetyFactor)) ? 'fail' : 'pass'}
-              progress={results.summary.maxStress / (MATERIALS[material].yield / Math.max(0.1, safetyFactor))}
-              onClick={() => setActiveTab('stress')}
-              active={activeTab === 'stress'}
-            />
-            <SummaryCard 
-              label="Max Moment" 
-              value={unitSystem === 'metric' 
-                ? `${(results.summary.maxMoment / 1000000).toFixed(2)} kNm` 
-                : `${(toDisplay(results.summary.maxMoment, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1)} lb-ft`} 
-              icon={<Layout className="w-4 h-4 text-purple-500" />}
-              onClick={() => setActiveTab('moment')}
-              active={activeTab === 'moment'}
-            />
-            <SummaryCard 
-              label="Max Shear" 
-              value={unitSystem === 'metric'
-                ? `${(results.summary.maxShear / 1000).toFixed(2)} kN`
-                : `${(toDisplay(results.summary.maxShear, 'force') / 1000).toFixed(2)} kip`} 
-              icon={<ChevronRight className="w-4 h-4 text-green-500" />}
-              onClick={() => setActiveTab('shear')}
-              active={activeTab === 'shear'}
-            />
-          </div>
-
-          {/* Charts */}
-          <Card className={cn(
-            "shadow-sm border-slate-200 transition-all duration-300",
-            isChartExpanded ? "fixed inset-0 z-[100] bg-white rounded-none border-none" : ""
-          )}>
-            <CardHeader className={cn("pb-0", isChartExpanded ? "p-6" : "")}>
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-                  <div className="flex items-center gap-3">
-                    <CardTitle className="text-lg">{t.results}</CardTitle>
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className={cn(
-                        "h-8 w-8 transition-colors",
-                        isChartExpanded ? "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100" : "text-slate-400 hover:text-blue-600"
-                      )}
-                      onClick={() => setIsChartExpanded(!isChartExpanded)}
-                      title={isChartExpanded ? "Collapse" : "Expand"}
-                    >
-                      {isChartExpanded ? <Maximize2 className="w-4 h-4 rotate-180" /> : <Maximize2 className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                  <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:grid-cols-6 sm:flex">
-                    <TabsTrigger value="deflection" className="text-[10px] sm:text-xs">{t.deflection}</TabsTrigger>
-                    <TabsTrigger value="moment" className="text-[10px] sm:text-xs">{t.moment}</TabsTrigger>
-                    <TabsTrigger value="shear" className="text-[10px] sm:text-xs">{t.shear}</TabsTrigger>
-                    <TabsTrigger value="stress" className="text-[10px] sm:text-xs">{t.stress}</TabsTrigger>
-                    <TabsTrigger value="utilization" className="text-[10px] sm:text-xs">Utilization</TabsTrigger>
-                    <TabsTrigger value="3d" className="text-[10px] sm:text-xs">{t.model3d}</TabsTrigger>
-                  </TabsList>
-                </div>
-                
-                <TabsContent value="3d" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
-                  <BeamVisualizer3D 
-                    length={length}
-                    width={width}
-                    height={height}
-                    thickness={thickness}
-                    sectionType={sectionType}
-                    supportCondition={supportCondition}
-                  />
-                </TabsContent>
-                <TabsContent value="deflection" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
-                  <ChartContainer 
-                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), deflection: toDisplay(p.deflection, 'length') }))} 
-                    dataKey="deflection" 
-                    color="#3B82F6" 
-                    unit={u.length} 
-                    label="Deflection"
-                    invert
-                    unitSystem={unitSystem}
-                    u={u}
-                  />
-                </TabsContent>
-                <TabsContent value="moment" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
-                  <ChartContainer 
-                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), moment: toDisplay(p.moment, 'moment') }))} 
-                    dataKey="moment" 
-                    color="#8B5CF6" 
-                    unit={u.moment} 
-                    label="Bending Moment"
-                    formatter={(v) => unitSystem === 'metric' ? (v / 1000000).toFixed(2) + ' kNm' : (v * CONVERSION.lbin_to_lbft).toFixed(1) + ' lb-ft'}
-                    unitSystem={unitSystem}
-                    u={u}
-                  />
-                </TabsContent>
-                <TabsContent value="shear" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
-                  <ChartContainer 
-                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), shear: toDisplay(p.shear, 'force') }))} 
-                    dataKey="shear" 
-                    color="#10B981" 
-                    unit={u.force} 
-                    label="Shear Force"
-                    formatter={(v) => unitSystem === 'metric' ? (v / 1000).toFixed(2) + ' kN' : (v / 1000).toFixed(2) + ' kip'}
-                    unitSystem={unitSystem}
-                    u={u}
-                  />
-                </TabsContent>
-                <TabsContent value="stress" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
-                  <ChartContainer 
-                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), stress: toDisplay(p.stress, 'stress') }))} 
-                    dataKey="stress" 
-                    color="#F59E0B" 
-                    unit={u.stress} 
-                    label="Bending Stress"
-                    formatter={(v) => v.toFixed(unitSystem === 'metric' ? 1 : 0) + ' ' + u.stress}
-                    unitSystem={unitSystem}
-                    u={u}
-                  />
-                </TabsContent>
-                <TabsContent value="utilization" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
-                  <ChartContainer 
-                    data={results.points.map(p => ({ ...p, x: toDisplay(p.x, 'length'), utilization: Math.max(p.utilizationStress, p.utilizationDeflection) * 100 }))} 
-                    dataKey="utilization" 
-                    color="#EF4444" 
-                    unit="%" 
-                    label="Total Utilization"
-                    formatter={(v) => v.toFixed(1) + '%'}
-                    unitSystem={unitSystem}
-                    u={u}
-                  />
-                </TabsContent>
-              </Tabs>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span>X-Axis: Distance from Left Support ({u.length})</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Info className="w-3 h-3" />
-                  <span>Calculated at {results.points.length} points</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Beam Visualization */}
           <Card className="shadow-sm border-slate-200 overflow-hidden">
             <CardHeader>
