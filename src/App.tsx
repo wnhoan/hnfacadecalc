@@ -42,7 +42,9 @@ import {
   FileCode,
   ArrowDown,
   Undo2,
-  Redo2
+  Redo2,
+  Image as ImageIcon,
+  Paperclip
 } from 'lucide-react';
 import { 
   Card, 
@@ -519,6 +521,8 @@ interface HistoryState {
   projectLocation: string;
   projectDescription: string;
   projectDate: string;
+  projectTime: string;
+  projectAttachment?: string;
   length: number;
   material: keyof typeof MATERIALS;
   sectionType: 'solid' | 'hollow';
@@ -545,6 +549,8 @@ const createNewProject = (id: string, title: string): Project => ({
   projectLocation: '',
   projectDescription: '',
   projectDate: new Date().toISOString().split('T')[0],
+  projectTime: new Date().toTimeString().split(' ')[0].slice(0, 5),
+  projectAttachment: '',
   length: 3500,
   material: 'aluminum_6061_t6',
   sectionType: 'hollow',
@@ -627,7 +633,7 @@ const ProjectResultsView = ({
   setIsChartExpanded: (v: boolean) => void;
 }) => {
   const governingCriteria = results.summary.utilizationStress >= results.summary.utilizationDeflection ? 'Stress' : 'Deflection';
-  const maxUtilization = Math.max(results.summary.utilizationStress, results.summary.utilizationDeflection);
+  const maxUtilization = Math.max(0, results.summary.utilizationStress || 0, results.summary.utilizationDeflection || 0);
 
   return (
     <div className="space-y-6">
@@ -839,6 +845,119 @@ const ProjectResultsView = ({
   );
 };
 
+const ReferenceAttachmentCard = ({ 
+  attachment, 
+  onAttachmentChange,
+  setNotification 
+}: { 
+  attachment: string; 
+  onAttachmentChange: (v: string) => void;
+  setNotification: (v: { message: string; type: 'success' | 'error' } | null) => void;
+}) => {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const processFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setNotification({ message: 'Only image files are supported', type: 'error' });
+      return;
+    }
+    if (file.size > 400 * 1024) {
+      setNotification({ message: 'Image size exceeds 400KB limit', type: 'error' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      onAttachmentChange(e.target?.result as string);
+      setNotification({ message: 'Reference image attached', type: 'success' });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) processFile(file);
+        break;
+      }
+    }
+  };
+
+  return (
+    <Card className="shadow-sm border-slate-200 overflow-hidden" onPaste={handlePaste}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-blue-600">
+            <Paperclip className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-widest">Reference</span>
+          </div>
+          {attachment && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 text-slate-400 hover:text-red-500"
+              onClick={() => onAttachmentChange('')}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
+        <CardTitle className="text-sm">Calculation Reference</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {attachment ? (
+          <div className="relative group rounded-lg overflow-hidden border bg-slate-50 aspect-video flex items-center justify-center">
+            <img 
+              src={attachment} 
+              alt="Reference" 
+              className="max-w-full max-h-full object-contain"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+               <Button 
+                 variant="secondary" 
+                 size="sm" 
+                 className="h-8 text-xs gap-2"
+                 onClick={() => fileInputRef.current?.click()}
+               >
+                 <ImageIcon className="w-3 h-3" />
+                 Replace
+               </Button>
+            </div>
+          </div>
+        ) : (
+          <div 
+            className="border-2 border-dashed border-slate-200 rounded-lg p-6 flex flex-col items-center justify-center gap-3 bg-slate-50/50 hover:bg-slate-50 hover:border-blue-200 transition-all cursor-pointer group"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-blue-500 transition-colors">
+              <ImageIcon className="w-5 h-5" />
+            </div>
+            <div className="text-center">
+              <p className="text-xs font-bold text-slate-600">Click to upload or Paste image</p>
+              <p className="text-[10px] text-slate-400 mt-1">PNG, JPG up to 400KB</p>
+            </div>
+          </div>
+        )}
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          accept="image/*" 
+          onChange={handleFileChange} 
+        />
+      </CardContent>
+    </Card>
+  );
+};
+
 export function App() {
   // Beam State
   const [length, setLength] = useState(() => {
@@ -1023,6 +1142,16 @@ export function App() {
     }
     return '';
   });
+  const [projectAttachment, setProjectAttachment] = useState<string>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.projectAttachment ?? '';
+      } catch (e) { return ''; }
+    }
+    return '';
+  });
   const [projectDate, setProjectDate] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
@@ -1032,6 +1161,16 @@ export function App() {
       } catch (e) { return new Date().toISOString().split('T')[0]; }
     }
     return new Date().toISOString().split('T')[0];
+  });
+  const [projectTime, setProjectTime] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.projectTime ?? new Date().toTimeString().split(' ')[0].slice(0, 5);
+      } catch (e) { return new Date().toTimeString().split(' ')[0].slice(0, 5); }
+    }
+    return new Date().toTimeString().split(' ')[0].slice(0, 5);
   });
 
   const t = TRANSLATIONS[lang];
@@ -1097,6 +1236,8 @@ export function App() {
     projectLocation,
     projectDescription,
     projectDate,
+    projectTime,
+    projectAttachment,
     length,
     material,
     sectionType,
@@ -1119,6 +1260,8 @@ export function App() {
     setProjectLocation(state.projectLocation);
     setProjectDescription(state.projectDescription);
     setProjectDate(state.projectDate);
+    setProjectTime(state.projectTime ?? new Date().toTimeString().split(' ')[0].slice(0, 5));
+    setProjectAttachment(state.projectAttachment ?? '');
     setLength(state.length);
     setMaterial(state.material);
     setSectionType(state.sectionType);
@@ -1185,7 +1328,7 @@ export function App() {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
   }, [
-    projectTitle, projectLocation, projectDescription, projectDate,
+    projectTitle, projectLocation, projectDescription, projectDate, projectTime, projectAttachment,
     length, material, sectionType, width, height, thickness,
     supportCondition, safetyFactor, selectedCodeId,
     loads, combinations, activeCombinationId,
@@ -1456,6 +1599,8 @@ export function App() {
       projectLocation,
       projectDescription,
       projectDate,
+      projectTime,
+      projectAttachment,
       length,
       material,
       sectionType,
@@ -1874,7 +2019,7 @@ export function App() {
                     <h1 className="text-3xl font-bold text-slate-900">{projectTitle || t.title}</h1>
                     <p className="text-slate-500 font-medium">{projectLocation || t.subtitle}</p>
                     <div className="mt-6 grid grid-cols-2 gap-x-16 gap-y-3 text-sm">
-                      <div className="flex gap-2"><span className="font-bold text-slate-700">Date:</span> <span>{projectDate}</span></div>
+                      <div className="flex gap-2"><span className="font-bold text-slate-700">Date:</span> <span>{projectDate} {projectTime}</span></div>
                       <div className="flex gap-2"><span className="font-bold text-slate-700">Description:</span> <span className="truncate max-w-[200px]">{projectDescription || 'N/A'}</span></div>
                       <div className="flex gap-2"><span className="font-bold text-slate-700">Design Code:</span> <span className="text-blue-700 font-bold">{selectedCodeId}</span></div>
                       <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
@@ -1925,15 +2070,27 @@ export function App() {
                         className="bg-slate-50/50"
                       />
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="proj-date">Date</Label>
-                      <Input 
-                        id="proj-date"
-                        type="date"
-                        value={projectDate}
-                        onChange={(e) => setProjectDate(e.target.value)}
-                        className="bg-slate-50/50"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="proj-date">Date</Label>
+                        <Input 
+                          id="proj-date"
+                          type="date"
+                          value={projectDate}
+                          onChange={(e) => setProjectDate(e.target.value)}
+                          className="bg-slate-50/50"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="proj-time">Time</Label>
+                        <Input 
+                          id="proj-time"
+                          type="time"
+                          value={projectTime}
+                          onChange={(e) => setProjectTime(e.target.value)}
+                          className="bg-slate-50/50"
+                        />
+                      </div>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="proj-desc">Description</Label>
@@ -1947,6 +2104,13 @@ export function App() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Reference Attachment */}
+                <ReferenceAttachmentCard 
+                  attachment={projectAttachment}
+                  onAttachmentChange={setProjectAttachment}
+                  setNotification={setNotification}
+                />
 
                 {/* Active Combination Selector for Mobile/Quick Access */}
                 <Card className="shadow-sm border-slate-200 lg:hidden">
@@ -3216,11 +3380,11 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active, pr
             {subValue}
           </div>
         )}
-        {progress !== undefined && (
+        {progress !== undefined && !isNaN(progress) && (
           <div className="mt-3 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
             <motion.div 
               initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, progress * 100)}%` }}
+              animate={{ width: `${Math.min(100, (progress || 0) * 100)}%` }}
               className={cn(
                 "h-full transition-colors duration-500",
                 progress > 1 ? "bg-red-500" : progress > 0.8 ? "bg-amber-500" : "bg-blue-500"
