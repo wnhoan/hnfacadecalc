@@ -121,7 +121,7 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
 
 export const BeamVisualizer3D: React.FC<BeamVisualizer3DProps> = (props) => {
   return (
-    <div className="w-full h-[400px] bg-slate-900 rounded-xl overflow-hidden relative border border-slate-800 shadow-2xl">
+    <div className="w-full h-[250px] sm:h-[400px] bg-slate-900 rounded-xl overflow-hidden relative border border-slate-800 shadow-2xl">
       <div className="absolute top-4 left-4 z-10">
         <div className="bg-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700 flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />

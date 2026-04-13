@@ -637,13 +637,13 @@ const ProjectResultsView = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">{project.projectTitle}</h3>
+      <div className="flex items-center justify-between mb-1 sm:mb-2">
+        <h3 className="text-[10px] sm:text-sm font-bold text-slate-500 uppercase tracking-wider truncate max-w-[60%]">{project.projectTitle}</h3>
         <div className={cn(
-          "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+          "px-1.5 sm:px-2 py-0.5 rounded text-[8px] sm:text-[10px] font-bold uppercase whitespace-nowrap",
           results.summary.status === 'pass' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
         )}>
-          {results.summary.status === 'pass' ? "Design Valid" : "Design Fails"}
+          {results.summary.status === 'pass' ? "Valid" : "Fails"}
         </div>
       </div>
 
@@ -655,35 +655,54 @@ const ProjectResultsView = ({
         )}
         onClick={() => setActiveTab('utilization')}
       >
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-black tracking-tighter text-slate-900">
+        <CardContent className="p-3 sm:p-6">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="space-y-0.5 sm:space-y-1">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xl sm:text-2xl font-black tracking-tighter text-slate-900">
                   {(maxUtilization * 100).toFixed(1)}%
                 </span>
-                <span className="text-xs font-bold text-slate-400 uppercase">Utilization</span>
+                <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase">Utilization</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className={cn(
-                  "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider",
+                  "text-[8px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0.5 rounded uppercase tracking-wider",
                   results.summary.status === 'pass' ? "bg-green-500 text-white" : "bg-red-500 text-white"
                 )}>
                   {results.summary.status === 'pass' ? "Pass" : "Fail"}
                 </span>
-                <span className="text-[10px] font-medium text-slate-500">
-                  Governing: <span className="font-bold text-slate-700">{governingCriteria}</span>
+                <span className="text-[8px] sm:text-[10px] font-medium text-slate-500 truncate max-w-[80px] sm:max-w-none">
+                  Gov: <span className="font-bold text-slate-700">{governingCriteria}</span>
                 </span>
               </div>
             </div>
-            <div className="h-12 w-12 rounded-full border-4 border-slate-100 flex items-center justify-center relative">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full border-2 sm:border-4 border-slate-100 flex items-center justify-center relative">
               <svg className="h-full w-full -rotate-90">
+                <circle
+                  cx="20" cy="20" r="18"
+                  fill="transparent"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  className="text-slate-100 sm:hidden"
+                />
                 <circle
                   cx="24" cy="24" r="20"
                   fill="transparent"
                   stroke="currentColor"
                   strokeWidth="4"
-                  className="text-slate-100"
+                  className="text-slate-100 hidden sm:block"
+                />
+                <circle
+                  cx="20" cy="20" r="18"
+                  fill="transparent"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeDasharray={113}
+                  strokeDashoffset={113 * (1 - Math.min(1, maxUtilization))}
+                  className={cn(
+                    "transition-all duration-1000 sm:hidden",
+                    maxUtilization > 1 ? "text-red-500" : maxUtilization > 0.8 ? "text-amber-500" : "text-blue-500"
+                  )}
                 />
                 <circle
                   cx="24" cy="24" r="20"
@@ -693,12 +712,12 @@ const ProjectResultsView = ({
                   strokeDasharray={125.6}
                   strokeDashoffset={125.6 * (1 - Math.min(1, maxUtilization))}
                   className={cn(
-                    "transition-all duration-1000",
+                    "transition-all duration-1000 hidden sm:block",
                     maxUtilization > 1 ? "text-red-500" : maxUtilization > 0.8 ? "text-amber-500" : "text-blue-500"
                   )}
                 />
               </svg>
-              <Activity className="w-4 h-4 absolute text-slate-300" />
+              <Activity className="w-3 h-3 sm:w-4 sm:h-4 absolute text-slate-300" />
             </div>
           </div>
           <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -714,7 +733,7 @@ const ProjectResultsView = ({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <SummaryCard 
           label={t.maxDeflection} 
           value={`${toDisplay(results.summary.maxDeflection, 'length').toFixed(unitSystem === 'metric' ? 2 : 4)} ${u.length}`} 
@@ -748,26 +767,26 @@ const ProjectResultsView = ({
 
       <Card className="shadow-sm border-slate-200 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="px-4 pt-4 border-b bg-slate-50/50 flex items-center justify-between">
-            <TabsList className="bg-transparent border-none h-auto p-0 gap-4">
-              <TabsTrigger value="deflection" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">{t.deflection}</TabsTrigger>
-              <TabsTrigger value="moment" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">{t.moment}</TabsTrigger>
-              <TabsTrigger value="shear" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">{t.shear}</TabsTrigger>
-              <TabsTrigger value="stress" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">{t.stress}</TabsTrigger>
-              <TabsTrigger value="utilization" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">Utilization</TabsTrigger>
-              <TabsTrigger value="3d" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-xs font-bold uppercase tracking-wider">3D Model</TabsTrigger>
+          <div className="px-4 pt-4 border-b bg-slate-50/50 flex items-center justify-between overflow-x-auto no-scrollbar">
+            <TabsList className="bg-transparent border-none h-auto p-0 gap-4 flex-nowrap">
+              <TabsTrigger value="deflection" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.deflection}</TabsTrigger>
+              <TabsTrigger value="moment" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.moment}</TabsTrigger>
+              <TabsTrigger value="shear" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.shear}</TabsTrigger>
+              <TabsTrigger value="stress" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.stress}</TabsTrigger>
+              <TabsTrigger value="utilization" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">Utilization</TabsTrigger>
+              <TabsTrigger value="3d" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">3D Model</TabsTrigger>
             </TabsList>
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 text-slate-400 hover:text-blue-600"
+              className="h-8 w-8 text-slate-400 hover:text-blue-600 shrink-0 ml-2 hidden sm:flex"
               onClick={() => setIsChartExpanded(!isChartExpanded)}
             >
               <Maximize2 className="w-4 h-4" />
             </Button>
           </div>
           
-          <div className={cn("p-4", isChartExpanded ? "h-[600px]" : "h-[350px]")}>
+          <div className={cn("p-3 sm:p-4", isChartExpanded ? "h-[600px]" : "h-[280px] sm:h-[350px]")}>
             <TabsContent value="deflection" className="h-full m-0">
               <ChartContainer 
                 data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), deflection: toDisplay(p.deflection, 'length') }))} 
@@ -845,14 +864,47 @@ const ProjectResultsView = ({
   );
 };
 
+const PRESET_PROFILES = [
+  {
+    id: 'mullion-50-150',
+    name: 'Mullion M150 (50x150)',
+    extruder: 'Standard Extrusions Ltd',
+    url: 'https://picsum.photos/seed/mullion1/400/300',
+    dimensions: { width: 50, height: 150, thickness: 3 }
+  },
+  {
+    id: 'transom-50-80',
+    name: 'Transom T80 (50x80)',
+    extruder: 'Standard Extrusions Ltd',
+    url: 'https://picsum.photos/seed/transom1/400/300',
+    dimensions: { width: 50, height: 80, thickness: 2.5 }
+  },
+  {
+    id: 'heavy-mullion-60-200',
+    name: 'Heavy Mullion H200 (60x200)',
+    extruder: 'Industrial Profiles Corp',
+    url: 'https://picsum.photos/seed/heavy1/400/300',
+    dimensions: { width: 60, height: 200, thickness: 4 }
+  },
+  {
+    id: 'slim-mullion-40-120',
+    name: 'Slim Mullion S120 (40x120)',
+    extruder: 'Architectural Systems',
+    url: 'https://picsum.photos/seed/slim1/400/300',
+    dimensions: { width: 40, height: 120, thickness: 2.5 }
+  }
+];
+
 const ReferenceAttachmentCard = ({ 
   attachment, 
   onAttachmentChange,
-  setNotification 
+  setNotification,
+  onApplyPreset
 }: { 
   attachment: string; 
   onAttachmentChange: (v: string) => void;
   setNotification: (v: { message: string; type: 'success' | 'error' } | null) => void;
+  onApplyPreset?: (preset: typeof PRESET_PROFILES[0]) => void;
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -892,26 +944,52 @@ const ReferenceAttachmentCard = ({
 
   return (
     <Card className="shadow-sm border-slate-200 overflow-hidden" onPaste={handlePaste}>
-      <CardHeader className="pb-3">
+      <CardHeader className="p-3 sm:pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-blue-600">
-            <Paperclip className="w-4 h-4" />
-            <span className="text-xs font-bold uppercase tracking-widest">Reference</span>
+            <Paperclip className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">Reference</span>
           </div>
-          {attachment && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-6 w-6 text-slate-400 hover:text-red-500"
-              onClick={() => onAttachmentChange('')}
-            >
-              <Trash2 className="w-3 h-3" />
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={
+                <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                  <Box className="w-3 h-3" />
+                  Presets
+                </Button>
+              } />
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Standard Profiles</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {PRESET_PROFILES.map((preset) => (
+                    <DropdownMenuItem 
+                      key={preset.id} 
+                      onClick={() => onApplyPreset?.(preset)}
+                      className="flex flex-col items-start gap-0.5"
+                    >
+                      <span className="font-bold text-xs">{preset.name}</span>
+                      <span className="text-[10px] text-slate-400">{preset.extruder}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {attachment && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-5 w-5 sm:h-6 sm:w-6 text-slate-400 hover:text-red-500"
+                onClick={() => onAttachmentChange('')}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            )}
+          </div>
         </div>
-        <CardTitle className="text-sm">Calculation Reference</CardTitle>
+        <CardTitle className="text-xs sm:text-sm">Calculation Reference</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
         {attachment ? (
           <div className="relative group rounded-lg overflow-hidden border bg-slate-50 aspect-video flex items-center justify-center">
             <img 
@@ -1906,26 +1984,26 @@ export function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-7xl mx-auto px-4 py-16 md:py-24"
+              className="max-w-7xl mx-auto px-4 py-8 md:py-24"
             >
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
-                <div className="space-y-8">
+              <div className="grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
+                <div className="space-y-6 md:space-y-8 text-center lg:text-left">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold uppercase tracking-wider">
                     <Activity className="w-3 h-3" />
                     v1.0.0 Now Live
                   </div>
-                  <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 leading-[1.1]">
+                  <h2 className="text-3xl sm:text-4xl md:text-6xl font-black tracking-tight text-slate-900 leading-[1.1]">
                     {t.heroTitle}
                   </h2>
-                  <p className="text-lg text-slate-600 leading-relaxed max-w-xl">
+                  <p className="text-base md:text-lg text-slate-600 leading-relaxed max-w-xl mx-auto lg:mx-0">
                     {t.heroDesc}
                   </p>
-                  <div className="flex flex-wrap gap-4">
-                    <Button size="lg" onClick={() => setView('calculator')} className="h-14 px-8 text-lg bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200">
+                  <div className="flex flex-wrap justify-center lg:justify-start gap-4">
+                    <Button size="lg" onClick={() => setView('calculator')} className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200">
                       {t.getStarted}
                       <ChevronRight className="ml-2 w-5 h-5" />
                     </Button>
-                    <Button size="lg" variant="outline" onClick={() => setView('docs')} className="h-14 px-8 text-lg border-slate-200">
+                    <Button size="lg" variant="outline" onClick={() => setView('docs')} className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg border-slate-200">
                       {t.howItWorks}
                     </Button>
                   </div>
@@ -2070,7 +2148,7 @@ export function App() {
                         className="bg-slate-50/50"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="proj-date">Date</Label>
                         <Input 
@@ -2078,7 +2156,7 @@ export function App() {
                           type="date"
                           value={projectDate}
                           onChange={(e) => setProjectDate(e.target.value)}
-                          className="bg-slate-50/50"
+                          className="bg-slate-50/50 text-xs sm:text-sm"
                         />
                       </div>
                       <div className="grid gap-2">
@@ -2088,7 +2166,7 @@ export function App() {
                           type="time"
                           value={projectTime}
                           onChange={(e) => setProjectTime(e.target.value)}
-                          className="bg-slate-50/50"
+                          className="bg-slate-50/50 text-xs sm:text-sm"
                         />
                       </div>
                     </div>
@@ -2099,7 +2177,7 @@ export function App() {
                         value={projectDescription}
                         onChange={(e) => setProjectDescription(e.target.value)}
                         placeholder="Project details..."
-                        className="flex min-h-[80px] w-full rounded-md border border-input bg-slate-50/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex min-h-[60px] sm:min-h-[80px] w-full rounded-md border border-input bg-slate-50/50 px-3 py-2 text-xs sm:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       />
                     </div>
                   </CardContent>
@@ -2110,6 +2188,14 @@ export function App() {
                   attachment={projectAttachment}
                   onAttachmentChange={setProjectAttachment}
                   setNotification={setNotification}
+                  onApplyPreset={(preset) => {
+                    setProjectAttachment(preset.url);
+                    setWidth(preset.dimensions.width);
+                    setHeight(preset.dimensions.height);
+                    setThickness(preset.dimensions.thickness);
+                    setSectionType('hollow');
+                    setNotification({ message: `Applied ${preset.name} preset`, type: 'success' });
+                  }}
                 />
 
                 {/* Active Combination Selector for Mobile/Quick Access */}
@@ -2296,12 +2382,12 @@ export function App() {
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-5 gap-0.5 bg-slate-100/80 rounded-sm p-0.5">
+                    <div className="grid grid-cols-5 gap-0.5 bg-slate-100/80 rounded-sm p-0.5 sm:p-1">
                       {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
-                        <div key={key} className="text-center border-r border-slate-200/50 last:border-none">
-                          <div className="text-[6px] uppercase text-slate-500 font-black leading-none mb-0.5">{key[0]}</div>
+                        <div key={key} className="text-center border-r border-slate-200/50 last:border-none px-0.5">
+                          <div className="text-[5px] sm:text-[6px] uppercase text-slate-500 font-black leading-none mb-0.5">{key[0]}</div>
                           <div className={cn(
-                            "text-[9px] font-mono font-bold leading-none",
+                            "text-[8px] sm:text-[9px] font-mono font-bold leading-none",
                             comb.factors[key as keyof typeof LOAD_CATEGORIES] > 0 ? "text-blue-600" : "text-slate-400"
                           )}>
                             {comb.factors[key as keyof typeof LOAD_CATEGORIES]}
@@ -2400,7 +2486,7 @@ export function App() {
                 </Tabs>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="width">{t.width} ({u.length})</Label>
                   <Input 
@@ -2410,7 +2496,7 @@ export function App() {
                     max={toDisplay(5000, 'length')}
                     value={Number(toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
                     onChange={(e) => setWidth(fromDisplay(safeParseNumber(e.target.value, toDisplay(width, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
-                    className="bg-slate-50/50"
+                    className="bg-slate-50/50 text-xs sm:text-sm"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -2422,7 +2508,7 @@ export function App() {
                     max={toDisplay(5000, 'length')}
                     value={Number(toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
                     onChange={(e) => setHeight(fromDisplay(safeParseNumber(e.target.value, toDisplay(height, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
-                    className="bg-slate-50/50"
+                    className="bg-slate-50/50 text-xs sm:text-sm"
                   />
                 </div>
               </div>
@@ -2556,7 +2642,7 @@ export function App() {
 
               <div className="grid gap-2">
                 <Label>{t.seismicCoeff}</Label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <div className="relative flex-1">
                     <Input 
                       type="number" 
@@ -2565,7 +2651,7 @@ export function App() {
                       max="10"
                       value={seismicCoeff} 
                       onChange={(e) => setSeismicCoeff(safeParseNumber(e.target.value, seismicCoeff, 0, 10))}
-                      className="bg-slate-50/50 pr-8"
+                      className="bg-slate-50/50 pr-8 text-xs sm:text-sm"
                     />
                     <Button
                       variant="ghost"
@@ -2580,10 +2666,10 @@ export function App() {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="shrink-0 gap-2 h-10 border-rose-200 text-rose-600 hover:bg-rose-50"
+                    className="shrink-0 gap-2 h-10 sm:h-9 border-rose-200 text-rose-600 hover:bg-rose-50 text-[10px] sm:text-xs font-bold uppercase tracking-wider"
                     onClick={applySeismicLoad}
                   >
-                    <PlusCircle className="w-4 h-4" />
+                    <PlusCircle className="w-3 h-3 sm:w-4 sm:h-4" />
                     {t.applySeismic}
                   </Button>
                 </div>
@@ -3194,21 +3280,21 @@ export function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t py-12 print:hidden">
+      <footer className="bg-white border-t py-8 sm:py-12 print:hidden">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
-            <div className="col-span-2 space-y-4">
-              <div className="flex items-center gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12 mb-8 sm:mb-12">
+            <div className="sm:col-span-2 space-y-4 text-center sm:text-left">
+              <div className="flex items-center justify-center sm:justify-start gap-3">
                 <div className="bg-blue-600 p-1.5 rounded-lg">
                   <Calculator className="w-5 h-5 text-white" />
                 </div>
                 <h2 className="font-bold text-xl tracking-tight">{t.title}</h2>
               </div>
-              <p className="text-slate-500 text-sm max-w-sm">
+              <p className="text-slate-500 text-sm max-w-sm mx-auto sm:mx-0">
                 Professional structural analysis for facade engineering. Built for precision, speed, and reliability.
               </p>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 text-center sm:text-left">
               <h4 className="font-bold text-sm uppercase tracking-widest text-slate-900">Product</h4>
               <ul className="space-y-2 text-sm text-slate-500">
                 <li><button onClick={() => setView('calculator')} className="hover:text-blue-600 transition-colors">Calculator</button></li>
@@ -3216,7 +3302,7 @@ export function App() {
                 <li><a href="#" className="hover:text-blue-600 transition-colors">Release Notes</a></li>
               </ul>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 text-center sm:text-left">
               <h4 className="font-bold text-sm uppercase tracking-widest text-slate-900">Support</h4>
               <ul className="space-y-2 text-sm text-slate-500">
                 <li><a href="#" className="hover:text-blue-600 transition-colors">Help Center</a></li>
@@ -3225,9 +3311,9 @@ export function App() {
               </ul>
             </div>
           </div>
-          <div className="pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400 font-medium">
+          <div className="pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] sm:text-xs text-slate-400 font-medium text-center sm:text-left">
             <div>© {new Date().getFullYear()} {t.title}. {t.footerRights}</div>
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6">
               <a href="#" className="hover:text-slate-600 transition-colors">Privacy Policy</a>
               <a href="#" className="hover:text-slate-600 transition-colors">Terms of Service</a>
               <a href="#" className="hover:text-slate-600 transition-colors">Cookie Settings</a>
@@ -3360,10 +3446,10 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active, pr
       )}
       onClick={onClick}
     >
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-center justify-between mb-2">
+      <CardContent className="p-2 sm:p-3 sm:p-4">
+        <div className="flex items-center justify-between mb-1 sm:mb-2">
           <span className={cn(
-            "text-[9px] sm:text-[10px] font-bold uppercase tracking-wider truncate mr-1 transition-colors",
+            "text-[8px] sm:text-[10px] font-bold uppercase tracking-wider truncate mr-1 transition-colors",
             active ? "text-blue-600" : "text-slate-500 group-hover:text-blue-500"
           )}>{label}</span>
           <div className={cn(
@@ -3371,10 +3457,10 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active, pr
             active ? "scale-110" : "group-hover:scale-110"
           )}>{icon}</div>
         </div>
-        <div className="text-sm sm:text-lg font-bold tracking-tight truncate">{value}</div>
+        <div className="text-xs sm:text-lg font-bold tracking-tight truncate">{value}</div>
         {subValue && (
           <div className={cn(
-            "text-[9px] sm:text-[10px] font-medium mt-1 truncate",
+            "text-[8px] sm:text-[10px] font-medium mt-0.5 sm:mt-1 truncate",
             status === 'fail' ? "text-red-600" : status === 'pass' ? "text-green-600" : "text-slate-400"
           )}>
             {subValue}
