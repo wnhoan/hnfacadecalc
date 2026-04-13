@@ -9,8 +9,26 @@ interface BeamVisualizer3DProps {
   height: number;
   thickness: number;
   sectionType: 'solid' | 'hollow';
+  supportCondition?: 'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned';
   materialColor?: string;
 }
+
+const SupportIndicator: React.FC<{ type: 'pin' | 'fixed', position: [number, number, number] }> = ({ type, position }) => {
+  if (type === 'pin') {
+    return (
+      <mesh position={position}>
+        <coneGeometry args={[20, 40, 4]} />
+        <meshStandardMaterial color="#64748b" />
+      </mesh>
+    );
+  }
+  return (
+    <mesh position={position}>
+      <boxGeometry args={[20, 80, 80]} />
+      <meshStandardMaterial color="#475569" />
+    </mesh>
+  );
+};
 
 const BeamModel: React.FC<BeamVisualizer3DProps> = ({ 
   length, 
@@ -18,6 +36,7 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
   height, 
   thickness, 
   sectionType,
+  supportCondition = 'simply_supported',
   materialColor = '#94a3b8' 
 }) => {
   const geometry = useMemo(() => {
@@ -67,10 +86,33 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
         />
       </mesh>
       
+      {/* Supports */}
+      {supportCondition === 'simply_supported' && (
+        <>
+          <SupportIndicator type="pin" position={[0, -height / 2 - 20, 0]} />
+          <SupportIndicator type="pin" position={[0, -height / 2 - 20, length]} />
+        </>
+      )}
+      {supportCondition === 'cantilever' && (
+        <SupportIndicator type="fixed" position={[0, 0, 0]} />
+      )}
+      {supportCondition === 'fixed_fixed' && (
+        <>
+          <SupportIndicator type="fixed" position={[0, 0, 0]} />
+          <SupportIndicator type="fixed" position={[0, 0, length]} />
+        </>
+      )}
+      {supportCondition === 'fixed_pinned' && (
+        <>
+          <SupportIndicator type="fixed" position={[0, 0, 0]} />
+          <SupportIndicator type="pin" position={[0, -height / 2 - 20, length]} />
+        </>
+      )}
+      
       {/* Dimension Labels */}
-      <group position={[length / 2, height / 2 + 20, 0]} rotation={[0, Math.PI / 2, 0]}>
-         <Text fontSize={15} color="#64748b" anchorX="center" anchorY="middle">
-           {length}mm
+      <group position={[length / 2, height / 2 + 40, 0]} rotation={[0, Math.PI / 2, 0]}>
+         <Text fontSize={20} color="#94a3b8" anchorX="center" anchorY="middle">
+           L = {length}mm
          </Text>
       </group>
     </group>

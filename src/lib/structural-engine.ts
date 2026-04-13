@@ -10,6 +10,7 @@ export interface BeamProperties {
   yieldStrength: number; // MPa
   sectionModulus: number; // mm3
   safetyFactor: number;
+  supportCondition?: 'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned';
 }
 
 export interface Load {
@@ -47,7 +48,7 @@ export function calculateBeam(
   loads: Load[],
   steps: number = 200
 ): { points: CalculationResult[]; summary: SummaryResults } {
-  const { length, elasticModulus, momentOfInertia, sectionModulus, yieldStrength } = props;
+  const { length, elasticModulus, momentOfInertia, sectionModulus, yieldStrength, supportCondition = 'simply_supported' } = props;
   
   // Robustness check: avoid division by zero
   if (length <= 0 || momentOfInertia <= 0 || elasticModulus <= 0) {
@@ -71,138 +72,262 @@ export function calculateBeam(
   }
 
   const EI = elasticModulus * momentOfInertia;
+  const dx = length / steps;
   const points: CalculationResult[] = [];
 
-  // Calculate reactions using numerical integration for simplicity and flexibility
-  let R1 = 0; 
-  const dx_reaction = length / 1000;
-  let totalLoadMagnitude = 0;
-  let totalMomentAboutR1 = 0;
+  // Function to calculate internal forces given reactions at x=0
+  const getInternalForces = (R0: number, M0: number) => {
+    const results: { x: number; moment: number; shear: number }[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const x = (length * i) / steps;
+      let moment = M0 + R0 * x;
+      let shear = R0;
 
-  loads.forEach((load) => {
-    if (load.type === 'udl') {
-      const w = load.value;
-      const W = w * length;
-      totalLoadMagnitude += W;
-      totalMomentAboutR1 += W * (length / 2);
-    } else if (load.type === 'point') {
-      const P = load.value;
-      const a = load.position ?? length / 2;
-      totalLoadMagnitude += P;
-      totalMomentAboutR1 += P * a;
-    } else if (load.type === 'trapezoidal') {
-      const w1 = load.value;
-      const w2 = load.value2 ?? load.value;
-      const x1 = load.start ?? 0;
-      const x2 = load.end ?? length;
-      const L_load = Math.max(0, x2 - x1);
-      
-      if (L_load > 0) {
-        // Area of trapezoid
-        const W = 0.5 * (w1 + w2) * L_load;
-        // Centroid of trapezoid relative to x1
-        // Avoid division by zero if w1 + w2 is zero
-        const x_c_rel = (w1 + w2) !== 0 
-          ? (L_load / 3) * ((w1 + 2 * w2) / (w1 + w2))
-          : L_load / 2;
-        const x_c = x1 + x_c_rel;
-        
-        totalLoadMagnitude += W;
-        totalMomentAboutR1 += W * x_c;
-      }
+      loads.forEach((load) => {
+        if (load.type === 'udl') {
+          if (x > 0) {
+            shear -= load.value * x;
+            moment -= (load.value * x * x) / 2;
+          }
+        } else if (load.type === 'point') {
+          const a = load.position ?? length / 2;
+          if (x > a) {
+            shear -= load.value;
+            moment -= load.value * (x - a);
+          }
+        } else if (load.type === 'trapezoidal') {
+          const w1 = load.value;
+          const w2 = load.value2 ?? load.value;
+          const x1 = load.start ?? 0;
+          const x2 = load.end ?? length;
+          const L_total = x2 - x1;
+          
+          if (x > x1 && L_total > 0) {
+            const curr_x = Math.min(x, x2);
+            const L_seg = curr_x - x1;
+            const w_at_x = w1 + (w2 - w1) * (L_seg / L_total);
+            const W_seg = 0.5 * (w1 + w_at_x) * L_seg;
+            const x_c_seg_rel = (w1 + w_at_x) !== 0
+              ? (L_seg / 3) * ((w1 + 2 * w_at_x) / (w1 + w_at_x))
+              : L_seg / 2;
+            
+            shear -= W_seg;
+            moment -= W_seg * (x - (x1 + x_c_seg_rel));
+          }
+        }
+      });
+      results.push({ x, moment, shear });
     }
-  });
+    return results;
+  };
 
-  const R2 = totalMomentAboutR1 / length;
-  R1 = totalLoadMagnitude - R2;
+  // Function to calculate deflection given internal forces and initial slope/deflection
+  const getDeflection = (internalForces: { x: number; moment: number }[], v0: number, theta0: number) => {
+    let slope = theta0;
+    let deflection = v0;
+    const deflections: number[] = [v0];
 
-  // Calculate internal forces and deflection
-  // We use numerical integration for deflection: EI * v'' = -M
-  // v' = integral(-M/EI) + C1
-  // v = integral(v') + C2
-  // Boundary conditions: v(0) = 0, v(L) = 0
-  
-  const tempPoints: { x: number; moment: number; shear: number }[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const x = (length * i) / steps;
-    let moment = R1 * x;
-    let shear = R1;
+    for (let i = 0; i < steps; i++) {
+      const M_avg = (internalForces[i].moment + internalForces[i+1].moment) / 2;
+      slope += (-M_avg / EI) * dx;
+      deflection += slope * dx;
+      deflections.push(deflection);
+    }
+    return deflections;
+  };
 
-    loads.forEach((load) => {
-      if (load.type === 'udl') {
-        if (x > 0) {
-          shear -= load.value * x;
-          moment -= (load.value * x * x) / 2;
-        }
-      } else if (load.type === 'point') {
-        const a = load.position ?? length / 2;
-        if (x > a) {
-          shear -= load.value;
-          moment -= load.value * (x - a);
-        }
-      } else if (load.type === 'trapezoidal') {
-        const w1 = load.value;
-        const w2 = load.value2 ?? load.value;
-        const x1 = load.start ?? 0;
-        const x2 = load.end ?? length;
-        const L_total = x2 - x1;
-        
-        if (x > x1 && L_total > 0) {
-          const curr_x = Math.min(x, x2);
-          const L_seg = curr_x - x1;
-          const w_at_x = w1 + (w2 - w1) * (L_seg / L_total);
-          
-          // Load of the segment from x1 to curr_x
-          const W_seg = 0.5 * (w1 + w_at_x) * L_seg;
-          // Centroid of the segment relative to x1
-          const x_c_seg_rel = (w1 + w_at_x) !== 0
-            ? (L_seg / 3) * ((w1 + 2 * w_at_x) / (w1 + w_at_x))
-            : L_seg / 2;
-          
-          shear -= W_seg;
-          moment -= W_seg * (x - (x1 + x_c_seg_rel));
-        }
+  let R0 = 0;
+  let M0 = 0;
+  let v0 = 0;
+  let theta0 = 0;
+
+  // Solve for reactions based on support conditions
+  if (supportCondition === 'simply_supported') {
+    // Reactions at x=0: R0. M0 = 0.
+    // Boundary conditions: v(0) = 0, v(L) = 0.
+    // We need to find R0 such that M(L) = 0 (pinned at L).
+    // Actually, for simply supported, R0 is statically determinate.
+    let totalLoad = 0;
+    let totalMomentAbout0 = 0;
+    loads.forEach(l => {
+      if (l.type === 'udl') {
+        const W = l.value * length;
+        totalLoad += W;
+        totalMomentAbout0 += W * (length / 2);
+      } else if (l.type === 'point') {
+        totalLoad += l.value;
+        totalMomentAbout0 += l.value * (l.position ?? length / 2);
+      } else if (l.type === 'trapezoidal') {
+        const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
+        const W = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
+        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 
+          ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value)))
+          : L_load / 2;
+        totalLoad += W;
+        totalMomentAbout0 += W * ((l.start ?? 0) + x_c_rel);
       }
     });
+    const R_L = totalMomentAbout0 / length;
+    R0 = totalLoad - R_L;
+    M0 = 0;
+    v0 = 0;
+    // Find theta0 such that v(L) = 0
+    const forces = getInternalForces(R0, M0);
+    const v_base = getDeflection(forces, 0, 0);
+    theta0 = -v_base[steps] / length;
+  } else if (supportCondition === 'cantilever') {
+    // Fixed at x=0. Free at x=L.
+    // Reactions at x=0: R0, M0.
+    // Boundary conditions: v(0) = 0, v'(0) = 0.
+    // R0 and M0 are statically determinate.
+    let totalLoad = 0;
+    let totalMomentAbout0 = 0;
+    loads.forEach(l => {
+      if (l.type === 'udl') {
+        const W = l.value * length;
+        totalLoad += W;
+        totalMomentAbout0 += W * (length / 2);
+      } else if (l.type === 'point') {
+        totalLoad += l.value;
+        totalMomentAbout0 += l.value * (l.position ?? length / 2);
+      } else if (l.type === 'trapezoidal') {
+        const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
+        const W = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
+        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 
+          ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value)))
+          : L_load / 2;
+        totalLoad += W;
+        totalMomentAbout0 += W * ((l.start ?? 0) + x_c_rel);
+      }
+    });
+    R0 = totalLoad;
+    M0 = -totalMomentAbout0;
+    v0 = 0;
+    theta0 = 0;
+  } else if (supportCondition === 'fixed_pinned') {
+    // Fixed at x=0, Pinned at x=L.
+    // v(0)=0, v'(0)=0, v(L)=0.
+    // Unknowns: R0, M0.
+    // We can use superposition or solve for redundant R_L.
+    // Let's solve for R_L such that v(L) = 0.
+    // M(x) = M_cantilever(x) + R_L * (L - x)
+    // Wait, let's use the R0, M0 approach.
+    // M1 + R2*L = Sum(P * (L - a)) => M0 + R_L*L = Sum(P*a)
+    // R0 + R_L = Sum(P)
+    // M0 = Sum(P*a) - R_L*L
+    // R0 = Sum(P) - R_L
+    
+    let sumP = 0;
+    let sumPa = 0;
+    loads.forEach(l => {
+      let P = 0, a = 0;
+      if (l.type === 'udl') { P = l.value * length; a = length / 2; }
+      else if (l.type === 'point') { P = l.value; a = l.position ?? length / 2; }
+      else if (l.type === 'trapezoidal') {
+        const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
+        P = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
+        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 
+          ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value)))
+          : L_load / 2;
+        a = (l.start ?? 0) + x_c_rel;
+      }
+      sumP += P;
+      sumPa += P * a;
+    });
 
-    tempPoints.push({ x, moment, shear });
+    // Solve for R_L such that v(L) = 0
+    // v(L) is linear in R_L. Let's use two points.
+    const getVL = (RL_test: number) => {
+      const R0_test = sumP - RL_test;
+      const M0_test = sumPa - RL_test * length;
+      const forces = getInternalForces(R0_test, M0_test);
+      const defls = getDeflection(forces, 0, 0);
+      return defls[steps];
+    };
+
+    const v1 = getVL(0);
+    const v2 = getVL(sumP);
+    const RL = v1 / (v1 - v2) * sumP;
+    
+    R0 = sumP - RL;
+    M0 = sumPa - RL * length;
+    v0 = 0;
+    theta0 = 0;
+  } else if (supportCondition === 'fixed_fixed') {
+    // Fixed at x=0, Fixed at x=L.
+    // v(0)=0, v'(0)=0, v(L)=0, v'(L)=0.
+    // Unknowns: R0, M0.
+    let sumP = 0;
+    let sumPa = 0;
+    loads.forEach(l => {
+      let P = 0, a = 0;
+      if (l.type === 'udl') { P = l.value * length; a = length / 2; }
+      else if (l.type === 'point') { P = l.value; a = l.position ?? length / 2; }
+      else if (l.type === 'trapezoidal') {
+        const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
+        P = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
+        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 
+          ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value)))
+          : L_load / 2;
+        a = (l.start ?? 0) + x_c_rel;
+      }
+      sumP += P;
+      sumPa += P * a;
+    });
+
+    // We need to find R0 and M0 such that v(L)=0 and v'(L)=0.
+    // This is a 2x2 system.
+    // v(L) = v_base(L) + R0 * f1 + M0 * f2
+    // v'(L) = v'_base(L) + R0 * g1 + M0 * g2
+    // But we can just use the numerical engine to find the influence coefficients.
+    
+    const getBoundaryErrors = (R0_test: number, M0_test: number) => {
+      const forces = getInternalForces(R0_test, M0_test);
+      const defls = getDeflection(forces, 0, 0);
+      // v'(L) = integral(-M/EI)
+      let finalSlope = 0;
+      for (let i = 0; i < steps; i++) {
+        finalSlope += (-(forces[i].moment + forces[i+1].moment) / (2 * EI)) * dx;
+      }
+      return { vL: defls[steps], thetaL: finalSlope };
+    };
+
+    // Solve system:
+    // f(R0, M0) = vL = 0
+    // g(R0, M0) = thetaL = 0
+    const base = getBoundaryErrors(0, 0);
+    const dR = getBoundaryErrors(1000, 0);
+    const dM = getBoundaryErrors(0, 1000000);
+
+    const dvL_dR = (dR.vL - base.vL) / 1000;
+    const dvL_dM = (dM.vL - base.vL) / 1000000;
+    const dthetaL_dR = (dR.thetaL - base.thetaL) / 1000;
+    const dthetaL_dM = (dM.thetaL - base.thetaL) / 1000000;
+
+    // Matrix:
+    // [ dvL_dR  dvL_dM ] [ R0 ] = [ -base.vL ]
+    // [ dthetaL_dR dthetaL_dM ] [ M0 ] = [ -base.thetaL ]
+    const det = dvL_dR * dthetaL_dM - dvL_dM * dthetaL_dR;
+    if (Math.abs(det) > 1e-20) {
+      R0 = ((-base.vL) * dthetaL_dM - (dvL_dM) * (-base.thetaL)) / det;
+      M0 = (dvL_dR * (-base.thetaL) - (-base.vL) * dthetaL_dR) / det;
+    }
+    v0 = 0;
+    theta0 = 0;
   }
 
-  // Numerical integration for deflection
-  // v'' = -M/EI
-  // Integrate twice
-  let slope = 0; // Initial guess for v'(0)
-  let deflection = 0;
-  const dx = length / steps;
-
-  // We need to find the correct initial slope C1 such that v(L) = 0
-  // v(x) = integral_0^x (integral_0^xi (-M/EI) dtau + C1) dxi
-  // v(x) = v_base(x) + C1*x
-  // v(L) = v_base(L) + C1*L = 0  => C1 = -v_base(L) / L
-
-  let v_base = 0;
-  let v_prime_base = 0;
-  const v_base_values: number[] = [0];
-
-  for (let i = 0; i < steps; i++) {
-    const M_avg = (tempPoints[i].moment + tempPoints[i+1].moment) / 2;
-    v_prime_base += (-M_avg / EI) * dx;
-    v_base += v_prime_base * dx;
-    v_base_values.push(v_base);
-  }
-
-  const C1 = -v_base / length;
+  const finalForces = getInternalForces(R0, M0);
+  const finalDeflections = getDeflection(finalForces, v0, theta0);
 
   for (let i = 0; i <= steps; i++) {
-    const x = tempPoints[i].x;
-    const defl = v_base_values[i] + C1 * x;
-    const stress = sectionModulus > 0 ? Math.abs(tempPoints[i].moment) / sectionModulus : 0;
+    const x = finalForces[i].x;
+    const stress = sectionModulus > 0 ? Math.abs(finalForces[i].moment) / sectionModulus : 0;
 
     points.push({
       x,
-      deflection: defl,
-      moment: tempPoints[i].moment,
-      shear: tempPoints[i].shear,
+      deflection: finalDeflections[i],
+      moment: finalForces[i].moment,
+      shear: finalForces[i].shear,
       stress,
     });
   }

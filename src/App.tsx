@@ -56,7 +56,9 @@ import { Button } from '@/components/ui/button';
 import { 
   Select, 
   SelectContent, 
+  SelectGroup,
   SelectItem, 
+  SelectLabel,
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
@@ -133,24 +135,56 @@ function ErrorFallback() {
 }
 
 const MATERIALS = {
-  aluminum_6063_t6: { name: 'Aluminum 6063-T6 (Extrusion)', e: 70000, yield: 160 },
-  aluminum_6063_t66: { name: 'Aluminum 6063-T66 (High Strength Extrusion)', e: 70000, yield: 200 },
-  aluminum_6063_t5: { name: 'Aluminum 6063-T5', e: 70000, yield: 110 },
-  aluminum_6061_t6: { name: 'Aluminum 6061-T6 (Structural)', e: 70000, yield: 240 },
-  aluminum_6082_t6: { name: 'Aluminum 6082-T6 (Structural)', e: 70000, yield: 250 },
-  aluminum_3003_h14: { name: 'Aluminum 3003-H14 (Cladding)', e: 70000, yield: 145 },
-  aluminum_5005_h34: { name: 'Aluminum 5005-H34 (Anodized)', e: 70000, yield: 135 },
-  aluminum_5754_h22: { name: 'Aluminum 5754-H22 (High Strength)', e: 70000, yield: 190 },
-  steel_s235: { name: 'Steel S235', e: 210000, yield: 235 },
-  steel_s275: { name: 'Steel S275', e: 210000, yield: 275 },
-  steel_s355: { name: 'Steel S355', e: 210000, yield: 355 },
-  stainless_304: { name: 'Stainless Steel 304', e: 193000, yield: 205 },
-  stainless_316: { name: 'Stainless Steel 316', e: 200000, yield: 215 },
-  glass_annealed: { name: 'Glass (Annealed)', e: 70000, yield: 45 },
-  glass_tempered: { name: 'Glass (Tempered)', e: 70000, yield: 120 },
-  grc: { name: 'GRC Panel', e: 15000, yield: 8 },
-  terracotta: { name: 'Terracotta', e: 30000, yield: 15 },
-  custom: { name: 'Custom', e: 200000, yield: 200 },
+  aluminum_6063_t6: { name: 'Aluminum 6063-T6 (Extrusion)', e: 70000, yield: 160, poisson: 0.33, category: 'Aluminum' },
+  aluminum_6063_t66: { name: 'Aluminum 6063-T66 (High Strength Extrusion)', e: 70000, yield: 200, poisson: 0.33, category: 'Aluminum' },
+  aluminum_6063_t5: { name: 'Aluminum 6063-T5', e: 70000, yield: 110, poisson: 0.33, category: 'Aluminum' },
+  aluminum_6061_t6: { name: 'Aluminum 6061-T6 (Structural)', e: 70000, yield: 240, poisson: 0.33, category: 'Aluminum' },
+  aluminum_6082_t6: { name: 'Aluminum 6082-T6 (Structural)', e: 70000, yield: 250, poisson: 0.33, category: 'Aluminum' },
+  aluminum_3003_h14: { name: 'Aluminum 3003-H14 (Cladding)', e: 70000, yield: 145, poisson: 0.33, category: 'Aluminum' },
+  aluminum_5005_h34: { name: 'Aluminum 5005-H34 (Anodized)', e: 70000, yield: 135, poisson: 0.33, category: 'Aluminum' },
+  aluminum_5754_h22: { name: 'Aluminum 5754-H22 (High Strength)', e: 70000, yield: 190, poisson: 0.33, category: 'Aluminum' },
+  steel_s235: { name: 'Steel S235', e: 210000, yield: 235, poisson: 0.30, category: 'Steel' },
+  steel_s275: { name: 'Steel S275', e: 210000, yield: 275, poisson: 0.30, category: 'Steel' },
+  steel_s355: { name: 'Steel S355', e: 210000, yield: 355, poisson: 0.30, category: 'Steel' },
+  steel_s420: { name: 'Steel S420', e: 210000, yield: 420, poisson: 0.30, category: 'Steel' },
+  steel_s460: { name: 'Steel S460', e: 210000, yield: 460, poisson: 0.30, category: 'Steel' },
+  stainless_304: { name: 'Stainless Steel 304', e: 193000, yield: 205, poisson: 0.30, category: 'Stainless Steel' },
+  stainless_316: { name: 'Stainless Steel 316', e: 200000, yield: 215, poisson: 0.30, category: 'Stainless Steel' },
+  stainless_2205: { name: 'Stainless Steel 2205 (Duplex)', e: 200000, yield: 450, poisson: 0.30, category: 'Stainless Steel' },
+  concrete_c25: { name: 'Concrete C25/30', e: 31000, yield: 25, poisson: 0.20, category: 'Concrete' },
+  concrete_c30: { name: 'Concrete C30/37', e: 33000, yield: 30, poisson: 0.20, category: 'Concrete' },
+  concrete_c40: { name: 'Concrete C40/50', e: 35000, yield: 40, poisson: 0.20, category: 'Concrete' },
+  timber_softwood: { name: 'Timber (Softwood C24)', e: 11000, yield: 24, poisson: 0.30, category: 'Timber' },
+  timber_hardwood: { name: 'Timber (Hardwood D40)', e: 14000, yield: 40, poisson: 0.30, category: 'Timber' },
+  timber_glulam: { name: 'Timber (Glulam GL24h)', e: 11500, yield: 24, poisson: 0.30, category: 'Timber' },
+  timber_clt: { name: 'Timber (CLT)', e: 11000, yield: 24, poisson: 0.30, category: 'Timber' },
+  glass_annealed: { name: 'Glass (Annealed Soda-Lime)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass' },
+  glass_tempered: { name: 'Glass (Fully Tempered Soda-Lime)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass' },
+  glass_hs: { name: 'Glass (Heat Strengthened Soda-Lime)', e: 70000, yield: 70, poisson: 0.22, category: 'Glass' },
+  glass_low_iron_annealed: { name: 'Glass (Low Iron Annealed)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass' },
+  glass_low_iron_tempered: { name: 'Glass (Low Iron Tempered)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass' },
+  glass_laminated_pvb: { name: 'Glass (Laminated PVB - Effective)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass' },
+  glass_laminated_sgp: { name: 'Glass (Laminated SentryGlas - Effective)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass' },
+  glass_borosilicate_annealed: { name: 'Glass (Borosilicate Annealed)', e: 64000, yield: 50, poisson: 0.20, category: 'Glass' },
+  glass_borosilicate_tempered: { name: 'Glass (Borosilicate Tempered)', e: 64000, yield: 150, poisson: 0.20, category: 'Glass' },
+  glass_ceramic: { name: 'Glass (Ceramic / Fire Rated)', e: 92000, yield: 180, poisson: 0.24, category: 'Glass' },
+  glass_wired: { name: 'Glass (Wired / Safety)', e: 70000, yield: 30, poisson: 0.22, category: 'Glass' },
+  glass_patterned: { name: 'Glass (Patterned / Textured)', e: 70000, yield: 35, poisson: 0.22, category: 'Glass' },
+  stone_granite: { name: 'Stone (Granite)', e: 60000, yield: 10, poisson: 0.25, category: 'Stone' },
+  stone_marble: { name: 'Stone (Marble)', e: 50000, yield: 8, poisson: 0.25, category: 'Stone' },
+  stone_limestone: { name: 'Stone (Limestone)', e: 40000, yield: 5, poisson: 0.25, category: 'Stone' },
+  stone_sandstone: { name: 'Stone (Sandstone)', e: 20000, yield: 3, poisson: 0.25, category: 'Stone' },
+  plastic_polycarb: { name: 'Polycarbonate', e: 2300, yield: 60, poisson: 0.37, category: 'Plastics' },
+  plastic_acrylic: { name: 'Acrylic (PMMA)', e: 3200, yield: 70, poisson: 0.35, category: 'Plastics' },
+  plastic_pvc: { name: 'PVC (Rigid)', e: 3000, yield: 50, poisson: 0.38, category: 'Plastics' },
+  composite_acm: { name: 'ACM (Aluminum Composite)', e: 70000, yield: 100, poisson: 0.33, category: 'Composites' },
+  composite_hpl: { name: 'HPL (High Pressure Laminate)', e: 9000, yield: 80, poisson: 0.30, category: 'Composites' },
+  metal_copper: { name: 'Copper', e: 117000, yield: 70, poisson: 0.34, category: 'Other Metals' },
+  metal_zinc: { name: 'Zinc', e: 90000, yield: 100, poisson: 0.25, category: 'Other Metals' },
+  metal_brass: { name: 'Brass', e: 105000, yield: 200, poisson: 0.34, category: 'Other Metals' },
+  grc: { name: 'GRC Panel', e: 15000, yield: 8, poisson: 0.24, category: 'Other' },
+  terracotta: { name: 'Terracotta', e: 30000, yield: 15, poisson: 0.20, category: 'Other' },
+  custom: { name: 'Custom', e: 200000, yield: 200, poisson: 0.30, category: 'Other' },
 };
 
 const LOAD_CATEGORIES = {
@@ -202,6 +236,11 @@ const TRANSLATIONS = {
     limits: 'Design Limits',
     materialProps: 'Material Properties',
     adjustSpan: 'Adjust Span Length',
+    supportCondition: 'Support Condition',
+    simplySupported: 'Simply Supported',
+    cantilever: 'Cantilever',
+    fixedFixed: 'Fixed-Fixed',
+    fixedPinned: 'Fixed-Pinned',
     seismic: 'Seismic Analysis',
     seismicRegion: 'Seismic Region',
     seismicCoeff: 'Seismic Coeff (Cs)',
@@ -256,6 +295,11 @@ const TRANSLATIONS = {
     limits: '设计限值',
     materialProps: '材料属性',
     adjustSpan: '调整跨度',
+    supportCondition: '支撑条件',
+    simplySupported: '简支',
+    cantilever: '悬臂',
+    fixedFixed: '双端固定',
+    fixedPinned: '一端固定一端简支',
     seismic: '地震分析',
     seismicRegion: '地震区域',
     seismicCoeff: '地震系数 (Cs)',
@@ -310,6 +354,11 @@ const TRANSLATIONS = {
     limits: 'ขีดจำกัดการออกแบบ',
     materialProps: 'คุณสมบัติวัสดุ',
     adjustSpan: 'ปรับความยาวช่วง',
+    supportCondition: 'เงื่อนไขการรองรับ',
+    simplySupported: 'รองรับแบบจุดหมุน',
+    cantilever: 'คานยื่น',
+    fixedFixed: 'ยึดแน่นทั้งสองด้าน',
+    fixedPinned: 'ยึดแน่นหนึ่งด้าน',
     seismic: 'การวิเคราะห์แผ่นดินไหว',
     seismicRegion: 'ภูมิภาคแผ่นดินไหว',
     seismicCoeff: 'สัมประสิทธิ์แผ่นดินไหว (Cs)',
@@ -364,6 +413,11 @@ const TRANSLATIONS = {
     limits: 'Had Reka Bentuk',
     materialProps: 'Sifat Bahan',
     adjustSpan: 'Laraskan Panjang Rentang',
+    supportCondition: 'Keadaan Sokongan',
+    simplySupported: 'Sokongan Mudah',
+    cantilever: 'Cantilever',
+    fixedFixed: 'Tetap-Tetap',
+    fixedPinned: 'Tetap-Pin',
     seismic: 'Analisis Seismik',
     seismicRegion: 'Wilayah Seismik',
     seismicCoeff: 'Pekali Seismik (Cs)',
@@ -519,6 +573,16 @@ export function App() {
       } catch (e) { return 3.5; }
     }
     return 3.5;
+  });
+  const [supportCondition, setSupportCondition] = useState<'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned'>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.supportCondition ?? 'simply_supported';
+      } catch (e) { return 'simply_supported'; }
+    }
+    return 'simply_supported';
   });
   const [safetyFactor, setSafetyFactor] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -680,7 +744,8 @@ export function App() {
     sectionModulus: sectionProps.sectionModulus,
     yieldStrength: MATERIALS[material].yield,
     safetyFactor,
-  }), [length, material, sectionProps, safetyFactor]);
+    supportCondition,
+  }), [length, material, sectionProps, safetyFactor, supportCondition]);
 
   const results = useMemo(() => {
     try {
@@ -790,7 +855,8 @@ export function App() {
         width,
         height,
         thickness,
-        safetyFactor
+        safetyFactor,
+        supportCondition
       },
       loads,
       results: {
@@ -859,6 +925,7 @@ export function App() {
       height,
       thickness,
       safetyFactor,
+      supportCondition,
       selectedCodeId,
       loads,
       combinations,
@@ -882,6 +949,7 @@ export function App() {
         if (data.height !== undefined) setHeight(data.height);
         if (data.thickness !== undefined) setThickness(data.thickness);
         if (data.safetyFactor !== undefined) setSafetyFactor(data.safetyFactor);
+        if (data.supportCondition) setSupportCondition(data.supportCondition);
         if (data.selectedCodeId) setSelectedCodeId(data.selectedCodeId);
         if (data.loads) setLoads(data.loads);
         if (data.combinations) setCombinations(data.combinations);
@@ -909,6 +977,18 @@ export function App() {
                 <Calculator className="w-5 h-5 text-white" />
               </div>
               <h1 className="font-bold text-xl tracking-tight">{t.title}</h1>
+              {view === 'calculator' && (
+                <div 
+                  className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm transition-all duration-500",
+                    results.summary.status === 'pass' 
+                      ? "bg-green-500 text-white" 
+                      : "bg-red-500 text-white"
+                  )}
+                >
+                  {results.summary.status === 'pass' ? 'PASS' : 'FAIL'}
+                </div>
+              )}
             </div>
 
             <nav className="hidden md:flex items-center gap-6">
@@ -1060,6 +1140,7 @@ export function App() {
                         height={150}
                         thickness={3.5}
                         sectionType="hollow"
+                        supportCondition="simply_supported"
                       />
                     </div>
                     <CardContent className="p-6 bg-white">
@@ -1378,8 +1459,15 @@ export function App() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(MATERIALS).map(([key, m]) => (
-                      <SelectItem key={key} value={key}>{m.name}</SelectItem>
+                    {Array.from(new Set(Object.values(MATERIALS).map(m => m.category))).map(category => (
+                      <SelectGroup key={category}>
+                        <SelectLabel className="text-blue-600 font-bold px-2 py-1.5 text-xs uppercase tracking-wider bg-blue-50/50">{category}</SelectLabel>
+                        {Object.entries(MATERIALS)
+                          .filter(([_, m]) => m.category === category)
+                          .map(([key, m]) => (
+                            <SelectItem key={key} value={key}>{m.name}</SelectItem>
+                          ))}
+                      </SelectGroup>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1397,6 +1485,21 @@ export function App() {
                   onChange={(e) => setSafetyFactor(safeParseNumber(e.target.value, safetyFactor, 1, 20))}
                   className="bg-slate-50/50"
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>{t.supportCondition}</Label>
+                <Select value={supportCondition} onValueChange={(v: any) => setSupportCondition(v)}>
+                  <SelectTrigger className="bg-slate-50/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="simply_supported">{t.simplySupported}</SelectItem>
+                    <SelectItem value="cantilever">{t.cantilever}</SelectItem>
+                    <SelectItem value="fixed_fixed">{t.fixedFixed}</SelectItem>
+                    <SelectItem value="fixed_pinned">{t.fixedPinned}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <Separator className="my-2" />
@@ -1476,13 +1579,19 @@ export function App() {
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase text-slate-400">Young's Modulus (E)</Label>
                   <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">
-                    {MATERIALS[material].e.toLocaleString()} MPa
+                    {toDisplay(MATERIALS[material].e, 'stress').toLocaleString()} {u.stress}
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase text-slate-400">Yield Strength (σy)</Label>
                   <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">
-                    {MATERIALS[material].yield.toLocaleString()} MPa
+                    {toDisplay(MATERIALS[material].yield, 'stress').toLocaleString()} {u.stress}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-slate-400">Poisson's Ratio (ν)</Label>
+                  <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">
+                    {MATERIALS[material].poisson.toFixed(2)}
                   </div>
                 </div>
               </div>
@@ -1856,6 +1965,7 @@ export function App() {
                     height={height}
                     thickness={thickness}
                     sectionType={sectionType}
+                    supportCondition={supportCondition}
                   />
                 </TabsContent>
                 <TabsContent value="deflection" className={cn("mt-0", isChartExpanded ? "h-[calc(100vh-180px)]" : "h-[300px] sm:h-[400px]")}>
@@ -1959,16 +2069,35 @@ export function App() {
 
                 {/* Supports */}
                 {/* Left Support (Pinned) */}
-                <g transform="translate(50, 132)">
-                  <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
-                  <rect x="-20" y="25" width="40" height="4" fill="#1e293b" rx="1" />
+                {/* Left Support */}
+                <g transform="translate(50, 120)">
+                  {supportCondition === 'simply_supported' || supportCondition === 'fixed_pinned' ? (
+                    <g transform="translate(0, 12)">
+                      <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
+                      <rect x="-20" y="25" width="40" height="4" fill="#1e293b" rx="1" />
+                    </g>
+                  ) : (supportCondition === 'cantilever' || supportCondition === 'fixed_fixed') ? (
+                    <rect x="-15" y="-40" width="15" height="80" fill="#1e293b" rx="2" />
+                  ) : null}
                 </g>
-                {/* Right Support (Roller) */}
-                <g transform="translate(950, 132)">
-                  <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
-                  <circle cx="-8" cy="28" r="3" fill="#1e293b" />
-                  <circle cx="8" cy="28" r="3" fill="#1e293b" />
-                  <rect x="-20" y="31" width="40" height="4" fill="#1e293b" rx="1" />
+
+                {/* Right Support */}
+                <g transform="translate(950, 120)">
+                  {supportCondition === 'simply_supported' ? (
+                    <g transform="translate(0, 12)">
+                      <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
+                      <circle cx="-8" cy="28" r="3" fill="#1e293b" />
+                      <circle cx="8" cy="28" r="3" fill="#1e293b" />
+                      <rect x="-20" y="31" width="40" height="4" fill="#1e293b" rx="1" />
+                    </g>
+                  ) : supportCondition === 'fixed_pinned' ? (
+                    <g transform="translate(0, 12)">
+                      <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
+                      <rect x="-20" y="25" width="40" height="4" fill="#1e293b" rx="1" />
+                    </g>
+                  ) : supportCondition === 'fixed_fixed' ? (
+                    <rect x="0" y="-40" width="15" height="80" fill="#1e293b" rx="2" />
+                  ) : null}
                 </g>
 
                 {/* Loads */}
@@ -2143,6 +2272,10 @@ export function App() {
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-slate-500">Yield Strength (fy)</span>
                       <span className="text-[10px] font-mono font-bold text-blue-600">{toDisplay(MATERIALS[material].yield, 'stress').toFixed(0)} {u.stress}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-500">Poisson's Ratio (ν)</span>
+                      <span className="text-[10px] font-mono font-bold text-blue-600">{MATERIALS[material].poisson.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center pt-1 border-t border-slate-200">
                       <span className="text-[10px] text-slate-500">Allowable Stress</span>
