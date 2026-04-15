@@ -1304,6 +1304,32 @@ export function App() {
   });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
+  // Auto-switch design code based on location
+  React.useEffect(() => {
+    if (!projectLocation) return;
+    
+    const loc = projectLocation.toLowerCase();
+    if (loc.includes('hong kong') || loc.includes('hk')) {
+      setSelectedCodeId('Hong Kong');
+    } else if (loc.includes('shanghai')) {
+      setSelectedCodeId('Shanghai');
+    } else if (loc.includes('shenzhen')) {
+      setSelectedCodeId('Shenzhen');
+    } else if (loc.includes('guangzhou')) {
+      setSelectedCodeId('Guangzhou');
+    } else if (loc.includes('thailand') || loc.includes('bangkok')) {
+      setSelectedCodeId('Thailand');
+    } else if (loc.includes('malaysia') || loc.includes('kuala lumpur')) {
+      setSelectedCodeId('Malaysia');
+    } else if (loc.includes('england') || loc.includes('uk') || loc.includes('london')) {
+      setSelectedCodeId('England');
+    } else if (loc.includes('europe') || loc.includes('eu') || loc.includes('germany') || loc.includes('france')) {
+      setSelectedCodeId('Eurocodes (EU)');
+    } else if (loc.includes('china')) {
+      setSelectedCodeId('China (National)');
+    }
+  }, [projectLocation]);
+
   // History State for Undo/Redo
   const [past, setPast] = useState<HistoryState[]>([]);
   const [future, setFuture] = useState<HistoryState[]>([]);
@@ -1456,6 +1482,29 @@ export function App() {
       localStorage.setItem('facadecalc_projects_list', JSON.stringify([initialProj]));
     }
   }, []);
+
+  // Automatic switch design code when input project location, city, or country
+  React.useEffect(() => {
+    if (!projectLocation) return;
+    
+    const loc = projectLocation.toLowerCase();
+    const matchedCode = CODES_OF_PRACTICE.find(item => 
+      loc.includes(item.country.toLowerCase()) || 
+      (item.country === 'United Kingdom' && (loc.includes('uk') || loc.includes('london') || loc.includes('britain'))) ||
+      (item.country === 'United States' && (loc.includes('usa') || loc.includes('us ') || loc.includes('america') || loc.includes('new york'))) ||
+      (item.country === 'Australia' && (loc.includes('sydney') || loc.includes('melbourne') || loc.includes('au '))) ||
+      (item.country === 'Vietnam' && (loc.includes('viet nam') || loc.includes('hanoi') || loc.includes('hcm'))) ||
+      (item.country === 'Singapore' && (loc.includes('sg') || loc.includes('singapore')))
+    );
+
+    if (matchedCode && matchedCode.country !== selectedCodeId) {
+      setSelectedCodeId(matchedCode.country);
+      setNotification({ 
+        message: `Design code switched to ${matchedCode.country} based on location`, 
+        type: 'success' 
+      });
+    }
+  }, [projectLocation]);
 
   // Sync current project to list periodically
   React.useEffect(() => {
@@ -1976,7 +2025,7 @@ export function App() {
         </div>
       )}
 
-      <main className="flex-1 overflow-y-auto">
+      <main className={cn("flex-1 flex flex-col", view === 'calculator' ? "overflow-hidden" : "overflow-y-auto")}>
         <AnimatePresence mode="wait">
           {view === 'home' && (
             <motion.div
@@ -2088,96 +2137,72 @@ export function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 print:block"
+              className="flex-1 flex flex-col min-h-0 print:block overflow-hidden"
             >
-              {/* Print Only Header */}
-              <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-6 col-span-12">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h1 className="text-3xl font-bold text-slate-900">{projectTitle || t.title}</h1>
-                    <p className="text-slate-500 font-medium">{projectLocation || t.subtitle}</p>
-                    <div className="mt-6 grid grid-cols-2 gap-x-16 gap-y-3 text-sm">
-                      <div className="flex gap-2"><span className="font-bold text-slate-700">Date:</span> <span>{projectDate} {projectTime}</span></div>
-                      <div className="flex gap-2"><span className="font-bold text-slate-700">Description:</span> <span className="truncate max-w-[200px]">{projectDescription || 'N/A'}</span></div>
-                      <div className="flex gap-2"><span className="font-bold text-slate-700">Design Code:</span> <span className="text-blue-700 font-bold">{selectedCodeId}</span></div>
-                      <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
-                      <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{MATERIALS[material].name}</span></div>
-                      <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{toDisplay(length, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}</span></div>
-                      <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{sectionType === 'hollow' ? `${toDisplay(width, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(thickness, 'length').toFixed(unitSystem === 'metric' ? 1 : 3)}${u.length}` : `${toDisplay(width, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}${u.length}`}</span></div>
+              <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-0 print:block overflow-hidden">
+                {/* Left Column: Inputs */}
+                <div className="lg:col-span-4 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/30 no-scrollbar print:hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
+                    {/* Project Information */}
+                    <Card className="shadow-sm border-slate-200 overflow-hidden">
+                  <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
+                    <div className="flex items-center gap-2 text-blue-600 mb-0.5">
+                      <FileText className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Project Info</span>
                     </div>
-                  </div>
-                  <div className={cn(
-                    "px-6 py-4 rounded-xl border-4 font-black text-2xl tracking-tighter",
-                    results.summary.status === 'pass' ? "border-green-500 text-green-600 bg-green-50" : "border-red-500 text-red-600 bg-red-50"
-                  )}>
-                    {results.summary.status === 'pass' ? "PASS" : "FAIL"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Left Column: Inputs */}
-              <div className="lg:col-span-4 space-y-6 print:hidden">
-                
-                {/* Project Information */}
-                <Card className="shadow-sm border-slate-200">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center gap-2 text-blue-600 mb-1">
-                      <FileText className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-widest">Project Info</span>
-                    </div>
-                    <CardTitle className="text-lg">General Information</CardTitle>
+                    <CardTitle className="text-sm sm:text-base">General Information</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="proj-title">Project Title</Label>
+                  <CardContent className="p-3 sm:p-4 space-y-3">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="proj-title" className="text-[10px] uppercase font-bold text-slate-400">Project Title</Label>
                       <Input 
                         id="proj-title"
                         value={projectTitle}
                         onChange={(e) => setProjectTitle(e.target.value)}
                         placeholder="Enter project name..."
-                        className="bg-slate-50/50"
+                        className="bg-white h-8 text-sm"
                       />
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="proj-loc">Location</Label>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="proj-loc" className="text-[10px] uppercase font-bold text-slate-400">Location</Label>
                       <Input 
                         id="proj-loc"
                         value={projectLocation}
                         onChange={(e) => setProjectLocation(e.target.value)}
                         placeholder="City, Country..."
-                        className="bg-slate-50/50"
+                        className="bg-white h-8 text-sm"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="proj-date">Date</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="proj-date" className="text-[10px] uppercase font-bold text-slate-400">Date</Label>
                         <Input 
                           id="proj-date"
                           type="date"
                           value={projectDate}
                           onChange={(e) => setProjectDate(e.target.value)}
-                          className="bg-slate-50/50 text-xs sm:text-sm"
+                          className="bg-white h-8 text-xs"
                         />
                       </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="proj-time">Time</Label>
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="proj-time" className="text-[10px] uppercase font-bold text-slate-400">Time</Label>
                         <Input 
                           id="proj-time"
                           type="time"
                           value={projectTime}
                           onChange={(e) => setProjectTime(e.target.value)}
-                          className="bg-slate-50/50 text-xs sm:text-sm"
+                          className="bg-white h-8 text-xs"
                         />
                       </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="proj-desc">Description</Label>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="proj-desc" className="text-[10px] uppercase font-bold text-slate-400">Description</Label>
                       <textarea 
                         id="proj-desc"
                         value={projectDescription}
                         onChange={(e) => setProjectDescription(e.target.value)}
                         placeholder="Project details..."
-                        className="flex min-h-[60px] sm:min-h-[80px] w-full rounded-md border border-input bg-slate-50/50 px-3 py-2 text-xs sm:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex min-h-[60px] w-full rounded-md border border-input bg-white px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       />
                     </div>
                   </CardContent>
@@ -2199,11 +2224,11 @@ export function App() {
                 />
 
                 {/* Active Combination Selector for Mobile/Quick Access */}
-                <Card className="shadow-sm border-slate-200 lg:hidden">
-                  <CardContent className="p-4">
-                    <Label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">{t.activeCase}</Label>
+                <Card className="shadow-sm border-slate-200 lg:hidden overflow-hidden">
+                  <CardContent className="p-3">
+                    <Label className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">{t.activeCase}</Label>
                     <Select value={activeCombinationId} onValueChange={setActiveCombinationId}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2215,354 +2240,354 @@ export function App() {
                   </CardContent>
                 </Card>
           
-          {/* Combinations Manager */}
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
-              <div>
-                <div className="flex items-center gap-2 text-blue-600 mb-1">
-                  <Layers className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase tracking-widest">{t.combinations}</span>
-                </div>
-                <CardTitle className="text-lg">{t.combinations.split(' ')[1]}</CardTitle>
-              </div>
-              <div className="flex items-center gap-2">
-                <Dialog open={isCombinationManagerOpen} onOpenChange={setIsCombinationManagerOpen}>
-                  <DialogTrigger render={<Button size="icon" variant="outline" className="h-8 w-8" />}>
-                    <Settings className="h-4 w-4" />
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>{t.combinations}</DialogTitle>
-                      <DialogDescription>
-                        Manage load factors for different analysis cases.
-                      </DialogDescription>
-                    </DialogHeader>
-                    
-                    <div className="space-y-6 py-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Button onClick={addCombination} size="sm" className="gap-2">
-                            <PlusCircle className="h-4 w-4" />
-                            Add Combination
-                          </Button>
-                          <Button onClick={resetCombinations} variant="outline" size="sm" className="gap-2">
-                            <RotateCcw className="h-4 w-4" />
-                            Reset to Defaults
-                          </Button>
-                        </div>
+                {/* Combinations Manager */}
+                <Card className="shadow-sm border-slate-200 overflow-hidden">
+                  <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <div className="flex items-center gap-2 text-blue-600 mb-0.5">
+                        <Layers className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{t.combinations}</span>
                       </div>
+                      <CardTitle className="text-sm sm:text-base">{t.combinations.split(' ')[1]}</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Dialog open={isCombinationManagerOpen} onOpenChange={setIsCombinationManagerOpen}>
+                        <DialogTrigger render={<Button size="icon" variant="outline" className="h-7 w-7" />}>
+                          <Settings className="h-3.5 w-3.5" />
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>{t.combinations}</DialogTitle>
+                            <DialogDescription>
+                              Manage load factors for different analysis cases.
+                            </DialogDescription>
+                          </DialogHeader>
+                          
+                          <div className="space-y-6 py-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Button onClick={addCombination} size="sm" className="gap-2">
+                                  <PlusCircle className="h-4 w-4" />
+                                  Add Combination
+                                </Button>
+                                <Button onClick={resetCombinations} variant="outline" size="sm" className="gap-2">
+                                  <RotateCcw className="h-4 w-4" />
+                                  Reset to Defaults
+                                </Button>
+                              </div>
+                            </div>
 
-                      <div className="border rounded-lg overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-slate-50">
-                              <TableHead className="w-[250px]">Name</TableHead>
-                              {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
-                                <TableHead key={key} className="text-center px-2">
-                                  <div className="text-[10px] uppercase text-slate-400">{key}</div>
-                                  <div className="text-[10px] font-bold">{cat.name.split(' ')[0]}</div>
-                                </TableHead>
-                              ))}
-                              <TableHead className="w-[100px] text-right">Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {combinations.map((comb) => (
-                              <TableRow key={comb.id} className={cn(activeCombinationId === comb.id && "bg-blue-50/50")}>
-                                <TableCell>
-                                  <Input 
-                                    value={comb.name} 
-                                    onChange={(e) => updateCombinationName(comb.id, e.target.value)}
-                                    className="h-8 font-medium"
-                                  />
-                                </TableCell>
-                                {Object.keys(LOAD_CATEGORIES).map((key) => (
-                                  <TableCell key={key} className="px-1">
-                                    <Input 
-                                      type="number" 
-                                      step="0.1"
-                                      min="-10"
-                                      max="10"
-                                      value={comb.factors[key as keyof typeof LOAD_CATEGORIES] ?? 0} 
-                                      onChange={(e) => updateCombinationFactor(comb.id, key as keyof typeof LOAD_CATEGORIES, safeParseNumber(e.target.value, comb.factors[key as keyof typeof LOAD_CATEGORIES] ?? 0, -10, 10))}
-                                      className="h-8 text-center w-16 mx-auto"
-                                    />
-                                  </TableCell>
-                                ))}
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-1">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-8 w-8 text-slate-400 hover:text-blue-600"
-                                      onClick={() => duplicateCombination(comb.id)}
-                                      title="Duplicate"
-                                    >
-                                      <Copy className="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-8 w-8 text-slate-400 hover:text-rose-500"
-                                      onClick={() => removeCombination(comb.id)}
-                                      disabled={combinations.length <= 1}
-                                      title="Delete"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                            <div className="border rounded-lg overflow-hidden">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-slate-50">
+                                    <TableHead className="w-[250px]">Name</TableHead>
+                                    {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
+                                      <TableHead key={key} className="text-center px-2">
+                                        <div className="text-[10px] uppercase text-slate-400">{key}</div>
+                                        <div className="text-[10px] font-bold">{cat.name.split(' ')[0]}</div>
+                                      </TableHead>
+                                    ))}
+                                    <TableHead className="w-[100px] text-right">Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {combinations.map((comb) => (
+                                    <TableRow key={comb.id} className={cn(activeCombinationId === comb.id && "bg-blue-50/50")}>
+                                      <TableCell>
+                                        <Input 
+                                          value={comb.name} 
+                                          onChange={(e) => updateCombinationName(comb.id, e.target.value)}
+                                          className="h-8 font-medium"
+                                        />
+                                      </TableCell>
+                                      {Object.keys(LOAD_CATEGORIES).map((key) => (
+                                        <TableCell key={key} className="px-1">
+                                          <Input 
+                                            type="number" 
+                                            step="0.1"
+                                            min="-10"
+                                            max="10"
+                                            value={comb.factors[key as keyof typeof LOAD_CATEGORIES] ?? 0} 
+                                            onChange={(e) => updateCombinationFactor(comb.id, key as keyof typeof LOAD_CATEGORIES, safeParseNumber(e.target.value, comb.factors[key as keyof typeof LOAD_CATEGORIES] ?? 0, -10, 10))}
+                                            className="h-8 text-center w-16 mx-auto"
+                                          />
+                                        </TableCell>
+                                      ))}
+                                      <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-8 w-8 text-slate-400 hover:text-blue-600"
+                                            onClick={() => duplicateCombination(comb.id)}
+                                            title="Duplicate"
+                                          >
+                                            <Copy className="h-4 w-4" />
+                                          </Button>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-8 w-8 text-slate-400 hover:text-rose-500"
+                                            onClick={() => removeCombination(comb.id)}
+                                            disabled={combinations.length <= 1}
+                                            title="Delete"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                          
+                          <DialogFooter>
+                            <Button onClick={() => setIsCombinationManagerOpen(false)}>Close</Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                      <Button size="icon" variant="outline" onClick={addCombination} className="h-7 w-7">
+                        <PlusCircle className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                    
-                    <DialogFooter>
-                      <Button onClick={() => setIsCombinationManagerOpen(false)}>Close</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-                <Button size="icon" variant="outline" onClick={addCombination} className="h-8 w-8">
-                  <PlusCircle className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2 px-3 pb-3">
-              <div className="space-y-1.5">
-                {combinations.map(comb => (
-                  <div key={comb.id} className={cn(
-                    "p-2 border rounded-lg transition-all group relative",
-                    activeCombinationId === comb.id 
-                      ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/30 shadow-sm" 
-                      : "bg-white hover:border-slate-300 hover:bg-slate-50/30"
-                  )}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex-1 min-w-0 mr-1.5">
-                        <Input 
-                          value={comb.name ?? ''} 
-                          onChange={(e) => updateCombinationName(comb.id, e.target.value)}
-                          className="h-5 text-[10px] font-bold border-none bg-transparent p-0 focus-visible:ring-0 truncate text-slate-700 placeholder:text-slate-300"
-                          placeholder="Combination Name"
-                        />
-                      </div>
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-5 w-5 text-slate-400 hover:text-blue-600 hover:bg-blue-100/50"
-                          onClick={() => duplicateCombination(comb.id)}
-                          title="Duplicate"
-                        >
-                          <Copy className="h-2.5 w-2.5" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-5 w-5 text-slate-400 hover:text-rose-500 hover:bg-rose-100/50"
-                          onClick={() => removeCombination(comb.id)}
-                          disabled={combinations.length <= 1}
-                          title="Delete"
-                        >
-                          <Trash2 className="h-2.5 w-2.5" />
-                        </Button>
-                        <div className="ml-1">
-                          <Button 
-                            variant={activeCombinationId === comb.id ? "default" : "outline"} 
-                            size="sm" 
-                            className={cn(
-                              "h-5 text-[8px] px-1.5 font-black uppercase tracking-tighter",
-                              activeCombinationId === comb.id ? "bg-blue-600 hover:bg-blue-700" : "text-slate-400 border-slate-200"
-                            )}
-                            onClick={() => setActiveCombinationId(comb.id)}
-                          >
-                            {activeCombinationId === comb.id ? "Active" : "Select"}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-5 gap-0.5 bg-slate-100/80 rounded-sm p-0.5 sm:p-1">
-                      {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
-                        <div key={key} className="text-center border-r border-slate-200/50 last:border-none px-0.5">
-                          <div className="text-[5px] sm:text-[6px] uppercase text-slate-500 font-black leading-none mb-0.5">{key[0]}</div>
-                          <div className={cn(
-                            "text-[8px] sm:text-[9px] font-mono font-bold leading-none",
-                            comb.factors[key as keyof typeof LOAD_CATEGORIES] > 0 ? "text-blue-600" : "text-slate-400"
-                          )}>
-                            {comb.factors[key as keyof typeof LOAD_CATEGORIES]}
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-3 space-y-1.5">
+                    {combinations.map(comb => (
+                      <div key={comb.id} className={cn(
+                        "p-2 border rounded-lg transition-all group relative",
+                        activeCombinationId === comb.id 
+                          ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/30 shadow-sm" 
+                          : "bg-white hover:border-slate-300 hover:bg-slate-50/30"
+                      )}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex-1 min-w-0 mr-1.5">
+                            <Input 
+                              value={comb.name ?? ''} 
+                              onChange={(e) => updateCombinationName(comb.id, e.target.value)}
+                              className="h-5 text-[10px] font-bold border-none bg-transparent p-0 focus-visible:ring-0 truncate text-slate-700 placeholder:text-slate-300"
+                              placeholder="Combination Name"
+                            />
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-5 w-5 text-slate-400 hover:text-blue-600 hover:bg-blue-100/50"
+                              onClick={() => duplicateCombination(comb.id)}
+                              title="Duplicate"
+                            >
+                              <Copy className="h-2.5 w-2.5" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-5 w-5 text-slate-400 hover:text-rose-500 hover:bg-rose-100/50"
+                              onClick={() => removeCombination(comb.id)}
+                              disabled={combinations.length <= 1}
+                              title="Delete"
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </Button>
+                            <div className="ml-1">
+                              <Button 
+                                variant={activeCombinationId === comb.id ? "default" : "outline"} 
+                                size="sm" 
+                                className={cn(
+                                  "h-5 text-[8px] px-1.5 font-black uppercase tracking-tighter",
+                                  activeCombinationId === comb.id ? "bg-blue-600 hover:bg-blue-700" : "text-slate-400 border-slate-200"
+                                )}
+                                onClick={() => setActiveCombinationId(comb.id)}
+                              >
+                                {activeCombinationId === comb.id ? "Active" : "Select"}
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Geometry & Material */}
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2 text-blue-600 mb-1">
-                <Settings2 className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-widest">{t.properties}</span>
-              </div>
-              <CardTitle className="text-lg">{t.properties}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="length">{t.span} ({u.length})</Label>
-                <Input 
-                  id="length" 
-                  type="number" 
-                  min={toDisplay(100, 'length')}
-                  max={toDisplay(50000, 'length')}
-                  value={Number(toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
-                  onChange={(e) => setLength(fromDisplay(safeParseNumber(e.target.value, toDisplay(length, 'length'), 0, toDisplay(50000, 'length')), 'length'))}
-                  className="bg-slate-50/50"
-                />
-              </div>
-              
-              <div className="grid gap-2">
-                <Label>{t.material}</Label>
-                <Select value={material} onValueChange={(v: any) => setMaterial(v)}>
-                  <SelectTrigger className="bg-slate-50/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from(new Set(Object.values(MATERIALS).map(m => m.category))).map(category => (
-                      <SelectGroup key={category}>
-                        <SelectLabel className="text-blue-600 font-bold px-2 py-1.5 text-xs uppercase tracking-wider bg-blue-50/50">{category}</SelectLabel>
-                        {Object.entries(MATERIALS)
-                          .filter(([_, m]) => m.category === category)
-                          .map(([key, m]) => (
-                            <SelectItem key={key} value={key}>{m.name}</SelectItem>
+                        <div className="grid grid-cols-5 gap-0.5 bg-slate-100/80 rounded-sm p-0.5 sm:p-1">
+                          {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
+                            <div key={key} className="text-center border-r border-slate-200/50 last:border-none px-0.5">
+                              <div className="text-[5px] sm:text-[6px] uppercase text-slate-500 font-black leading-none mb-0.5">{key[0]}</div>
+                              <div className={cn(
+                                "text-[8px] sm:text-[9px] font-mono font-bold leading-none",
+                                comb.factors[key as keyof typeof LOAD_CATEGORIES] > 0 ? "text-blue-600" : "text-slate-400"
+                              )}>
+                                {comb.factors[key as keyof typeof LOAD_CATEGORIES]}
+                              </div>
+                            </div>
                           ))}
-                      </SelectGroup>
+                        </div>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  </CardContent>
+                </Card>
 
-              <div className="grid gap-2">
-                <Label htmlFor="safetyFactor">{t.safetyFactor} (γ)</Label>
-                <Input 
-                  id="safetyFactor" 
-                  type="number" 
-                  step="0.1"
-                  min="1"
-                  max="20"
-                  value={safetyFactor ?? 1} 
-                  onChange={(e) => setSafetyFactor(safeParseNumber(e.target.value, safetyFactor, 1, 20))}
-                  className="bg-slate-50/50"
-                />
-              </div>
+                {/* Geometry & Material */}
+                <Card className="shadow-sm border-slate-200 overflow-hidden">
+                  <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
+                    <div className="flex items-center gap-2 text-blue-600 mb-0.5">
+                      <Settings2 className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">{t.properties}</span>
+                    </div>
+                    <CardTitle className="text-sm sm:text-base">{t.properties}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 space-y-3">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="length" className="text-[10px] uppercase font-bold text-slate-400">{t.span} ({u.length})</Label>
+                      <Input 
+                        id="length" 
+                        type="number" 
+                        min={toDisplay(100, 'length')}
+                        max={toDisplay(50000, 'length')}
+                        value={Number(toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                        onChange={(e) => setLength(fromDisplay(safeParseNumber(e.target.value, toDisplay(length, 'length'), 0, toDisplay(50000, 'length')), 'length'))}
+                        className="bg-white h-8 text-sm"
+                      />
+                    </div>
+                    
+                    <div className="grid gap-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-slate-400">{t.material}</Label>
+                      <Select value={material} onValueChange={(v: any) => setMaterial(v)}>
+                        <SelectTrigger className="bg-white h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from(new Set(Object.values(MATERIALS).map(m => m.category))).map(category => (
+                            <SelectGroup key={category}>
+                              <SelectLabel className="text-blue-600 font-bold px-2 py-1.5 text-[10px] uppercase tracking-wider bg-blue-50/50">{category}</SelectLabel>
+                              {Object.entries(MATERIALS)
+                                .filter(([_, m]) => m.category === category)
+                                .map(([key, m]) => (
+                                  <SelectItem key={key} value={key} className="text-xs">{m.name}</SelectItem>
+                                ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              <div className="grid gap-2">
-                <Label>{t.supportCondition}</Label>
-                <Select value={supportCondition} onValueChange={(v: any) => setSupportCondition(v)}>
-                  <SelectTrigger className="bg-slate-50/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="simply_supported">{t.simplySupported}</SelectItem>
-                    <SelectItem value="cantilever">{t.cantilever}</SelectItem>
-                    <SelectItem value="fixed_fixed">{t.fixedFixed}</SelectItem>
-                    <SelectItem value="fixed_pinned">{t.fixedPinned}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="safetyFactor" className="text-[10px] uppercase font-bold text-slate-400">{t.safetyFactor} (γ)</Label>
+                        <Input 
+                          id="safetyFactor" 
+                          type="number" 
+                          step="0.1"
+                          min="1"
+                          max="20"
+                          value={safetyFactor ?? 1} 
+                          onChange={(e) => setSafetyFactor(safeParseNumber(e.target.value, safetyFactor, 1, 20))}
+                          className="bg-white h-8 text-sm"
+                        />
+                      </div>
 
-              <Separator className="my-2" />
+                      <div className="grid gap-1.5">
+                        <Label className="text-[10px] uppercase font-bold text-slate-400">{t.supportCondition}</Label>
+                        <Select value={supportCondition} onValueChange={(v: any) => setSupportCondition(v)}>
+                          <SelectTrigger className="bg-white h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="simply_supported" className="text-xs">{t.simplySupported}</SelectItem>
+                            <SelectItem value="cantilever" className="text-xs">{t.cantilever}</SelectItem>
+                            <SelectItem value="fixed_fixed" className="text-xs">{t.fixedFixed}</SelectItem>
+                            <SelectItem value="fixed_pinned" className="text-xs">{t.fixedPinned}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
 
-              <div className="grid gap-2">
-                <Label>{t.sectionType}</Label>
-                <Tabs value={sectionType} onValueChange={(v: any) => setSectionType(v)} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="solid">{t.solid}</TabsTrigger>
-                    <TabsTrigger value="hollow">{t.hollow}</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+                    <Separator className="my-1" />
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="width">{t.width} ({u.length})</Label>
-                  <Input 
-                    id="width" 
-                    type="number" 
-                    min={toDisplay(1, 'length')}
-                    max={toDisplay(5000, 'length')}
-                    value={Number(toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
-                    onChange={(e) => setWidth(fromDisplay(safeParseNumber(e.target.value, toDisplay(width, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
-                    className="bg-slate-50/50 text-xs sm:text-sm"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="height">{t.height} ({u.length})</Label>
-                  <Input 
-                    id="height" 
-                    type="number" 
-                    min={toDisplay(1, 'length')}
-                    max={toDisplay(5000, 'length')}
-                    value={Number(toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
-                    onChange={(e) => setHeight(fromDisplay(safeParseNumber(e.target.value, toDisplay(height, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
-                    className="bg-slate-50/50 text-xs sm:text-sm"
-                  />
-                </div>
-              </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-slate-400">{t.sectionType}</Label>
+                      <Tabs value={sectionType} onValueChange={(v: any) => setSectionType(v)} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 h-8">
+                          <TabsTrigger value="solid" className="text-[10px]">{t.solid}</TabsTrigger>
+                          <TabsTrigger value="hollow" className="text-[10px]">{t.hollow}</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
 
-              {sectionType === 'hollow' && (
-                <div className="grid gap-2">
-                  <Label htmlFor="thickness">{t.thickness} ({u.length})</Label>
-                  <Input 
-                    id="thickness" 
-                    type="number" 
-                    min={toDisplay(0.1, 'length')}
-                    max={toDisplay(Math.min(width, height) / 2.1, 'length')}
-                    step={unitSystem === 'metric' ? "0.1" : "0.01"}
-                    value={Number(toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 1 : 3))} 
-                    onChange={(e) => setThickness(fromDisplay(safeParseNumber(e.target.value, toDisplay(thickness, 'length'), 0.1, toDisplay(Math.min(width, height) / 2.1, 'length')), 'length'))}
-                    className="bg-slate-50/50"
-                  />
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="bg-slate-50/50 border-t px-6 py-3">
-              <div className="w-full grid grid-cols-2 gap-4 text-[11px] font-mono text-slate-500 uppercase">
-                <div>I: {sectionProps.momentOfInertia.toExponential(2)} mm⁴</div>
-                <div>W: {sectionProps.sectionModulus.toExponential(2)} mm³</div>
-              </div>
-            </CardFooter>
-          </Card>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="width" className="text-[10px] uppercase font-bold text-slate-400">{t.width} ({u.length})</Label>
+                        <Input 
+                          id="width" 
+                          type="number" 
+                          min={toDisplay(1, 'length')}
+                          max={toDisplay(5000, 'length')}
+                          value={Number(toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
+                          onChange={(e) => setWidth(fromDisplay(safeParseNumber(e.target.value, toDisplay(width, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
+                          className="bg-white h-8 text-sm"
+                        />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="height" className="text-[10px] uppercase font-bold text-slate-400">{t.height} ({u.length})</Label>
+                        <Input 
+                          id="height" 
+                          type="number" 
+                          min={toDisplay(1, 'length')}
+                          max={toDisplay(5000, 'length')}
+                          value={Number(toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
+                          onChange={(e) => setHeight(fromDisplay(safeParseNumber(e.target.value, toDisplay(height, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
+                          className="bg-white h-8 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {sectionType === 'hollow' && (
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="thickness" className="text-[10px] uppercase font-bold text-slate-400">{t.thickness} ({u.length})</Label>
+                        <Input 
+                          id="thickness" 
+                          type="number" 
+                          min={toDisplay(0.1, 'length')}
+                          max={toDisplay(Math.min(width, height) / 2.1, 'length')}
+                          step={unitSystem === 'metric' ? "0.1" : "0.01"}
+                          value={Number(toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 1 : 3))} 
+                          onChange={(e) => setThickness(fromDisplay(safeParseNumber(e.target.value, toDisplay(thickness, 'length'), 0.1, toDisplay(Math.min(width, height) / 2.1, 'length')), 'length'))}
+                          className="bg-white h-8 text-sm"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="bg-slate-50/50 border-t px-4 py-2">
+                    <div className="w-full grid grid-cols-2 gap-4 text-[9px] font-mono text-slate-500 uppercase font-bold">
+                      <div>I: {sectionProps.momentOfInertia.toExponential(2)} mm⁴</div>
+                      <div>W: {sectionProps.sectionModulus.toExponential(2)} mm³</div>
+                    </div>
+                  </CardFooter>
+                </Card>
           
           {/* Material Properties */}
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2 text-blue-600 mb-1">
-                <Info className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-widest">{t.materialProps}</span>
+          <Card className="shadow-sm border-slate-200 overflow-hidden">
+            <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
+              <div className="flex items-center gap-2 text-blue-600 mb-0.5">
+                <Info className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">{t.materialProps}</span>
               </div>
-              <CardTitle className="text-lg">{MATERIALS[material].name}</CardTitle>
+              <CardTitle className="text-sm sm:text-base">{MATERIALS[material].name}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <CardContent className="p-3 sm:p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[10px] uppercase text-slate-400">Young's Modulus (E)</Label>
-                  <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">
+                  <Label className="text-[9px] uppercase font-bold text-slate-400">Young's Modulus (E)</Label>
+                  <div className="text-xs font-semibold bg-slate-50 p-1.5 rounded border border-slate-100">
                     {toDisplay(MATERIALS[material].e, 'stress').toLocaleString()} {u.stress}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] uppercase text-slate-400">Yield Strength (σy)</Label>
-                  <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">
+                  <Label className="text-[9px] uppercase font-bold text-slate-400">Yield Strength (σy)</Label>
+                  <div className="text-xs font-semibold bg-slate-50 p-1.5 rounded border border-slate-100">
                     {toDisplay(MATERIALS[material].yield, 'stress').toLocaleString()} {u.stress}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] uppercase text-slate-400">Poisson's Ratio (ν)</Label>
-                  <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">
+                  <Label className="text-[9px] uppercase font-bold text-slate-400">Poisson's Ratio (ν)</Label>
+                  <div className="text-xs font-semibold bg-slate-50 p-1.5 rounded border border-slate-100">
                     {MATERIALS[material].poisson.toFixed(2)}
                   </div>
                 </div>
@@ -2570,55 +2595,55 @@ export function App() {
             </CardContent>
           </Card>
 
-          {/* Codes of Practice */}
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2 text-blue-600 mb-1">
-                <BookOpen className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-widest">{t.codes}</span>
-              </div>
-              <CardTitle className="text-lg">Select Design Code</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {CODES_OF_PRACTICE.map((item) => (
-                <div 
-                  key={item.country} 
-                  className={cn(
-                    "space-y-1 p-2 rounded-lg border transition-all cursor-pointer",
-                    selectedCodeId === item.country 
-                      ? "bg-blue-50 border-blue-200 ring-1 ring-blue-200" 
-                      : "border-transparent hover:bg-slate-50 hover:border-slate-200"
-                  )}
-                  onClick={() => setSelectedCodeId(item.country)}
-                >
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-900">{item.country}</h4>
-                    {selectedCodeId === item.country && (
-                      <CheckCircle2 className="w-3 h-3 text-blue-600" />
-                    )}
-                  </div>
-                  <ul className="text-[10px] text-slate-500 list-disc list-inside">
-                    {item.codes.map((code, idx) => (
-                      <li key={idx}>{code}</li>
+                {/* Codes of Practice */}
+                <Card className="shadow-sm border-slate-200 overflow-hidden">
+                  <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
+                    <div className="flex items-center gap-2 text-blue-600 mb-0.5">
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">{t.codes}</span>
+                    </div>
+                    <CardTitle className="text-sm sm:text-base">Select Design Code</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-3 space-y-1">
+                    {CODES_OF_PRACTICE.map((item) => (
+                      <div 
+                        key={item.country} 
+                        className={cn(
+                          "space-y-0.5 p-2 rounded-lg border transition-all cursor-pointer",
+                          selectedCodeId === item.country 
+                            ? "bg-blue-50 border-blue-200 ring-1 ring-blue-200" 
+                            : "border-transparent hover:bg-slate-50 hover:border-slate-200"
+                        )}
+                        onClick={() => setSelectedCodeId(item.country)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-[11px] font-bold text-slate-900">{item.country}</h4>
+                          {selectedCodeId === item.country && (
+                            <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                          )}
+                        </div>
+                        <ul className="text-[9px] text-slate-500 list-disc list-inside">
+                          {item.codes.map((code, idx) => (
+                            <li key={idx} className="truncate">{code}</li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
 
           {/* Seismic Analysis */}
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2 text-rose-600 mb-1">
-                <Activity className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-widest">{t.seismic}</span>
+          <Card className="shadow-sm border-slate-200 overflow-hidden">
+            <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
+              <div className="flex items-center gap-2 text-rose-600 mb-0.5">
+                <Activity className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">{t.seismic}</span>
               </div>
-              <CardTitle className="text-lg">{t.seismic}</CardTitle>
+              <CardTitle className="text-sm sm:text-base">{t.seismic}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label>{t.seismicRegion}</Label>
+            <CardContent className="p-3 sm:p-4 space-y-3">
+              <div className="grid gap-1.5">
+                <Label className="text-[10px] uppercase font-bold text-slate-400">{t.seismicRegion}</Label>
                 <Select 
                   value={seismicRegion} 
                   onValueChange={(v: any) => {
@@ -2626,24 +2651,24 @@ export function App() {
                     setSeismicCoeff(SEISMIC_REGIONS[v as keyof typeof SEISMIC_REGIONS].coeff);
                   }}
                 >
-                  <SelectTrigger className="bg-slate-50/50">
+                  <SelectTrigger className="bg-white h-8 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(SEISMIC_REGIONS).map(([key, region]) => (
-                      <SelectItem key={key} value={key}>{region.name}</SelectItem>
+                      <SelectItem key={key} value={key} className="text-xs">{region.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-slate-400 italic">
+                <p className="text-[9px] text-slate-400 italic leading-tight">
                   {SEISMIC_REGIONS[seismicRegion].desc}
                 </p>
               </div>
 
-              <div className="grid gap-2">
-                <Label>{t.seismicCoeff}</Label>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <div className="relative flex-1">
+              <div className="grid gap-1.5">
+                <Label className="text-[10px] uppercase font-bold text-slate-400">{t.seismicCoeff}</Label>
+                <div className="flex flex-col gap-2">
+                  <div className="relative">
                     <Input 
                       type="number" 
                       step="0.01"
@@ -2651,7 +2676,7 @@ export function App() {
                       max="10"
                       value={seismicCoeff} 
                       onChange={(e) => setSeismicCoeff(safeParseNumber(e.target.value, seismicCoeff, 0, 10))}
-                      className="bg-slate-50/50 pr-8 text-xs sm:text-sm"
+                      className="bg-white h-8 pr-8 text-sm"
                     />
                     <Button
                       variant="ghost"
@@ -2666,14 +2691,14 @@ export function App() {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="shrink-0 gap-2 h-10 sm:h-9 border-rose-200 text-rose-600 hover:bg-rose-50 text-[10px] sm:text-xs font-bold uppercase tracking-wider"
+                    className="w-full gap-2 h-8 border-rose-200 text-rose-600 hover:bg-rose-50 text-[10px] font-bold uppercase tracking-wider"
                     onClick={applySeismicLoad}
                   >
-                    <PlusCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <PlusCircle className="w-3 h-3" />
                     {t.applySeismic}
                   </Button>
                 </div>
-                <div className="flex justify-between text-[10px] text-slate-400 font-medium px-1">
+                <div className="flex justify-between text-[9px] text-slate-400 font-medium px-1">
                   <span>Total Dead Load:</span>
                   <span>{unitSystem === 'metric' ? (totalDeadMagnitude / 1000).toFixed(2) + ' kN' : (toDisplay(totalDeadMagnitude, 'force') / 1000).toFixed(2) + ' kip'}</span>
                 </div>
@@ -2681,30 +2706,30 @@ export function App() {
             </CardContent>
           </Card>
 
-          {/* Loads */}
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
-              <div>
-                <div className="flex items-center gap-2 text-blue-600 mb-1">
-                  <BarChart3 className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase tracking-widest">{t.loading}</span>
-                </div>
-                <CardTitle className="text-lg">{t.loading}</CardTitle>
-              </div>
-              <div className="flex gap-1">
-                <Button size="icon" variant="outline" onClick={() => addLoad('point')} className="h-8 w-8" title="Add Point Load">
-                  <div className="w-1 h-3 bg-rose-500 rounded-full" />
-                </Button>
-                <Button size="icon" variant="outline" onClick={() => addLoad('udl')} className="h-8 w-8" title="Add UDL">
-                  <Plus className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="outline" onClick={() => addLoad('trapezoidal')} className="h-8 w-8" title="Add Trapezoidal Load">
-                  <Layout className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loads.map((load, idx) => (
+                {/* Loads */}
+                <Card className="shadow-sm border-slate-200 overflow-hidden">
+                  <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <div className="flex items-center gap-2 text-blue-600 mb-0.5">
+                        <BarChart3 className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{t.loading}</span>
+                      </div>
+                      <CardTitle className="text-sm sm:text-base">{t.loading}</CardTitle>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="outline" onClick={() => addLoad('point')} className="h-7 w-7" title="Add Point Load">
+                        <div className="w-0.5 h-2.5 bg-rose-500 rounded-full" />
+                      </Button>
+                      <Button size="icon" variant="outline" onClick={() => addLoad('udl')} className="h-7 w-7" title="Add UDL">
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="outline" onClick={() => addLoad('trapezoidal')} className="h-7 w-7" title="Add Trapezoidal Load">
+                        <Layout className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-3 space-y-2">
+                    {loads.map((load, idx) => (
                 <div key={load.id} className="relative overflow-hidden rounded-lg border bg-white group hover:border-blue-200 transition-colors">
                   {/* Swipe Action Background */}
                   <div className="absolute inset-0 bg-rose-500 flex items-center justify-end pr-2">
@@ -2719,125 +2744,125 @@ export function App() {
                     </Button>
                   </div>
 
-                  <motion.div 
-                    drag="x"
-                    dragConstraints={{ left: -100, right: 0 }}
-                    dragElastic={0.1}
-                    dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
-                    className="p-3 bg-white space-y-3 relative min-h-[140px] flex flex-col justify-between z-10"
-                  >
-                    <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-6 w-6 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                        onClick={() => {
-                          const newLoad = { ...load, id: Math.random().toString(36).substr(2, 9) };
-                          setLoads([...loads, newLoad]);
-                        }}
-                        title="Duplicate Load"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 flex-1">
-                      <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#{idx + 1}</span>
-                      <Select 
-                        value={load.type} 
-                        onValueChange={(v: any) => updateLoad(load.id, { 
-                          type: v,
-                          value2: v === 'trapezoidal' ? load.value : undefined,
-                          start: v === 'trapezoidal' ? 0 : undefined,
-                          end: v === 'trapezoidal' ? length : undefined
-                        })}
-                      >
-                        <SelectTrigger className="h-7 text-xs border-slate-200 bg-slate-50/50 px-2 w-[110px] focus:ring-1 focus:ring-blue-500">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="udl">UDL ({u.udl})</SelectItem>
-                          <SelectItem value="point">Point ({u.force})</SelectItem>
-                          <SelectItem value="trapezoidal">Trapezoidal</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <Select 
-                      value={load.category} 
-                      onValueChange={(v: any) => updateLoad(load.id, { category: v })}
+                    <motion.div 
+                      drag="x"
+                      dragConstraints={{ left: -100, right: 0 }}
+                      dragElastic={0.1}
+                      dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
+                      className="p-2 bg-white space-y-2 relative z-10"
                     >
-                      <SelectTrigger className={cn(
-                        "h-7 text-[10px] font-bold px-3 rounded-full border-none focus:ring-0 w-fit shadow-sm",
-                        LOAD_CATEGORIES[load.category].bg,
-                        LOAD_CATEGORIES[load.category].color
-                      )}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
-                          <SelectItem key={key} value={key}>{cat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-5 w-5 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                          onClick={() => {
+                            const newLoad = { ...load, id: Math.random().toString(36).substr(2, 9) };
+                            setLoads([...loads, newLoad]);
+                          }}
+                          title="Duplicate Load"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <span className="text-[9px] font-bold bg-slate-100 px-1 py-0.5 rounded text-slate-500">#{idx + 1}</span>
+                          <Select 
+                            value={load.type} 
+                            onValueChange={(v: any) => updateLoad(load.id, { 
+                              type: v,
+                              value2: v === 'trapezoidal' ? load.value : undefined,
+                              start: v === 'trapezoidal' ? 0 : undefined,
+                              end: v === 'trapezoidal' ? length : undefined
+                            })}
+                          >
+                            <SelectTrigger className="h-6 text-[10px] border-slate-200 bg-slate-50/50 px-1.5 w-[90px] focus:ring-1 focus:ring-blue-500">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="udl" className="text-[10px]">UDL ({u.udl})</SelectItem>
+                              <SelectItem value="point" className="text-[10px]">Point ({u.force})</SelectItem>
+                              <SelectItem value="trapezoidal" className="text-[10px]">Trapezoidal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                    
+                        <Select 
+                          value={load.category} 
+                          onValueChange={(v: any) => updateLoad(load.id, { category: v })}
+                        >
+                          <SelectTrigger className={cn(
+                            "h-6 text-[9px] font-bold px-2 rounded-full border-none focus:ring-0 w-fit shadow-sm",
+                            LOAD_CATEGORIES[load.category].bg,
+                            LOAD_CATEGORIES[load.category].color
+                          )}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
+                              <SelectItem key={key} value={key} className="text-[10px]">{cat.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                  <div className="bg-slate-50/50 p-2 rounded-md border border-slate-100 flex-1 flex flex-col justify-center">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-[9px] uppercase font-bold text-slate-400">
+                  <div className="bg-slate-50/50 p-1.5 rounded-md border border-slate-100 flex-1 flex flex-col justify-center">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-0.5">
+                        <Label className="text-[8px] uppercase font-bold text-slate-400">
                           {load.type === 'trapezoidal' ? `w1 (${u.udl})` : `Value (${load.type === 'point' ? u.force : u.udl})`}
                         </Label>
                         <Input 
                           type="number" 
                           value={Number(toDisplay(load.value ?? 0, load.type === 'point' ? 'force' : 'udl').toFixed(unitSystem === 'metric' ? 2 : 4))} 
                           onChange={(e) => updateLoad(load.id, { value: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.value, load.type === 'point' ? 'force' : 'udl'), -1000000, 1000000), load.type === 'point' ? 'force' : 'udl') })}
-                          className="h-8 text-sm bg-white"
+                          className="h-7 text-xs bg-white"
                         />
                       </div>
                       {load.type === 'point' && (
-                        <div className="space-y-1">
-                          <Label className="text-[9px] uppercase font-bold text-slate-400">Pos ({u.length})</Label>
+                        <div className="space-y-0.5">
+                          <Label className="text-[8px] uppercase font-bold text-slate-400">Pos ({u.length})</Label>
                           <Input 
                             type="number" 
                             value={Number(toDisplay(load.position ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
                             onChange={(e) => updateLoad(load.id, { position: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.position ?? 0, 'length'), 0, toDisplay(length, 'length')), 'length') })}
-                            className="h-8 text-sm bg-white"
+                            className="h-7 text-xs bg-white"
                           />
                         </div>
                       )}
                       {load.type === 'trapezoidal' && (
-                        <div className="space-y-1">
-                          <Label className="text-[9px] uppercase font-bold text-slate-400">w2 ({u.udl})</Label>
+                        <div className="space-y-0.5">
+                          <Label className="text-[8px] uppercase font-bold text-slate-400">w2 ({u.udl})</Label>
                           <Input 
                             type="number" 
                             value={Number(toDisplay(load.value2 ?? load.value, 'udl').toFixed(unitSystem === 'metric' ? 2 : 4))} 
                             onChange={(e) => updateLoad(load.id, { value2: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.value2 ?? load.value, 'udl'), -1000000, 1000000), 'udl') })}
-                            className="h-8 text-sm bg-white"
+                            className="h-7 text-xs bg-white"
                           />
                         </div>
                       )}
                     </div>
 
                     {load.type === 'trapezoidal' && (
-                      <div className="grid grid-cols-2 gap-3 mt-2">
-                        <div className="space-y-1">
-                          <Label className="text-[9px] uppercase font-bold text-slate-400">Start ({u.length})</Label>
+                      <div className="grid grid-cols-2 gap-2 mt-1.5">
+                        <div className="space-y-0.5">
+                          <Label className="text-[8px] uppercase font-bold text-slate-400">Start ({u.length})</Label>
                           <Input 
                             type="number" 
                             value={Number(toDisplay(load.start ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
                             onChange={(e) => updateLoad(load.id, { start: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.start ?? 0, 'length'), 0, toDisplay(length, 'length')), 'length') })}
-                            className="h-8 text-sm bg-white"
+                            className="h-7 text-xs bg-white"
                           />
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-[9px] uppercase font-bold text-slate-400">End ({u.length})</Label>
+                        <div className="space-y-0.5">
+                          <Label className="text-[8px] uppercase font-bold text-slate-400">End ({u.length})</Label>
                           <Input 
                             type="number" 
                             value={Number(toDisplay(load.end ?? length, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
                             onChange={(e) => updateLoad(load.id, { end: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.end ?? length, 'length'), 0, toDisplay(length, 'length')), 'length') })}
-                            className="h-8 text-sm bg-white"
+                            className="h-7 text-xs bg-white"
                           />
                         </div>
                       </div>
@@ -2854,12 +2879,38 @@ export function App() {
             </CardContent>
           </Card>
         </div>
+      </div>
+    </div>
 
-        {/* Right Column: Results & Visuals */}
-        <div className={cn(
-          "space-y-6",
-          isBiViewMode ? "lg:col-span-12" : "lg:col-span-8"
-        )}>
+                {/* Right Column: Results & Visuals */}
+                <div className={cn(
+                  "h-full overflow-y-auto p-3 sm:p-4 space-y-4 no-scrollbar print:block",
+                  isBiViewMode ? "lg:col-span-12" : "lg:col-span-8"
+                )}>
+                  {/* Print Only Header */}
+                  <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-6">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h1 className="text-3xl font-bold text-slate-900">{projectTitle || t.title}</h1>
+                        <p className="text-slate-500 font-medium">{projectLocation || t.subtitle}</p>
+                        <div className="mt-6 grid grid-cols-2 gap-x-16 gap-y-3 text-sm">
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Date:</span> <span>{projectDate} {projectTime}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Description:</span> <span className="truncate max-w-[200px]">{projectDescription || 'N/A'}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Design Code:</span> <span className="text-blue-700 font-bold">{selectedCodeId}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{MATERIALS[material].name}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{toDisplay(length, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{sectionType === 'hollow' ? `${toDisplay(width, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(thickness, 'length').toFixed(unitSystem === 'metric' ? 1 : 3)}${u.length}` : `${toDisplay(width, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}${u.length}`}</span></div>
+                        </div>
+                      </div>
+                      <div className={cn(
+                        "px-6 py-4 rounded-xl border-4 font-black text-2xl tracking-tighter",
+                        results.summary.status === 'pass' ? "border-green-500 text-green-600 bg-green-50" : "border-red-500 text-red-600 bg-red-50"
+                      )}>
+                        {results.summary.status === 'pass' ? "PASS" : "FAIL"}
+                      </div>
+                    </div>
+                  </div>
           {isBiViewMode ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
@@ -3446,28 +3497,28 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active, pr
       )}
       onClick={onClick}
     >
-      <CardContent className="p-2 sm:p-3 sm:p-4">
-        <div className="flex items-center justify-between mb-1 sm:mb-2">
+      <CardContent className="p-2 sm:p-3">
+        <div className="flex items-center justify-between mb-0.5 sm:mb-1">
           <span className={cn(
-            "text-[8px] sm:text-[10px] font-bold uppercase tracking-wider truncate mr-1 transition-colors",
+            "text-[7px] sm:text-[9px] font-bold uppercase tracking-wider truncate mr-1 transition-colors",
             active ? "text-blue-600" : "text-slate-500 group-hover:text-blue-500"
           )}>{label}</span>
           <div className={cn(
-            "shrink-0 transition-transform duration-300",
-            active ? "scale-110" : "group-hover:scale-110"
+            "shrink-0 transition-transform duration-300 scale-75 sm:scale-100",
+            active ? "scale-90 sm:scale-110" : "group-hover:scale-90 sm:group-hover:scale-110"
           )}>{icon}</div>
         </div>
-        <div className="text-xs sm:text-lg font-bold tracking-tight truncate">{value}</div>
+        <div className="text-[10px] sm:text-base font-bold tracking-tight truncate">{value}</div>
         {subValue && (
           <div className={cn(
-            "text-[8px] sm:text-[10px] font-medium mt-0.5 sm:mt-1 truncate",
+            "text-[7px] sm:text-[9px] font-medium mt-0.5 truncate",
             status === 'fail' ? "text-red-600" : status === 'pass' ? "text-green-600" : "text-slate-400"
           )}>
             {subValue}
           </div>
         )}
         {progress !== undefined && !isNaN(progress) && (
-          <div className="mt-3 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+          <div className="mt-1.5 sm:mt-2 h-0.5 sm:h-1 w-full bg-slate-100 rounded-full overflow-hidden">
             <motion.div 
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(100, (progress || 0) * 100)}%` }}
