@@ -94,6 +94,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { 
   LineChart, 
   Line, 
@@ -537,6 +543,7 @@ interface HistoryState {
   activeCombinationId: string;
   seismicRegion: keyof typeof SEISMIC_REGIONS;
   seismicCoeff: number;
+  unitSystem: 'metric' | 'imperial';
 }
 
 interface Project extends HistoryState {
@@ -564,7 +571,8 @@ const createNewProject = (id: string, title: string): Project => ({
   combinations: DEFAULT_COMBINATIONS,
   activeCombinationId: 'c1',
   seismicRegion: 'china',
-  seismicCoeff: SEISMIC_REGIONS.china.coeff
+  seismicCoeff: SEISMIC_REGIONS.china.coeff,
+  unitSystem: 'metric'
 });
 
 const getProjectResults = (project: Project) => {
@@ -741,6 +749,7 @@ const ProjectResultsView = ({
           icon={<Maximize2 className="w-4 h-4 text-blue-500" />}
           status={results.summary.utilizationDeflection > 1 ? 'fail' : 'pass'}
           progress={results.summary.utilizationDeflection}
+          tooltip="Maximum vertical displacement of the beam under applied loads."
         />
         <SummaryCard 
           label={t.maxStress} 
@@ -748,6 +757,7 @@ const ProjectResultsView = ({
           icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
           status={results.summary.utilizationStress > 1 ? 'fail' : 'pass'}
           progress={results.summary.utilizationStress}
+          tooltip="Maximum internal stress in the material. Must be less than the allowable yield strength."
         />
         <SummaryCard 
           label={t.maxMoment} 
@@ -755,6 +765,7 @@ const ProjectResultsView = ({
             ? `${(results.summary.maxMoment / 1000000).toFixed(2)} kNm` 
             : `${(toDisplay(results.summary.maxMoment, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1)} lb-ft`} 
           icon={<Layout className="w-4 h-4 text-purple-500" />}
+          tooltip="Maximum bending moment occurring along the beam span."
         />
         <SummaryCard 
           label={t.maxShear} 
@@ -762,6 +773,7 @@ const ProjectResultsView = ({
             ? `${(results.summary.maxShear / 1000).toFixed(2)} kN`
             : `${(toDisplay(results.summary.maxShear, 'force') / 1000).toFixed(2)} kip`} 
           icon={<ChevronRight className="w-4 h-4 text-green-500" />}
+          tooltip="Maximum internal shear force acting perpendicular to the beam axis."
         />
       </div>
 
@@ -1169,7 +1181,16 @@ export function App() {
   const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [lang, setLang] = useState<keyof typeof TRANSLATIONS>('en');
   const [view, setView] = useState<'home' | 'calculator' | 'docs'>('home');
-  const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('metric');
+  const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.unitSystem ?? 'metric';
+      } catch (e) { return 'metric'; }
+    }
+    return 'metric';
+  });
   
   // Multi-Project State
   const [projects, setProjects] = useState<Project[]>(() => {
@@ -1309,23 +1330,45 @@ export function App() {
     if (!projectLocation) return;
     
     const loc = projectLocation.toLowerCase();
-    if (loc.includes('hong kong') || loc.includes('hk')) {
+    
+    // Hong Kong
+    if (loc.includes('hong kong') || loc.includes('hk') || loc.includes('kowloon') || loc.includes('lantau')) {
       setSelectedCodeId('Hong Kong');
-    } else if (loc.includes('shanghai')) {
+    } 
+    // Shanghai
+    else if (loc.includes('shanghai') || loc.includes('pudong') || loc.includes('puxi')) {
       setSelectedCodeId('Shanghai');
-    } else if (loc.includes('shenzhen')) {
+    } 
+    // Shenzhen
+    else if (loc.includes('shenzhen') || loc.includes('futian') || loc.includes('nanshan') || loc.includes('baoan')) {
       setSelectedCodeId('Shenzhen');
-    } else if (loc.includes('guangzhou')) {
+    } 
+    // Guangzhou
+    else if (loc.includes('guangzhou') || loc.includes('tianhe') || loc.includes('yuexiu') || loc.includes('haizhu')) {
       setSelectedCodeId('Guangzhou');
-    } else if (loc.includes('thailand') || loc.includes('bangkok')) {
+    } 
+    // Thailand
+    else if (loc.includes('thailand') || loc.includes('bangkok') || loc.includes('phuket') || loc.includes('chiang mai') || loc.includes('pattaya')) {
       setSelectedCodeId('Thailand');
-    } else if (loc.includes('malaysia') || loc.includes('kuala lumpur')) {
+    } 
+    // Malaysia
+    else if (loc.includes('malaysia') || loc.includes('kuala lumpur') || loc.includes('kl') || loc.includes('penang') || loc.includes('johor')) {
       setSelectedCodeId('Malaysia');
-    } else if (loc.includes('england') || loc.includes('uk') || loc.includes('london')) {
+    } 
+    // England / UK
+    else if (loc.includes('england') || loc.includes('uk') || loc.includes('london') || loc.includes('manchester') || loc.includes('birmingham') || loc.includes('united kingdom')) {
       setSelectedCodeId('England');
-    } else if (loc.includes('europe') || loc.includes('eu') || loc.includes('germany') || loc.includes('france')) {
+    } 
+    // Europe / Eurocodes
+    else if (
+      loc.includes('europe') || loc.includes('eu') || loc.includes('germany') || loc.includes('france') || 
+      loc.includes('italy') || loc.includes('spain') || loc.includes('netherlands') || loc.includes('belgium') ||
+      loc.includes('berlin') || loc.includes('paris') || loc.includes('rome') || loc.includes('madrid') || loc.includes('amsterdam')
+    ) {
       setSelectedCodeId('Eurocodes (EU)');
-    } else if (loc.includes('china')) {
+    } 
+    // China (National)
+    else if (loc.includes('china') || loc.includes('beijing') || loc.includes('chengdu') || loc.includes('hangzhou') || loc.includes('nanjing') || loc.includes('wuhan') || loc.includes('prc')) {
       setSelectedCodeId('China (National)');
     }
   }, [projectLocation]);
@@ -1355,7 +1398,8 @@ export function App() {
     combinations,
     activeCombinationId,
     seismicRegion,
-    seismicCoeff
+    seismicCoeff,
+    unitSystem
   });
 
   const applyState = (state: HistoryState) => {
@@ -1380,6 +1424,7 @@ export function App() {
     setActiveCombinationId(state.activeCombinationId);
     setSeismicRegion(state.seismicRegion);
     setSeismicCoeff(state.seismicCoeff);
+    setUnitSystem(state.unitSystem ?? 'metric');
   };
 
   const undo = () => {
@@ -1830,7 +1875,8 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100 flex flex-col">
+    <TooltipProvider>
+      <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100 flex flex-col">
       {/* Header */}
       <header className="border-b bg-white sticky top-0 z-50 print:hidden">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
@@ -2435,14 +2481,25 @@ export function App() {
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4 space-y-3">
                     <div className="grid gap-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-slate-400">{t.unitSystem}</Label>
+                      <Tabs value={unitSystem} onValueChange={(v: any) => setUnitSystem(v)} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 h-8">
+                          <TabsTrigger value="metric" className="text-[10px]">{t.metric}</TabsTrigger>
+                          <TabsTrigger value="imperial" className="text-[10px]">{t.imperial}</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
+
+                    <div className="grid gap-1.5">
                       <Label htmlFor="length" className="text-[10px] uppercase font-bold text-slate-400">{t.span} ({u.length})</Label>
                       <Input 
                         id="length" 
                         type="number" 
                         min={toDisplay(100, 'length')}
                         max={toDisplay(50000, 'length')}
-                        value={Number(toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                        value={Number(toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
                         onChange={(e) => setLength(fromDisplay(safeParseNumber(e.target.value, toDisplay(length, 'length'), 0, toDisplay(50000, 'length')), 'length'))}
+                        step="any"
                         className="bg-white h-8 text-sm"
                       />
                     </div>
@@ -2519,8 +2576,9 @@ export function App() {
                           type="number" 
                           min={toDisplay(1, 'length')}
                           max={toDisplay(5000, 'length')}
-                          value={Number(toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
+                          value={Number(toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
                           onChange={(e) => setWidth(fromDisplay(safeParseNumber(e.target.value, toDisplay(width, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
+                          step="any"
                           className="bg-white h-8 text-sm"
                         />
                       </div>
@@ -2531,8 +2589,9 @@ export function App() {
                           type="number" 
                           min={toDisplay(1, 'length')}
                           max={toDisplay(5000, 'length')}
-                          value={Number(toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 3))} 
+                          value={Number(toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
                           onChange={(e) => setHeight(fromDisplay(safeParseNumber(e.target.value, toDisplay(height, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
+                          step="any"
                           className="bg-white h-8 text-sm"
                         />
                       </div>
@@ -2546,8 +2605,8 @@ export function App() {
                           type="number" 
                           min={toDisplay(0.1, 'length')}
                           max={toDisplay(Math.min(width, height) / 2.1, 'length')}
-                          step={unitSystem === 'metric' ? "0.1" : "0.01"}
-                          value={Number(toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 1 : 3))} 
+                          step="any"
+                          value={Number(toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
                           onChange={(e) => setThickness(fromDisplay(safeParseNumber(e.target.value, toDisplay(thickness, 'length'), 0.1, toDisplay(Math.min(width, height) / 2.1, 'length')), 'length'))}
                           className="bg-white h-8 text-sm"
                         />
@@ -2826,8 +2885,9 @@ export function App() {
                           <Label className="text-[8px] uppercase font-bold text-slate-400">Pos ({u.length})</Label>
                           <Input 
                             type="number" 
-                            value={Number(toDisplay(load.position ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                            value={Number(toDisplay(load.position ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
                             onChange={(e) => updateLoad(load.id, { position: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.position ?? 0, 'length'), 0, toDisplay(length, 'length')), 'length') })}
+                            step="any"
                             className="h-7 text-xs bg-white"
                           />
                         </div>
@@ -2851,8 +2911,9 @@ export function App() {
                           <Label className="text-[8px] uppercase font-bold text-slate-400">Start ({u.length})</Label>
                           <Input 
                             type="number" 
-                            value={Number(toDisplay(load.start ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                            value={Number(toDisplay(load.start ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
                             onChange={(e) => updateLoad(load.id, { start: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.start ?? 0, 'length'), 0, toDisplay(length, 'length')), 'length') })}
+                            step="any"
                             className="h-7 text-xs bg-white"
                           />
                         </div>
@@ -2860,8 +2921,9 @@ export function App() {
                           <Label className="text-[8px] uppercase font-bold text-slate-400">End ({u.length})</Label>
                           <Input 
                             type="number" 
-                            value={Number(toDisplay(load.end ?? length, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
+                            value={Number(toDisplay(load.end ?? length, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
                             onChange={(e) => updateLoad(load.id, { end: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.end ?? length, 'length'), 0, toDisplay(length, 'length')), 'length') })}
+                            step="any"
                             className="h-7 text-xs bg-white"
                           />
                         </div>
@@ -3472,6 +3534,7 @@ export function App() {
         )}
       </AnimatePresence>
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -3479,7 +3542,7 @@ export default function Root() {
   return <App />;
 }
 
-function SummaryCard({ label, value, subValue, icon, status, onClick, active, progress }: { 
+function SummaryCard({ label, value, subValue, icon, status, onClick, active, progress, tooltip }: { 
   label: string; 
   value: string; 
   subValue?: string; 
@@ -3488,8 +3551,9 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active, pr
   onClick?: () => void;
   active?: boolean;
   progress?: number;
+  tooltip?: string;
 }) {
-  return (
+  const CardContentWrapper = (
     <Card 
       className={cn(
         "shadow-sm border-slate-200 overflow-hidden cursor-pointer transition-all duration-200 group relative",
@@ -3538,6 +3602,21 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active, pr
       )}
     </Card>
   );
+
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger>
+          {CardContentWrapper}
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[200px] text-[10px] p-2">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return CardContentWrapper;
 }
 
 function ChartContainer({ data, dataKey, color, unit, label, invert = false, formatter, unitSystem, u }: { 
