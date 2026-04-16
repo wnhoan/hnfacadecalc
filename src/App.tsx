@@ -9,6 +9,7 @@ import { Slider } from '@/components/ui/slider';
 import { 
   Calculator, 
   Plus, 
+  Minus,
   Trash2, 
   Info, 
   CheckCircle2, 
@@ -453,15 +454,23 @@ const TRANSLATIONS = {
 };
 
 const CODES_OF_PRACTICE = [
-  { country: 'Eurocodes (EU)', codes: ['EN 1990 (Basis of Design)', 'EN 1991 (Actions)', 'EN 1993 (Steel)', 'EN 1999 (Aluminum)', 'EN 1998 (Seismic)'] },
-  { country: 'China (National)', codes: ['GB 50009 (Loads)', 'JGJ 102 (Curtain Wall)', 'GB 50011 (Seismic)', 'GB 50017 (Steel)'] },
-  { country: 'Hong Kong', codes: ['CoP for Glass 2018', 'CoP on Wind 2019', 'CoP for Seismic Design 2024'] },
-  { country: 'Shanghai', codes: ['DGJ08-56 (Curtain Wall)', 'DGJ08-11 (Loads)', 'DGJ08-9 (Steel)'] },
-  { country: 'Shenzhen', codes: ['SZJG 48 (Glass)', 'SZJG 54 (Metal/Stone)', 'SJG 15 (Wind)'] },
-  { country: 'Guangzhou', codes: ['DBJ/T 15-30 (Curtain Wall)', 'DBJ 15-101 (Wind)', 'GZJG (Guidelines)'] },
-  { country: 'England', codes: ['BS EN 1991 (Actions)', 'BS EN 1999 (Aluminum)', 'BS EN 1998 (Seismic)'] },
-  { country: 'Thailand', codes: ['EIT 1011-46 (Steel)', 'DPT 1311-50 (Wind)', 'DPT 1301/1302 (Seismic)'] },
-  { country: 'Malaysia', codes: ['MS 1553 (Wind)', 'MS EN 1991 (EC1)', 'MS EN 1998 (Seismic)'] },
+  { region: 'Europe', country: 'Eurocodes (EU)', codes: ['EN 1990 (Basis)', 'EN 1991 (Actions)', 'EN 1993 (Steel)', 'EN 1999 (Aluminum)', 'EN 1998 (Seismic)'] },
+  { region: 'Europe', country: 'United Kingdom', codes: ['BS EN 1991 (Actions)', 'BS EN 1993 (Steel)', 'BS EN 1999 (Aluminum)', 'BS EN 1998 (Seismic)'] },
+  { region: 'Asia', country: 'China (National)', codes: ['GB 50009 (Loads)', 'JGJ 102 (Curtain Wall)', 'GB 50011 (Seismic)', 'GB 50017 (Steel)'] },
+  { region: 'Asia', country: 'Hong Kong', codes: ['CoP for Glass 2018', 'CoP on Wind 2019', 'CoP for Seismic Design 2024'] },
+  { region: 'Asia', country: 'Shanghai', codes: ['DGJ08-56 (Curtain Wall)', 'DGJ08-11 (Loads)', 'DGJ08-9 (Steel)'] },
+  { region: 'Asia', country: 'Shenzhen', codes: ['SZJG 48 (Glass)', 'SZJG 54 (Metal/Stone)', 'SJG 15 (Wind)'] },
+  { region: 'Asia', country: 'Guangzhou', codes: ['DBJ/T 15-30 (Curtain Wall)', 'DBJ 15-101 (Wind)', 'GZJG (Guidelines)'] },
+  { region: 'Asia', country: 'Thailand', codes: ['EIT 1011-46 (Steel)', 'DPT 1311-50 (Wind)', 'DPT 1301/1302 (Seismic)'] },
+  { region: 'Asia', country: 'Malaysia', codes: ['MS 1553 (Wind)', 'MS EN 1991 (EC1)', 'MS EN 1998 (Seismic)'] },
+  { region: 'Asia', country: 'Singapore', codes: ['SS EN 1991 (Actions)', 'SS EN 1993 (Steel)', 'SS EN 1999 (Aluminum)'] },
+  { region: 'North America', country: 'United States', codes: ['ASCE 7-22 (Loads)', 'AISC 360-22 (Steel)', 'ADM 2020 (Aluminum)', 'ASTM E1300 (Glass)'] },
+  { region: 'North America', country: 'Canada', codes: ['NBCC 2020 (Loads)', 'CSA S16 (Steel)', 'CSA S157 (Aluminum)', 'CAN/CGSB 12.20 (Glass)'] },
+  { region: 'Oceania', country: 'Australia', codes: ['AS/NZS 1170 (Loads)', 'AS 4100 (Steel)', 'AS/NZS 1664 (Aluminum)', 'AS 1288 (Glass)'] },
+  { region: 'Oceania', country: 'New Zealand', codes: ['AS/NZS 1170 (Loads)', 'NZS 3404 (Steel)', 'AS/NZS 1664 (Aluminum)', 'NZS 4223 (Glass)'] },
+  { region: 'Middle East', country: 'UAE / Dubai', codes: ['DBC (Loads)', 'ASCE 7 (Wind)', 'AISC 360 (Steel)', 'ADM (Aluminum)'] },
+  { region: 'Middle East', country: 'Saudi Arabia', codes: ['SBC 301 (Loads)', 'SBC 304 (Steel)', 'SBC 306 (Aluminum)'] },
+  { region: 'Africa', country: 'South Africa', codes: ['SANS 10160 (Loads)', 'SANS 10162 (Steel)', 'SANS 10137 (Glass)'] },
 ];
 
 const UNITS = {
@@ -1332,43 +1341,69 @@ export function App() {
     const loc = projectLocation.toLowerCase();
     
     // Hong Kong
-    if (loc.includes('hong kong') || loc.includes('hk') || loc.includes('kowloon') || loc.includes('lantau')) {
+    if (loc.includes('hong kong') || loc.includes('hk') || loc.includes('kowloon') || loc.includes('lantau') || loc.includes('香港') || loc.includes('九龙') || loc.includes('大屿山')) {
       setSelectedCodeId('Hong Kong');
     } 
     // Shanghai
-    else if (loc.includes('shanghai') || loc.includes('pudong') || loc.includes('puxi')) {
+    else if (loc.includes('shanghai') || loc.includes('pudong') || loc.includes('puxi') || loc.includes('上海') || loc.includes('浦东') || loc.includes('浦西')) {
       setSelectedCodeId('Shanghai');
     } 
     // Shenzhen
-    else if (loc.includes('shenzhen') || loc.includes('futian') || loc.includes('nanshan') || loc.includes('baoan')) {
+    else if (loc.includes('shenzhen') || loc.includes('futian') || loc.includes('nanshan') || loc.includes('baoan') || loc.includes('深圳') || loc.includes('福田') || loc.includes('南山') || loc.includes('宝安')) {
       setSelectedCodeId('Shenzhen');
     } 
     // Guangzhou
-    else if (loc.includes('guangzhou') || loc.includes('tianhe') || loc.includes('yuexiu') || loc.includes('haizhu')) {
+    else if (loc.includes('guangzhou') || loc.includes('tianhe') || loc.includes('yuexiu') || loc.includes('haizhu') || loc.includes('广州') || loc.includes('天河') || loc.includes('越秀') || loc.includes('海珠')) {
       setSelectedCodeId('Guangzhou');
     } 
     // Thailand
-    else if (loc.includes('thailand') || loc.includes('bangkok') || loc.includes('phuket') || loc.includes('chiang mai') || loc.includes('pattaya')) {
+    else if (loc.includes('thailand') || loc.includes('bangkok') || loc.includes('phuket') || loc.includes('chiang mai') || loc.includes('pattaya') || loc.includes('泰国') || loc.includes('曼谷') || loc.includes('普吉') || loc.includes('清迈') || loc.includes('芭提雅')) {
       setSelectedCodeId('Thailand');
     } 
     // Malaysia
-    else if (loc.includes('malaysia') || loc.includes('kuala lumpur') || loc.includes('kl') || loc.includes('penang') || loc.includes('johor')) {
+    else if (loc.includes('malaysia') || loc.includes('kuala lumpur') || loc.includes('kl') || loc.includes('penang') || loc.includes('johor') || loc.includes('马来西亚') || loc.includes('吉隆坡') || loc.includes('槟城') || loc.includes('柔佛')) {
       setSelectedCodeId('Malaysia');
     } 
     // England / UK
-    else if (loc.includes('england') || loc.includes('uk') || loc.includes('london') || loc.includes('manchester') || loc.includes('birmingham') || loc.includes('united kingdom')) {
-      setSelectedCodeId('England');
+    else if (loc.includes('england') || loc.includes('uk') || loc.includes('london') || loc.includes('manchester') || loc.includes('birmingham') || loc.includes('united kingdom') || loc.includes('英国') || loc.includes('伦敦') || loc.includes('曼彻斯特') || loc.includes('伯明翰')) {
+      setSelectedCodeId('United Kingdom');
     } 
+    // US / Canada
+    else if (loc.includes('usa') || loc.includes('us ') || loc.includes('america') || loc.includes('united states') || loc.includes('new york') || loc.includes('美国')) {
+      setSelectedCodeId('United States');
+    }
+    else if (loc.includes('canada') || loc.includes('toronto') || loc.includes('vancouver') || loc.includes('加拿大')) {
+      setSelectedCodeId('Canada');
+    }
+    // Oceania
+    else if (loc.includes('australia') || loc.includes('sydney') || loc.includes('melbourne') || loc.includes('au ') || loc.includes('澳大利亚')) {
+      setSelectedCodeId('Australia');
+    }
+    else if (loc.includes('new zealand') || loc.includes('auckland') || loc.includes('nz') || loc.includes('新西兰')) {
+      setSelectedCodeId('New Zealand');
+    }
+    // Middle East
+    else if (loc.includes('uae') || loc.includes('dubai') || loc.includes('abu dhabi') || loc.includes('阿联酋')) {
+      setSelectedCodeId('UAE / Dubai');
+    }
+    else if (loc.includes('saudi') || loc.includes('riyadh') || loc.includes('ksa') || loc.includes('沙特')) {
+      setSelectedCodeId('Saudi Arabia');
+    }
+    // Africa
+    else if (loc.includes('south africa') || loc.includes('cape town') || loc.includes('joburg') || loc.includes('南非')) {
+      setSelectedCodeId('South Africa');
+    }
     // Europe / Eurocodes
     else if (
       loc.includes('europe') || loc.includes('eu') || loc.includes('germany') || loc.includes('france') || 
       loc.includes('italy') || loc.includes('spain') || loc.includes('netherlands') || loc.includes('belgium') ||
-      loc.includes('berlin') || loc.includes('paris') || loc.includes('rome') || loc.includes('madrid') || loc.includes('amsterdam')
+      loc.includes('berlin') || loc.includes('paris') || loc.includes('rome') || loc.includes('madrid') || loc.includes('amsterdam') ||
+      loc.includes('欧洲') || loc.includes('德国') || loc.includes('法国') || loc.includes('意大利') || loc.includes('西班牙') || loc.includes('荷兰') || loc.includes('比利时')
     ) {
       setSelectedCodeId('Eurocodes (EU)');
     } 
     // China (National)
-    else if (loc.includes('china') || loc.includes('beijing') || loc.includes('chengdu') || loc.includes('hangzhou') || loc.includes('nanjing') || loc.includes('wuhan') || loc.includes('prc')) {
+    else if (loc.includes('china') || loc.includes('beijing') || loc.includes('chengdu') || loc.includes('hangzhou') || loc.includes('nanjing') || loc.includes('wuhan') || loc.includes('prc') || loc.includes('中国') || loc.includes('北京') || loc.includes('成都') || loc.includes('杭州') || loc.includes('南京') || loc.includes('武汉')) {
       setSelectedCodeId('China (National)');
     }
   }, [projectLocation]);
@@ -1511,6 +1546,55 @@ export function App() {
     }
   }, [width, height, sectionType, thickness]);
 
+  // Ensure all loads are within beam length and logically valid
+  React.useEffect(() => {
+    let changed = false;
+    const validatedLoads = loads.map(load => {
+      let updated = { ...load };
+      let loadChanged = false;
+
+      if (load.type === 'point') {
+        if (load.position !== undefined && load.position > length) {
+          updated.position = length;
+          loadChanged = true;
+        }
+        if (load.position !== undefined && load.position < 0) {
+          updated.position = 0;
+          loadChanged = true;
+        }
+      } else if (load.type === 'trapezoidal') {
+        if (load.start !== undefined && load.start > length) {
+          updated.start = length;
+          loadChanged = true;
+        }
+        if (load.start !== undefined && load.start < 0) {
+          updated.start = 0;
+          loadChanged = true;
+        }
+        if (load.end !== undefined && load.end > length) {
+          updated.end = length;
+          loadChanged = true;
+        }
+        if (load.end !== undefined && load.end < 0) {
+          updated.end = 0;
+          loadChanged = true;
+        }
+        // Ensure start <= end
+        if (updated.start !== undefined && updated.end !== undefined && updated.start > updated.end) {
+          updated.start = updated.end;
+          loadChanged = true;
+        }
+      }
+
+      if (loadChanged) changed = true;
+      return updated;
+    });
+
+    if (changed) {
+      setLoads(validatedLoads);
+    }
+  }, [length, loads]);
+
   // Auto-clear notification
   React.useEffect(() => {
     if (notification) {
@@ -1527,29 +1611,6 @@ export function App() {
       localStorage.setItem('facadecalc_projects_list', JSON.stringify([initialProj]));
     }
   }, []);
-
-  // Automatic switch design code when input project location, city, or country
-  React.useEffect(() => {
-    if (!projectLocation) return;
-    
-    const loc = projectLocation.toLowerCase();
-    const matchedCode = CODES_OF_PRACTICE.find(item => 
-      loc.includes(item.country.toLowerCase()) || 
-      (item.country === 'United Kingdom' && (loc.includes('uk') || loc.includes('london') || loc.includes('britain'))) ||
-      (item.country === 'United States' && (loc.includes('usa') || loc.includes('us ') || loc.includes('america') || loc.includes('new york'))) ||
-      (item.country === 'Australia' && (loc.includes('sydney') || loc.includes('melbourne') || loc.includes('au '))) ||
-      (item.country === 'Vietnam' && (loc.includes('viet nam') || loc.includes('hanoi') || loc.includes('hcm'))) ||
-      (item.country === 'Singapore' && (loc.includes('sg') || loc.includes('singapore')))
-    );
-
-    if (matchedCode && matchedCode.country !== selectedCodeId) {
-      setSelectedCodeId(matchedCode.country);
-      setNotification({ 
-        message: `Design code switched to ${matchedCode.country} based on location`, 
-        type: 'success' 
-      });
-    }
-  }, [projectLocation]);
 
   // Sync current project to list periodically
   React.useEffect(() => {
@@ -2349,14 +2410,14 @@ export function App() {
                                       </TableCell>
                                       {Object.keys(LOAD_CATEGORIES).map((key) => (
                                         <TableCell key={key} className="px-1">
-                                          <Input 
-                                            type="number" 
-                                            step="0.1"
-                                            min="-10"
-                                            max="10"
+                                          <NumericInputWithControls 
+                                            min={-10}
+                                            max={10}
+                                            step={0.1}
+                                            precision={2}
                                             value={comb.factors[key as keyof typeof LOAD_CATEGORIES] ?? 0} 
-                                            onChange={(e) => updateCombinationFactor(comb.id, key as keyof typeof LOAD_CATEGORIES, safeParseNumber(e.target.value, comb.factors[key as keyof typeof LOAD_CATEGORIES] ?? 0, -10, 10))}
-                                            className="h-8 text-center w-16 mx-auto"
+                                            onChange={(val) => updateCombinationFactor(comb.id, key as keyof typeof LOAD_CATEGORIES, val)}
+                                            className="w-24 mx-auto"
                                           />
                                         </TableCell>
                                       ))}
@@ -2492,15 +2553,14 @@ export function App() {
 
                     <div className="grid gap-1.5">
                       <Label htmlFor="length" className="text-[10px] uppercase font-bold text-slate-400">{t.span} ({u.length})</Label>
-                      <Input 
-                        id="length" 
-                        type="number" 
+                      <NumericInputWithControls 
+                        id="length"
                         min={toDisplay(100, 'length')}
                         max={toDisplay(50000, 'length')}
-                        value={Number(toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
-                        onChange={(e) => setLength(fromDisplay(safeParseNumber(e.target.value, toDisplay(length, 'length'), 0, toDisplay(50000, 'length')), 'length'))}
-                        step="any"
-                        className="bg-white h-8 text-sm"
+                        step={unitSystem === 'metric' ? 100 : 1}
+                        precision={unitSystem === 'metric' ? 0 : 2}
+                        value={toDisplay(length ?? 0, 'length')} 
+                        onChange={(val) => setLength(fromDisplay(val, 'length'))}
                       />
                     </div>
                     
@@ -2528,15 +2588,14 @@ export function App() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="grid gap-1.5">
                         <Label htmlFor="safetyFactor" className="text-[10px] uppercase font-bold text-slate-400">{t.safetyFactor} (γ)</Label>
-                        <Input 
+                        <NumericInputWithControls 
                           id="safetyFactor" 
-                          type="number" 
-                          step="0.1"
-                          min="1"
-                          max="20"
+                          min={1}
+                          max={20}
+                          step={0.1}
+                          precision={1}
                           value={safetyFactor ?? 1} 
-                          onChange={(e) => setSafetyFactor(safeParseNumber(e.target.value, safetyFactor, 1, 20))}
-                          className="bg-white h-8 text-sm"
+                          onChange={(val) => setSafetyFactor(val)}
                         />
                       </div>
 
@@ -2571,28 +2630,26 @@ export function App() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="grid gap-1.5">
                         <Label htmlFor="width" className="text-[10px] uppercase font-bold text-slate-400">{t.width} ({u.length})</Label>
-                        <Input 
+                        <NumericInputWithControls 
                           id="width" 
-                          type="number" 
                           min={toDisplay(1, 'length')}
                           max={toDisplay(5000, 'length')}
-                          value={Number(toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
-                          onChange={(e) => setWidth(fromDisplay(safeParseNumber(e.target.value, toDisplay(width, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
-                          step="any"
-                          className="bg-white h-8 text-sm"
+                          step={unitSystem === 'metric' ? 10 : 0.5}
+                          precision={unitSystem === 'metric' ? 0 : 2}
+                          value={toDisplay(width ?? 0, 'length')} 
+                          onChange={(val) => setWidth(fromDisplay(val, 'length'))}
                         />
                       </div>
                       <div className="grid gap-1.5">
                         <Label htmlFor="height" className="text-[10px] uppercase font-bold text-slate-400">{t.height} ({u.length})</Label>
-                        <Input 
+                        <NumericInputWithControls 
                           id="height" 
-                          type="number" 
                           min={toDisplay(1, 'length')}
                           max={toDisplay(5000, 'length')}
-                          value={Number(toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
-                          onChange={(e) => setHeight(fromDisplay(safeParseNumber(e.target.value, toDisplay(height, 'length'), 1, toDisplay(5000, 'length')), 'length'))}
-                          step="any"
-                          className="bg-white h-8 text-sm"
+                          step={unitSystem === 'metric' ? 10 : 0.5}
+                          precision={unitSystem === 'metric' ? 0 : 2}
+                          value={toDisplay(height ?? 0, 'length')} 
+                          onChange={(val) => setHeight(fromDisplay(val, 'length'))}
                         />
                       </div>
                     </div>
@@ -2600,23 +2657,36 @@ export function App() {
                     {sectionType === 'hollow' && (
                       <div className="grid gap-1.5">
                         <Label htmlFor="thickness" className="text-[10px] uppercase font-bold text-slate-400">{t.thickness} ({u.length})</Label>
-                        <Input 
+                        <NumericInputWithControls 
                           id="thickness" 
-                          type="number" 
                           min={toDisplay(0.1, 'length')}
                           max={toDisplay(Math.min(width, height) / 2.1, 'length')}
-                          step="any"
-                          value={Number(toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
-                          onChange={(e) => setThickness(fromDisplay(safeParseNumber(e.target.value, toDisplay(thickness, 'length'), 0.1, toDisplay(Math.min(width, height) / 2.1, 'length')), 'length'))}
-                          className="bg-white h-8 text-sm"
+                          step={unitSystem === 'metric' ? 1 : 0.05}
+                          precision={unitSystem === 'metric' ? 1 : 3}
+                          value={toDisplay(thickness ?? 0, 'length')} 
+                          onChange={(val) => setThickness(fromDisplay(val, 'length'))}
                         />
                       </div>
                     )}
                   </CardContent>
                   <CardFooter className="bg-slate-50/50 border-t px-4 py-2">
                     <div className="w-full grid grid-cols-2 gap-4 text-[9px] font-mono text-slate-500 uppercase font-bold">
-                      <div>I: {sectionProps.momentOfInertia.toExponential(2)} mm⁴</div>
-                      <div>W: {sectionProps.sectionModulus.toExponential(2)} mm³</div>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <div className="cursor-help hover:text-blue-600 transition-colors">I: {sectionProps.momentOfInertia.toExponential(2)} mm⁴</div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[200px] text-[10px]">
+                          <p><strong>Moment of Inertia (I)</strong>: A geometric property that measures a shape's resistance to bending. Higher values mean less deflection.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <div className="cursor-help hover:text-blue-600 transition-colors">W: {sectionProps.sectionModulus.toExponential(2)} mm³</div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[200px] text-[10px]">
+                          <p><strong>Section Modulus (W)</strong>: Ratio of Moment of Inertia to distance from neutral axis. Used to calculate maximum bending stress.</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </CardFooter>
                 </Card>
@@ -2633,19 +2703,46 @@ export function App() {
             <CardContent className="p-3 sm:p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[9px] uppercase font-bold text-slate-400">Young's Modulus (E)</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Label className="text-[9px] uppercase font-bold text-slate-400 cursor-help hover:text-blue-600 transition-colors flex items-center gap-1">
+                        Young's Modulus (E) <HelpCircle className="w-2.5 h-2.5" />
+                      </Label>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px] text-[10px]">
+                      <p><strong>Elastic Modulus (E)</strong>: A measure of material stiffness. It defines the relationship between stress and strain. Higher E means a stiffer material.</p>
+                    </TooltipContent>
+                  </Tooltip>
                   <div className="text-xs font-semibold bg-slate-50 p-1.5 rounded border border-slate-100">
                     {toDisplay(MATERIALS[material].e, 'stress').toLocaleString()} {u.stress}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[9px] uppercase font-bold text-slate-400">Yield Strength (σy)</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Label className="text-[9px] uppercase font-bold text-slate-400 cursor-help hover:text-blue-600 transition-colors flex items-center gap-1">
+                        Yield Strength (σy) <HelpCircle className="w-2.5 h-2.5" />
+                      </Label>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px] text-[10px]">
+                      <p><strong>Yield Strength</strong>: The stress level at which a material begins to deform plastically. Beyond this point, deformation is permanent.</p>
+                    </TooltipContent>
+                  </Tooltip>
                   <div className="text-xs font-semibold bg-slate-50 p-1.5 rounded border border-slate-100">
                     {toDisplay(MATERIALS[material].yield, 'stress').toLocaleString()} {u.stress}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[9px] uppercase font-bold text-slate-400">Poisson's Ratio (ν)</Label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Label className="text-[9px] uppercase font-bold text-slate-400 cursor-help hover:text-blue-600 transition-colors flex items-center gap-1">
+                        Poisson's Ratio (ν) <HelpCircle className="w-2.5 h-2.5" />
+                      </Label>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px] text-[10px]">
+                      <p><strong>Poisson's Ratio</strong>: The ratio of transverse strain to axial strain. For most metals, it is around 0.3.</p>
+                    </TooltipContent>
+                  </Tooltip>
                   <div className="text-xs font-semibold bg-slate-50 p-1.5 rounded border border-slate-100">
                     {MATERIALS[material].poisson.toFixed(2)}
                   </div>
@@ -2663,29 +2760,47 @@ export function App() {
                     </div>
                     <CardTitle className="text-sm sm:text-base">Select Design Code</CardTitle>
                   </CardHeader>
-                  <CardContent className="p-2 sm:p-3 space-y-1">
-                    {CODES_OF_PRACTICE.map((item) => (
-                      <div 
-                        key={item.country} 
-                        className={cn(
-                          "space-y-0.5 p-2 rounded-lg border transition-all cursor-pointer",
-                          selectedCodeId === item.country 
-                            ? "bg-blue-50 border-blue-200 ring-1 ring-blue-200" 
-                            : "border-transparent hover:bg-slate-50 hover:border-slate-200"
-                        )}
-                        onClick={() => setSelectedCodeId(item.country)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-[11px] font-bold text-slate-900">{item.country}</h4>
-                          {selectedCodeId === item.country && (
-                            <CheckCircle2 className="w-3 h-3 text-blue-600" />
-                          )}
-                        </div>
-                        <ul className="text-[9px] text-slate-500 list-disc list-inside">
-                          {item.codes.map((code, idx) => (
-                            <li key={idx} className="truncate">{code}</li>
+                  <CardContent className="p-2 sm:p-3 space-y-4">
+                    {Array.from(new Set(CODES_OF_PRACTICE.map(c => c.region))).map(region => (
+                      <div key={region} className="space-y-1.5">
+                        <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-1 flex items-center gap-2">
+                          <span className="h-px flex-1 bg-blue-100"></span>
+                          {region}
+                          <span className="h-px flex-1 bg-blue-100"></span>
+                        </h3>
+                        <div className="grid grid-cols-1 gap-1">
+                          {CODES_OF_PRACTICE.filter(c => c.region === region).map((item) => (
+                            <div 
+                              key={item.country} 
+                              className={cn(
+                                "group relative flex flex-col p-2 rounded-lg border transition-all cursor-pointer",
+                                selectedCodeId === item.country 
+                                  ? "bg-blue-50 border-blue-200 ring-1 ring-blue-200 shadow-sm" 
+                                  : "bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50/50"
+                              )}
+                              onClick={() => setSelectedCodeId(item.country)}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className={cn(
+                                  "text-[11px] font-bold transition-colors",
+                                  selectedCodeId === item.country ? "text-blue-700" : "text-slate-700 group-hover:text-slate-900"
+                                )}>
+                                  {item.country}
+                                </span>
+                                {selectedCodeId === item.country && (
+                                  <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {item.codes.map((code, idx) => (
+                                  <span key={idx} className="text-[8px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded-sm border border-slate-200/50">
+                                    {code.split(' (')[0]}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       </div>
                     ))}
                   </CardContent>
@@ -2727,20 +2842,20 @@ export function App() {
               <div className="grid gap-1.5">
                 <Label className="text-[10px] uppercase font-bold text-slate-400">{t.seismicCoeff}</Label>
                 <div className="flex flex-col gap-2">
-                  <div className="relative">
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      min="0"
-                      max="10"
+                  <div className="flex items-center gap-2">
+                    <NumericInputWithControls 
+                      min={0}
+                      max={10}
+                      step={0.01}
+                      precision={2}
                       value={seismicCoeff} 
-                      onChange={(e) => setSeismicCoeff(safeParseNumber(e.target.value, seismicCoeff, 0, 10))}
-                      className="bg-white h-8 pr-8 text-sm"
+                      onChange={(val) => setSeismicCoeff(val)}
+                      className="flex-1"
                     />
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 hover:text-blue-600"
+                      className="h-7 w-7 text-slate-400 hover:text-blue-600 shrink-0"
                       onClick={() => setSeismicCoeff(SEISMIC_REGIONS[seismicRegion].coeff)}
                       title="Reset to region default"
                     >
@@ -2873,33 +2988,38 @@ export function App() {
                         <Label className="text-[8px] uppercase font-bold text-slate-400">
                           {load.type === 'trapezoidal' ? `w1 (${u.udl})` : `Value (${load.type === 'point' ? u.force : u.udl})`}
                         </Label>
-                        <Input 
-                          type="number" 
-                          value={Number(toDisplay(load.value ?? 0, load.type === 'point' ? 'force' : 'udl').toFixed(unitSystem === 'metric' ? 2 : 4))} 
-                          onChange={(e) => updateLoad(load.id, { value: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.value, load.type === 'point' ? 'force' : 'udl'), -1000000, 1000000), load.type === 'point' ? 'force' : 'udl') })}
-                          className="h-7 text-xs bg-white"
+                        <NumericInputWithControls 
+                          min={-1000000}
+                          max={1000000}
+                          step={load.type === 'point' ? (unitSystem === 'metric' ? 100 : 10) : (unitSystem === 'metric' ? 0.5 : 0.05)}
+                          precision={unitSystem === 'metric' ? 2 : 4}
+                          value={toDisplay(load.value ?? 0, load.type === 'point' ? 'force' : 'udl')} 
+                          onChange={(val) => updateLoad(load.id, { value: fromDisplay(val, load.type === 'point' ? 'force' : 'udl') })}
                         />
                       </div>
                       {load.type === 'point' && (
                         <div className="space-y-0.5">
                           <Label className="text-[8px] uppercase font-bold text-slate-400">Pos ({u.length})</Label>
-                          <Input 
-                            type="number" 
-                            value={Number(toDisplay(load.position ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
-                            onChange={(e) => updateLoad(load.id, { position: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.position ?? 0, 'length'), 0, toDisplay(length, 'length')), 'length') })}
-                            step="any"
-                            className="h-7 text-xs bg-white"
+                          <NumericInputWithControls 
+                            min={0}
+                            max={toDisplay(length, 'length')}
+                            step={unitSystem === 'metric' ? 100 : 1}
+                            precision={unitSystem === 'metric' ? 0 : 2}
+                            value={toDisplay(load.position ?? 0, 'length')} 
+                            onChange={(val) => updateLoad(load.id, { position: fromDisplay(val, 'length') })}
                           />
                         </div>
                       )}
                       {load.type === 'trapezoidal' && (
                         <div className="space-y-0.5">
                           <Label className="text-[8px] uppercase font-bold text-slate-400">w2 ({u.udl})</Label>
-                          <Input 
-                            type="number" 
-                            value={Number(toDisplay(load.value2 ?? load.value, 'udl').toFixed(unitSystem === 'metric' ? 2 : 4))} 
-                            onChange={(e) => updateLoad(load.id, { value2: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.value2 ?? load.value, 'udl'), -1000000, 1000000), 'udl') })}
-                            className="h-7 text-xs bg-white"
+                          <NumericInputWithControls 
+                            min={-1000000}
+                            max={1000000}
+                            step={unitSystem === 'metric' ? 0.5 : 0.05}
+                            precision={unitSystem === 'metric' ? 2 : 4}
+                            value={toDisplay(load.value2 ?? load.value, 'udl')} 
+                            onChange={(val) => updateLoad(load.id, { value2: fromDisplay(val, 'udl') })}
                           />
                         </div>
                       )}
@@ -2909,22 +3029,24 @@ export function App() {
                       <div className="grid grid-cols-2 gap-2 mt-1.5">
                         <div className="space-y-0.5">
                           <Label className="text-[8px] uppercase font-bold text-slate-400">Start ({u.length})</Label>
-                          <Input 
-                            type="number" 
-                            value={Number(toDisplay(load.start ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
-                            onChange={(e) => updateLoad(load.id, { start: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.start ?? 0, 'length'), 0, toDisplay(length, 'length')), 'length') })}
-                            step="any"
-                            className="h-7 text-xs bg-white"
+                          <NumericInputWithControls 
+                            min={0}
+                            max={toDisplay(length, 'length')}
+                            step={unitSystem === 'metric' ? 100 : 1}
+                            precision={unitSystem === 'metric' ? 0 : 2}
+                            value={toDisplay(load.start ?? 0, 'length')} 
+                            onChange={(val) => updateLoad(load.id, { start: fromDisplay(val, 'length') })}
                           />
                         </div>
                         <div className="space-y-0.5">
                           <Label className="text-[8px] uppercase font-bold text-slate-400">End ({u.length})</Label>
-                          <Input 
-                            type="number" 
-                            value={Number(toDisplay(load.end ?? length, 'length').toFixed(unitSystem === 'metric' ? 2 : 4))} 
-                            onChange={(e) => updateLoad(load.id, { end: fromDisplay(safeParseNumber(e.target.value, toDisplay(load.end ?? length, 'length'), 0, toDisplay(length, 'length')), 'length') })}
-                            step="any"
-                            className="h-7 text-xs bg-white"
+                          <NumericInputWithControls 
+                            min={0}
+                            max={toDisplay(length, 'length')}
+                            step={unitSystem === 'metric' ? 100 : 1}
+                            precision={unitSystem === 'metric' ? 0 : 2}
+                            value={toDisplay(load.end ?? length, 'length')} 
+                            onChange={(val) => updateLoad(load.id, { end: fromDisplay(val, 'length') })}
                           />
                         </div>
                       </div>
@@ -3215,13 +3337,14 @@ export function App() {
                 <div className="flex items-center justify-between gap-4">
                   <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">{t.adjustSpan}</Label>
                   <div className="flex items-center gap-2">
-                    <Input 
-                      type="number"
+                    <NumericInputWithControls 
                       min={toDisplay(100, 'length')}
                       max={toDisplay(50000, 'length')}
-                      value={Number(toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2))} 
-                      onChange={(e) => setLength(fromDisplay(safeParseNumber(e.target.value, toDisplay(length, 'length'), 0, toDisplay(50000, 'length')), 'length'))}
-                      className="h-8 w-24 text-right font-mono font-bold text-blue-600 bg-white"
+                      step={unitSystem === 'metric' ? 100 : 1}
+                      precision={unitSystem === 'metric' ? 0 : 2}
+                      value={toDisplay(length ?? 0, 'length')} 
+                      onChange={(val) => setLength(fromDisplay(val, 'length'))}
+                      className="w-32"
                     />
                     <span className="text-xs font-bold text-slate-400">{u.length}</span>
                   </div>
@@ -3229,13 +3352,13 @@ export function App() {
                 <Slider 
                   value={[length ?? 3000]} 
                   onValueChange={(vals) => setLength(vals[0] ?? 3000)} 
-                  min={500} 
-                  max={30000} 
-                  step={50}
+                  min={100} 
+                  max={50000} 
+                  step={1}
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 font-medium px-1">
-                  <span>{toDisplay(500, 'length').toFixed(0)} {u.length}</span>
-                  <span>{toDisplay(30000, 'length').toFixed(0)} {u.length}</span>
+                  <span>{toDisplay(100, 'length').toFixed(unitSystem === 'metric' ? 0 : 1)} {u.length}</span>
+                  <span>{toDisplay(50000, 'length').toFixed(unitSystem === 'metric' ? 0 : 1)} {u.length}</span>
                 </div>
               </div>
             </CardFooter>
@@ -3677,5 +3800,82 @@ function ChartContainer({ data, dataKey, color, unit, label, invert = false, for
         />
       </AreaChart>
     </ResponsiveContainer>
+  );
+}
+
+function NumericInputWithControls({ 
+  value, 
+  onChange, 
+  min = -Infinity, 
+  max = Infinity, 
+  step = 1, 
+  precision = 2,
+  className,
+  id
+}: { 
+  value: number; 
+  onChange: (val: number) => void; 
+  min?: number; 
+  max?: number; 
+  step?: number; 
+  precision?: number;
+  className?: string;
+  id?: string;
+}) {
+  const [localValue, setLocalValue] = useState(value.toFixed(precision));
+
+  React.useEffect(() => {
+    setLocalValue(value.toFixed(precision));
+  }, [value, precision]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setLocalValue(val);
+    if (val === '') return;
+    const num = parseFloat(val);
+    if (!isNaN(num)) {
+      onChange(Math.min(max, Math.max(min, num)));
+    }
+  };
+
+  const increment = () => {
+    const newValue = Math.min(max, value + step);
+    onChange(newValue);
+  };
+
+  const decrement = () => {
+    const newValue = Math.max(min, value - step);
+    onChange(newValue);
+  };
+
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      <Button 
+        variant="outline" 
+        size="icon" 
+        className="h-7 w-7 shrink-0" 
+        onClick={decrement}
+        disabled={value <= min}
+      >
+        <Minus className="h-3 w-3" />
+      </Button>
+      <Input 
+        id={id}
+        type="number" 
+        value={localValue} 
+        onChange={handleInputChange}
+        className="h-7 flex-1 text-center bg-white text-xs px-1"
+        step="any"
+      />
+      <Button 
+        variant="outline" 
+        size="icon" 
+        className="h-7 w-7 shrink-0" 
+        onClick={increment}
+        disabled={value >= max}
+      >
+        <Plus className="h-3 w-3" />
+      </Button>
+    </div>
   );
 }
