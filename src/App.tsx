@@ -101,6 +101,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Switch } from '@/components/ui/switch';
 import { 
   LineChart, 
   Line, 
@@ -1057,6 +1058,237 @@ const ReferenceAttachmentCard = ({
   );
 };
 
+const CalculusStepsCard = ({ 
+  options, 
+  setOptions,
+  sectionProps,
+  factoredLoads,
+  beamProps,
+  results,
+  u,
+  unitSystem,
+  sectionType,
+  width,
+  height,
+  thickness,
+  material,
+  safetyFactor,
+  t
+}: {
+  options: { section: boolean; loads: boolean; analysis: boolean; stress: boolean };
+  setOptions: (v: any) => void;
+  sectionProps: any;
+  factoredLoads: any[];
+  beamProps: any;
+  results: any;
+  u: any;
+  unitSystem: string;
+  sectionType: string;
+  width: number;
+  height: number;
+  thickness: number;
+  material: string;
+  safetyFactor: number;
+  t: any;
+}) => {
+  const toggleOption = (key: keyof typeof options) => {
+    setOptions({ ...options, [key]: !options[key] });
+  };
+
+  return (
+    <Card className="shadow-sm border-slate-200 overflow-hidden">
+      <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-blue-600">
+            <Activity className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Calculus Steps</span>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
+              <span className="text-[9px] font-bold text-slate-400 uppercase">Section</span>
+              <Switch checked={options.section} onCheckedChange={() => toggleOption('section')} className="scale-75" />
+            </div>
+            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
+              <span className="text-[9px] font-bold text-slate-400 uppercase">Loads</span>
+              <Switch checked={options.loads} onCheckedChange={() => toggleOption('loads')} className="scale-75" />
+            </div>
+            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
+              <span className="text-[9px] font-bold text-slate-400 uppercase">Analysis</span>
+              <Switch checked={options.analysis} onCheckedChange={() => toggleOption('analysis')} className="scale-75" />
+            </div>
+            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
+              <span className="text-[9px] font-bold text-slate-400 uppercase">Stress</span>
+              <Switch checked={options.stress} onCheckedChange={() => toggleOption('stress')} className="scale-75" />
+            </div>
+          </div>
+        </div>
+        <CardTitle className="text-sm sm:text-base mt-1">Detailed Calculation Steps</CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 space-y-6">
+        {options.section && (
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+              <Layers className="w-3 h-3" />
+              Step 1: Section Properties
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-slate-500 italic">Formulas:</p>
+                <div className="font-mono text-[11px] space-y-1.5">
+                  {sectionType === 'solid' ? (
+                    <>
+                      <div className="bg-white p-2 rounded border border-slate-200">A = w × h</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">I = (w × h³) / 12</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">W = I / (h / 2)</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="bg-white p-2 rounded border border-slate-200">A = (w × h) - (w_i × h_i)</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">I = ((w × h³) - (w_i × h_i³)) / 12</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">W = I / (h / 2)</div>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-slate-500 italic">Calculations:</p>
+                <div className="font-mono text-[11px] space-y-1.5">
+                  <div className="bg-white p-2 rounded border border-slate-200">A = {sectionProps.area.toFixed(2)} mm²</div>
+                  <div className="bg-white p-2 rounded border border-slate-200">I = {sectionProps.momentOfInertia.toExponential(4)} mm⁴</div>
+                  <div className="bg-white p-2 rounded border border-slate-200">W = {sectionProps.sectionModulus.toExponential(4)} mm³</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {options.loads && (
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+              <Scale className="w-3 h-3" />
+              Step 2: Load Factoring
+            </h4>
+            <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-slate-200">
+                    <TableHead className="h-8 text-[9px] uppercase font-bold text-slate-400">Type</TableHead>
+                    <TableHead className="h-8 text-[9px] uppercase font-bold text-slate-400 text-right">Nominal</TableHead>
+                    <TableHead className="h-8 text-[9px] uppercase font-bold text-slate-400 text-center">Factor</TableHead>
+                    <TableHead className="h-8 text-[9px] uppercase font-bold text-slate-400 text-right">Factored</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {factoredLoads.map((load, idx) => (
+                    <TableRow key={idx} className="hover:bg-slate-100/50 border-slate-100">
+                      <TableCell className="py-2 text-[10px] font-medium text-slate-700 capitalize">{load.type} ({load.category})</TableCell>
+                      <TableCell className="py-2 text-[10px] font-mono text-right">{load.value.toFixed(2)}</TableCell>
+                      <TableCell className="py-2 text-[10px] font-mono text-center text-blue-600 font-bold">×</TableCell>
+                      <TableCell className="py-2 text-[10px] font-mono text-right font-bold text-slate-900">{load.value.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+
+        {options.analysis && (
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+              <Calculator className="w-3 h-3" />
+              Step 3: Beam Analysis
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-slate-500 italic">Key Results:</p>
+                <div className="font-mono text-[11px] space-y-1.5">
+                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                    <span>Max Moment (M_max):</span>
+                    <span className="font-bold text-blue-600">{(results.summary.maxMoment / 1000000).toFixed(3)} kNm</span>
+                  </div>
+                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                    <span>Max Shear (V_max):</span>
+                    <span className="font-bold text-blue-600">{(results.summary.maxShear / 1000).toFixed(3)} kN</span>
+                  </div>
+                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                    <span>Max Deflection (Δ_max):</span>
+                    <span className="font-bold text-blue-600">{results.summary.maxDeflection.toFixed(3)} mm</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-slate-500 italic">Verification:</p>
+                <div className="font-mono text-[11px] space-y-1.5">
+                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                    <span>Span Ratio:</span>
+                    <span className="font-bold text-slate-900">{results.summary.deflectionRatio}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                    <span>Limit (L/175):</span>
+                    <span className="font-bold text-slate-900">{(beamProps.length / 175).toFixed(2)} mm</span>
+                  </div>
+                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                    <span>Status:</span>
+                    <span className={cn("font-bold uppercase", results.summary.status === 'pass' ? "text-green-600" : "text-red-600")}>
+                      {results.summary.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {options.stress && (
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+              <Scale className="w-3 h-3" />
+              Step 4: Stress Check
+            </h4>
+            <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress Calculation</p>
+                  <div className="font-mono text-xs space-y-1">
+                    <p>σ = M_max / W</p>
+                    <p>σ = {(results.summary.maxMoment).toFixed(0)} / {sectionProps.sectionModulus.toFixed(0)}</p>
+                    <p className="text-blue-600 font-bold">σ = {results.summary.maxStress.toFixed(2)} MPa</p>
+                  </div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Allowable Stress</p>
+                  <div className="font-mono text-xs space-y-1">
+                    <p>σ_allow = fy / Safety Factor (γ)</p>
+                    <p>σ_allow = {beamProps.yieldStrength} / {safetyFactor}</p>
+                    <p className="text-green-600 font-bold">σ_allow = {(beamProps.yieldStrength / safetyFactor).toFixed(2)} MPa</p>
+                  </div>
+                </div>
+              </div>
+              <div className={cn(
+                "p-3 rounded-lg border flex items-center justify-between",
+                results.summary.maxStress <= (beamProps.yieldStrength / safetyFactor) 
+                  ? "bg-green-50 border-green-200 text-green-700" 
+                  : "bg-red-50 border-red-200 text-red-700"
+              )}>
+                <div className="flex items-center gap-2">
+                  {results.summary.maxStress <= (beamProps.yieldStrength / safetyFactor) ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  <span className="text-xs font-bold uppercase tracking-tight">
+                    {results.summary.maxStress <= (beamProps.yieldStrength / safetyFactor) ? "Stress Check Passed" : "Stress Check Failed"}
+                  </span>
+                </div>
+                <span className="text-xs font-mono font-bold">
+                  {(results.summary.maxStress / (beamProps.yieldStrength / safetyFactor) * 100).toFixed(1)}% Utilization
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 export function App() {
   // Beam State
   const [length, setLength] = useState(() => {
@@ -1186,6 +1418,14 @@ export function App() {
     return 'c1';
   });
   const [isCombinationManagerOpen, setIsCombinationManagerOpen] = useState(false);
+  const [showAllCodes, setShowAllCodes] = useState(false);
+  const [showCalculusSteps, setShowCalculusSteps] = useState(false);
+  const [calcStepOptions, setCalcStepOptions] = useState({
+    section: true,
+    loads: true,
+    analysis: true,
+    stress: true
+  });
   const [activeTab, setActiveTab] = useState('deflection');
   const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [lang, setLang] = useState<keyof typeof TRANSLATIONS>('en');
@@ -1611,6 +1851,18 @@ export function App() {
       localStorage.setItem('facadecalc_projects_list', JSON.stringify([initialProj]));
     }
   }, []);
+
+  // Automatically update Unit System to follow selected region
+  React.useEffect(() => {
+    const code = CODES_OF_PRACTICE.find(c => c.country === selectedCodeId);
+    if (code) {
+      if (code.country === 'United States') {
+        setUnitSystem('imperial');
+      } else {
+        setUnitSystem('metric');
+      }
+    }
+  }, [selectedCodeId]);
 
   // Sync current project to list periodically
   React.useEffect(() => {
@@ -2315,6 +2567,99 @@ export function App() {
                   </CardContent>
                 </Card>
 
+                {/* Codes of Practice */}
+                <Card className="shadow-sm border-slate-200 overflow-hidden">
+                  <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-blue-600">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{t.codes}</span>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2"
+                        onClick={() => setShowAllCodes(!showAllCodes)}
+                      >
+                        {showAllCodes ? "Hide Options" : "Change Code"}
+                      </Button>
+                    </div>
+                    <CardTitle className="text-sm sm:text-base mt-1">Design Standard</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-3 space-y-4">
+                    {!showAllCodes ? (
+                      // Only show active standard
+                      <div className="bg-blue-50 border border-blue-200 ring-1 ring-blue-200 rounded-lg p-3 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-bold text-blue-600 uppercase tracking-tighter">Active Standard</span>
+                            <span className="text-sm font-bold text-blue-900">{selectedCodeId}</span>
+                          </div>
+                          <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {CODES_OF_PRACTICE.find(c => c.country === selectedCodeId)?.codes.map((code, idx) => (
+                            <span key={idx} className="text-[9px] px-2 py-0.5 bg-white text-blue-700 rounded-full border border-blue-100 font-medium">
+                              {code}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-blue-100 flex items-center justify-between">
+                          <span className="text-[9px] text-blue-600/70 italic">Units synced: {unitSystem === 'metric' ? 'Metric (SI)' : 'Imperial (US)'}</span>
+                          <span className="text-[9px] font-bold text-blue-600">{CODES_OF_PRACTICE.find(c => c.country === selectedCodeId)?.region}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      // Show all options for selection
+                      Array.from(new Set(CODES_OF_PRACTICE.map(c => c.region))).map(region => (
+                        <div key={region} className="space-y-1.5">
+                          <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-1 flex items-center gap-2">
+                            <span className="h-px flex-1 bg-blue-100"></span>
+                            {region}
+                            <span className="h-px flex-1 bg-blue-100"></span>
+                          </h3>
+                          <div className="grid grid-cols-1 gap-1">
+                            {CODES_OF_PRACTICE.filter(c => c.region === region).map((item) => (
+                              <div 
+                                key={item.country} 
+                                className={cn(
+                                  "group relative flex flex-col p-2 rounded-lg border transition-all cursor-pointer",
+                                  selectedCodeId === item.country 
+                                    ? "bg-blue-50 border-blue-200 ring-1 ring-blue-200 shadow-sm" 
+                                    : "bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50/50"
+                                )}
+                                onClick={() => {
+                                  setSelectedCodeId(item.country);
+                                  setShowAllCodes(false);
+                                }}
+                              >
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={cn(
+                                    "text-[11px] font-bold transition-colors",
+                                    selectedCodeId === item.country ? "text-blue-700" : "text-slate-700 group-hover:text-slate-900"
+                                  )}>
+                                    {item.country}
+                                  </span>
+                                  {selectedCodeId === item.country && (
+                                    <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {item.codes.map((code, idx) => (
+                                    <span key={idx} className="text-[8px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded-sm border border-slate-200/50">
+                                      {code.split(' (')[0]}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* Reference Attachment */}
                 <ReferenceAttachmentCard 
                   attachment={projectAttachment}
@@ -2750,61 +3095,6 @@ export function App() {
               </div>
             </CardContent>
           </Card>
-
-                {/* Codes of Practice */}
-                <Card className="shadow-sm border-slate-200 overflow-hidden">
-                  <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
-                    <div className="flex items-center gap-2 text-blue-600 mb-0.5">
-                      <BookOpen className="w-3.5 h-3.5" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest">{t.codes}</span>
-                    </div>
-                    <CardTitle className="text-sm sm:text-base">Select Design Code</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-2 sm:p-3 space-y-4">
-                    {Array.from(new Set(CODES_OF_PRACTICE.map(c => c.region))).map(region => (
-                      <div key={region} className="space-y-1.5">
-                        <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-1 flex items-center gap-2">
-                          <span className="h-px flex-1 bg-blue-100"></span>
-                          {region}
-                          <span className="h-px flex-1 bg-blue-100"></span>
-                        </h3>
-                        <div className="grid grid-cols-1 gap-1">
-                          {CODES_OF_PRACTICE.filter(c => c.region === region).map((item) => (
-                            <div 
-                              key={item.country} 
-                              className={cn(
-                                "group relative flex flex-col p-2 rounded-lg border transition-all cursor-pointer",
-                                selectedCodeId === item.country 
-                                  ? "bg-blue-50 border-blue-200 ring-1 ring-blue-200 shadow-sm" 
-                                  : "bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50/50"
-                              )}
-                              onClick={() => setSelectedCodeId(item.country)}
-                            >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className={cn(
-                                  "text-[11px] font-bold transition-colors",
-                                  selectedCodeId === item.country ? "text-blue-700" : "text-slate-700 group-hover:text-slate-900"
-                                )}>
-                                  {item.country}
-                                </span>
-                                {selectedCodeId === item.country && (
-                                  <CheckCircle2 className="w-3 h-3 text-blue-600" />
-                                )}
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {item.codes.map((code, idx) => (
-                                  <span key={idx} className="text-[8px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded-sm border border-slate-200/50">
-                                    {code.split(' (')[0]}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
 
           {/* Seismic Analysis */}
           <Card className="shadow-sm border-slate-200 overflow-hidden">
@@ -3365,8 +3655,12 @@ export function App() {
           </Card>
           {/* Calculation Notes */}
           <Card className="shadow-sm border-slate-200">
-            <CardHeader>
+            <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50 flex flex-row items-center justify-between">
               <CardTitle className="text-lg">{t.notes}</CardTitle>
+              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Show Calculus Steps</span>
+                <Switch checked={showCalculusSteps} onCheckedChange={setShowCalculusSteps} />
+              </div>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-slate-600">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -3434,6 +3728,32 @@ export function App() {
               </div>
             </CardContent>
           </Card>
+
+          {showCalculusSteps && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6"
+            >
+              <CalculusStepsCard 
+                options={calcStepOptions}
+                setOptions={setCalcStepOptions}
+                sectionProps={sectionProps}
+                factoredLoads={factoredLoads}
+                beamProps={beamProps}
+                results={results}
+                u={u}
+                unitSystem={unitSystem}
+                sectionType={sectionType}
+                width={width}
+                height={height}
+                thickness={thickness}
+                material={material}
+                safetyFactor={safetyFactor}
+                t={t}
+              />
+            </motion.div>
+          )}
         </div>
             </motion.div>
           )}
