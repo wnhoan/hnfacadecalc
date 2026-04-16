@@ -11,6 +11,7 @@ export interface BeamProperties {
   sectionModulus: number; // mm3
   safetyFactor: number;
   supportCondition?: 'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned';
+  beamType?: 'mullion' | 'transom';
 }
 
 export interface Load {
@@ -331,7 +332,8 @@ export function calculateBeam(
   const finalDeflections = getDeflection(finalForces, v0, theta0);
 
   const allowableStress = yieldStrength / Math.max(0.1, props.safetyFactor);
-  const deflectionLimit = length / 175;
+  const deflectionLimitRatio = props.beamType === 'transom' ? 240 : 175;
+  const deflectionLimit = length / deflectionLimitRatio;
 
   for (let i = 0; i <= steps; i++) {
     const x = finalForces[i].x;
@@ -356,7 +358,7 @@ export function calculateBeam(
   const deflectionRatioValue = maxDeflection > 0.0001 ? length / maxDeflection : Infinity;
   const deflectionRatio = deflectionRatioValue < 100000 ? `L/${Math.round(deflectionRatioValue)}` : 'N/A';
 
-  const status = maxStress <= allowableStress && deflectionRatioValue >= 175 ? 'pass' : 'fail';
+  const status = maxStress <= allowableStress && deflectionRatioValue >= deflectionLimitRatio ? 'pass' : 'fail';
 
   return {
     points,
@@ -395,5 +397,61 @@ export function calculateHollowRectangularProperties(width: number, height: numb
   const area = (w * h) - (innerWidth * innerHeight);
   const momentOfInertia = ((w * Math.pow(h, 3)) - (innerWidth * Math.pow(innerHeight, 3))) / 12;
   const sectionModulus = h > 0 ? momentOfInertia / (h / 2) : 0;
+  return { area, momentOfInertia, sectionModulus };
+}
+
+export function calculateChannelProperties(width: number, height: number, thickness: number) {
+  const w = Math.max(0, width);
+  const h = Math.max(0, height);
+  const t = Math.max(0, thickness);
+
+  if (t <= 0 || w <= t || h <= 2 * t) {
+    return calculateRectangularProperties(w, h);
+  }
+
+  // Channel area: 2 flanges + 1 web
+  // Area = 2 * (w * t) + (h - 2t) * t
+  const area = 2 * w * t + (h - 2 * t) * t;
+
+  // Moment of Inertia (Ix) - assuming bending about major axis (horizontal)
+  // I = (w * h^3)/12 - ((w - t) * (h - 2t)^3)/12
+  const momentOfInertia = (w * Math.pow(h, 3)) / 12 - ((w - t) * Math.pow(h - 2 * t, 3)) / 12;
+  const sectionModulus = h > 0 ? momentOfInertia / (h / 2) : 0;
+
+  return { area, momentOfInertia, sectionModulus };
+}
+
+export function calculateLPlateProperties(width: number, height: number, thickness: number) {
+  const w = Math.max(0, width);
+  const h = Math.max(0, height);
+  const t = Math.max(0, thickness);
+
+  if (t <= 0 || w <= t || h <= t) {
+    return calculateRectangularProperties(w, h);
+  }
+
+  // L-plate area: horizontal leg + vertical leg
+  // Area = w*t + (h-t)*t
+  const area = w * t + (h - t) * t;
+
+  // Centroid y_c from bottom
+  // A1 = w*t, y1 = t/2
+  // A2 = (h-t)*t, y2 = t + (h-t)/2 = (h+t)/2
+  const a1 = w * t;
+  const y1 = t / 2;
+  const a2 = (h - t) * t;
+  const y2 = (h + t) / 2;
+  const yc = (a1 * y1 + a2 * y2) / area;
+
+  // Moment of Inertia (Ix) about centroid
+  // I1 = w*t^3/12 + a1*(yc-y1)^2
+  // I2 = t*(h-t)^3/12 + a2*(yc-y2)^2
+  const i1 = (w * Math.pow(t, 3)) / 12 + a1 * Math.pow(yc - y1, 2);
+  const i2 = (t * Math.pow(h - t, 3)) / 12 + a2 * Math.pow(yc - y2, 2);
+  const momentOfInertia = i1 + i2;
+
+  // Section Modulus (Wx)
+  const sectionModulus = Math.max(yc, h - yc) > 0 ? momentOfInertia / Math.max(yc, h - yc) : 0;
+
   return { area, momentOfInertia, sectionModulus };
 }

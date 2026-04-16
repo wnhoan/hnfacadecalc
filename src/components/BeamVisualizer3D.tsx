@@ -8,9 +8,10 @@ interface BeamVisualizer3DProps {
   width: number;
   height: number;
   thickness: number;
-  sectionType: 'solid' | 'hollow';
+  sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate';
   supportCondition?: 'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned';
   materialColor?: string;
+  unitSystem?: 'metric' | 'imperial';
 }
 
 const SupportIndicator: React.FC<{ type: 'pin' | 'fixed', position: [number, number, number] }> = ({ type, position }) => {
@@ -37,32 +38,60 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
   thickness, 
   sectionType,
   supportCondition = 'simply_supported',
-  materialColor = '#94a3b8' 
+  materialColor = '#94a3b8',
+  unitSystem = 'metric'
 }) => {
+  const u = unitSystem === 'metric' ? 'mm' : 'in';
+  
   const geometry = useMemo(() => {
     const shape = new THREE.Shape();
-    
-    // Outer rectangle
     const hw = width / 2;
     const hh = height / 2;
-    shape.moveTo(-hw, -hh);
-    shape.lineTo(hw, -hh);
-    shape.lineTo(hw, hh);
-    shape.lineTo(-hw, hh);
-    shape.lineTo(-hw, -hh);
 
-    if (sectionType === 'hollow' && thickness > 0) {
-      const hole = new THREE.Path();
-      const ihw = hw - thickness;
-      const ihh = hh - thickness;
-      
-      if (ihw > 0 && ihh > 0) {
-        hole.moveTo(-ihw, -ihh);
-        hole.lineTo(ihw, -ihh);
-        hole.lineTo(ihw, ihh);
-        hole.lineTo(-ihw, ihh);
-        hole.lineTo(-ihw, -ihh);
-        shape.holes.push(hole);
+    if (sectionType === 'channel') {
+      // Channel shape (C-shape)
+      // Start at bottom right of web
+      shape.moveTo(-hw + thickness, -hh);
+      shape.lineTo(hw, -hh);
+      shape.lineTo(hw, -hh + thickness);
+      shape.lineTo(-hw + thickness, -hh + thickness);
+      shape.lineTo(-hw + thickness, hh - thickness);
+      shape.lineTo(hw, hh - thickness);
+      shape.lineTo(hw, hh);
+      shape.lineTo(-hw, hh);
+      shape.lineTo(-hw, -hh);
+      shape.closePath();
+    } else if (sectionType === 'l-plate') {
+      // L-plate shape (Angle)
+      shape.moveTo(-hw, -hh);
+      shape.lineTo(hw, -hh);
+      shape.lineTo(hw, -hh + thickness);
+      shape.lineTo(-hw + thickness, -hh + thickness);
+      shape.lineTo(-hw + thickness, hh);
+      shape.lineTo(-hw, hh);
+      shape.lineTo(-hw, -hh);
+      shape.closePath();
+    } else {
+      // Outer rectangle for solid/hollow
+      shape.moveTo(-hw, -hh);
+      shape.lineTo(hw, -hh);
+      shape.lineTo(hw, hh);
+      shape.lineTo(-hw, hh);
+      shape.lineTo(-hw, -hh);
+
+      if (sectionType === 'hollow' && thickness > 0) {
+        const hole = new THREE.Path();
+        const ihw = hw - thickness;
+        const ihh = hh - thickness;
+        
+        if (ihw > 0 && ihh > 0) {
+          hole.moveTo(-ihw, -ihh);
+          hole.lineTo(ihw, -ihh);
+          hole.lineTo(ihw, ihh);
+          hole.lineTo(-ihw, ihh);
+          hole.lineTo(-ihw, -ihh);
+          shape.holes.push(hole);
+        }
       }
     }
 
@@ -112,7 +141,7 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
       {/* Dimension Labels */}
       <group position={[length / 2, height / 2 + 40, 0]} rotation={[0, Math.PI / 2, 0]}>
          <Text fontSize={20} color="#94a3b8" anchorX="center" anchorY="middle">
-           L = {length}mm
+           L = {length}{u}
          </Text>
       </group>
     </group>
@@ -156,7 +185,7 @@ export const BeamVisualizer3D: React.FC<BeamVisualizer3DProps> = (props) => {
       
       <div className="absolute bottom-4 right-4 z-10 flex gap-2">
         <div className="text-[9px] text-slate-500 bg-slate-800/50 px-2 py-1 rounded border border-slate-700/50">
-          L: {props.length}mm | W: {props.width}mm | H: {props.height}mm
+          L: {props.length}{props.unitSystem === 'metric' ? 'mm' : 'in'} | W: {props.width}{props.unitSystem === 'metric' ? 'mm' : 'in'} | H: {props.height}{props.unitSystem === 'metric' ? 'mm' : 'in'}
         </div>
       </div>
     </div>

@@ -119,6 +119,8 @@ import {
   calculateBeam, 
   calculateRectangularProperties, 
   calculateHollowRectangularProperties,
+  calculateChannelProperties,
+  calculateLPlateProperties,
   BeamProperties,
   Load
 } from '@/lib/structural-engine';
@@ -515,14 +517,35 @@ const CONVERSION = {
 interface Combination {
   id: string;
   name: string;
+  description: string;
   factors: Record<keyof typeof LOAD_CATEGORIES, number>;
 }
 
 const DEFAULT_COMBINATIONS: Combination[] = [
-  { id: 'c1', name: 'Serviceability (D+L)', factors: { dead: 1.0, live: 1.0, wind: 0, snow: 0, seismic: 0 } },
-  { id: 'c2', name: 'Ultimate (1.2D + 1.6L)', factors: { dead: 1.2, live: 1.6, wind: 0, snow: 0, seismic: 0 } },
-  { id: 'c3', name: 'Wind Dominant (D + W)', factors: { dead: 1.0, live: 0, wind: 1.0, snow: 0, seismic: 0 } },
-  { id: 'c4', name: 'Seismic Dominant (D + E)', factors: { dead: 1.0, live: 0.5, wind: 0, snow: 0, seismic: 1.0 } },
+  { 
+    id: 'c1', 
+    name: 'Serviceability (D+L)', 
+    description: 'Used for checking deflection limits (SLS). Ensures the structure remains functional and aesthetically pleasing under normal usage.',
+    factors: { dead: 1.0, live: 1.0, wind: 0, snow: 0, seismic: 0 } 
+  },
+  { 
+    id: 'c2', 
+    name: 'Ultimate (1.2D + 1.6L)', 
+    description: 'Primary strength check (ULS). Applies safety factors to dead and live loads to ensure structural integrity against collapse.',
+    factors: { dead: 1.2, live: 1.6, wind: 0, snow: 0, seismic: 0 } 
+  },
+  { 
+    id: 'c3', 
+    name: 'Wind Dominant (D + W)', 
+    description: 'Checks structural response under maximum design wind pressures. Critical for facade members and external cladding.',
+    factors: { dead: 1.0, live: 0, wind: 1.0, snow: 0, seismic: 0 } 
+  },
+  { 
+    id: 'c4', 
+    name: 'Seismic Dominant (D + E)', 
+    description: 'Evaluates performance during earthquake events. Includes a portion of live load as per most international building codes.',
+    factors: { dead: 1.0, live: 0.5, wind: 0, snow: 0, seismic: 1.0 } 
+  },
 ];
 
 // Helper for robust number parsing with clamping
@@ -541,7 +564,8 @@ interface HistoryState {
   projectAttachment?: string;
   length: number;
   material: keyof typeof MATERIALS;
-  sectionType: 'solid' | 'hollow';
+  sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate';
+  beamType: 'mullion' | 'transom';
   width: number;
   height: number;
   thickness: number;
@@ -571,6 +595,7 @@ const createNewProject = (id: string, title: string): Project => ({
   length: 3500,
   material: 'aluminum_6061_t6',
   sectionType: 'hollow',
+  beamType: 'mullion',
   width: 65,
   height: 150,
   thickness: 3.5,
@@ -606,6 +631,7 @@ const getProjectResults = (project: Project) => {
     yieldStrength: MATERIALS[project.material].yield,
     safetyFactor: project.safetyFactor,
     supportCondition: project.supportCondition,
+    beamType: project.beamType,
   };
 
   try {
@@ -877,6 +903,7 @@ const ProjectResultsView = ({
                 thickness={project.thickness} 
                 sectionType={project.sectionType} 
                 supportCondition={project.supportCondition}
+                unitSystem={unitSystem as any}
               />
             </TabsContent>
           </div>
@@ -914,6 +941,22 @@ const PRESET_PROFILES = [
     extruder: 'Architectural Systems',
     url: 'https://picsum.photos/seed/slim1/400/300',
     dimensions: { width: 40, height: 120, thickness: 2.5 }
+  },
+  {
+    id: 'channel-40-100',
+    name: 'C-Channel C100 (40x100)',
+    extruder: 'Structural Steel Co',
+    url: 'https://picsum.photos/seed/channel1/400/300',
+    dimensions: { width: 40, height: 100, thickness: 5 },
+    sectionType: 'channel'
+  },
+  {
+    id: 'l-plate-50-50',
+    name: 'L-Plate L50 (50x50)',
+    extruder: 'Structural Steel Co',
+    url: 'https://picsum.photos/seed/lplate1/400/300',
+    dimensions: { width: 50, height: 50, thickness: 5 },
+    sectionType: 'l-plate'
   }
 ];
 
@@ -1068,11 +1111,13 @@ const CalculusStepsCard = ({
   u,
   unitSystem,
   sectionType,
+  beamType,
   width,
   height,
   thickness,
   material,
   safetyFactor,
+  activeCombination,
   t
 }: {
   options: { section: boolean; loads: boolean; analysis: boolean; stress: boolean };
@@ -1084,11 +1129,13 @@ const CalculusStepsCard = ({
   u: any;
   unitSystem: string;
   sectionType: string;
+  beamType: string;
   width: number;
   height: number;
   thickness: number;
   material: string;
   safetyFactor: number;
+  activeCombination: Combination;
   t: any;
 }) => {
   const toggleOption = (key: keyof typeof options) => {
@@ -1141,6 +1188,18 @@ const CalculusStepsCard = ({
                       <div className="bg-white p-2 rounded border border-slate-200">I = (w × h³) / 12</div>
                       <div className="bg-white p-2 rounded border border-slate-200">W = I / (h / 2)</div>
                     </>
+                  ) : sectionType === 'channel' ? (
+                    <>
+                      <div className="bg-white p-2 rounded border border-slate-200">A = 2wt + (h-2t)t</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">I = (wh³)/12 - ((w-t)(h-2t)³)/12</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">W = I / (h / 2)</div>
+                    </>
+                  ) : sectionType === 'l-plate' ? (
+                    <>
+                      <div className="bg-white p-2 rounded border border-slate-200">A = wt + (h-t)t</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">I = Σ(I_i + A_i·d_i²)</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">W = I / y_max</div>
+                    </>
                   ) : (
                     <>
                       <div className="bg-white p-2 rounded border border-slate-200">A = (w × h) - (w_i × h_i)</div>
@@ -1159,6 +1218,33 @@ const CalculusStepsCard = ({
                 </div>
               </div>
             </div>
+            
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-2">
+                <div className="flex items-center gap-2 text-blue-700">
+                  <div className="p-1 rounded bg-blue-100">
+                    <Activity className="w-3 h-3" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider">I-Value (Moment of Inertia)</span>
+                </div>
+                <p className="text-[10px] text-slate-600 leading-relaxed">
+                  <strong>Calculus Measure:</strong> The second moment of area, defined as <code className="text-blue-700 font-bold">I = ∫ y² dA</code>. 
+                  It measures the section's geometric efficiency in resisting bending. A larger I-value significantly reduces deflection (Δ ∝ 1/I).
+                </p>
+              </div>
+              <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 space-y-2">
+                <div className="flex items-center gap-2 text-indigo-700">
+                  <div className="p-1 rounded bg-indigo-100">
+                    <Layers className="w-3 h-3" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider">W-Value (Section Modulus)</span>
+                </div>
+                <p className="text-[10px] text-slate-600 leading-relaxed">
+                  <strong>Calculus Measure:</strong> Derived as <code className="text-indigo-700 font-bold">W = I / y_max</code>. 
+                  It relates the internal bending moment to the maximum stress at the extreme fiber (σ = M/W). It defines the strength capacity of the section.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1166,8 +1252,9 @@ const CalculusStepsCard = ({
           <div className="space-y-3">
             <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
               <Scale className="w-3 h-3" />
-              Step 2: Load Factoring
+              Step 2: Load Factoring ({activeCombination.name})
             </h4>
+            <p className="text-[10px] text-slate-500 italic px-1">{activeCombination.description}</p>
             <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -1225,8 +1312,8 @@ const CalculusStepsCard = ({
                     <span className="font-bold text-slate-900">{results.summary.deflectionRatio}</span>
                   </div>
                   <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                    <span>Limit (L/175):</span>
-                    <span className="font-bold text-slate-900">{(beamProps.length / 175).toFixed(2)} mm</span>
+                    <span>Limit (L/{beamType === 'transom' ? 240 : 175}):</span>
+                    <span className="font-bold text-slate-900">{(beamProps.length / (beamType === 'transom' ? 240 : 175)).toFixed(2)} mm</span>
                   </div>
                   <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
                     <span>Status:</span>
@@ -1311,7 +1398,7 @@ export function App() {
     }
     return 'aluminum_6061_t6';
   });
-  const [sectionType, setSectionType] = useState<'solid' | 'hollow'>(() => {
+  const [sectionType, setSectionType] = useState<'solid' | 'hollow' | 'channel' | 'l-plate'>(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
       try {
@@ -1320,6 +1407,16 @@ export function App() {
       } catch (e) { return 'hollow'; }
     }
     return 'hollow';
+  });
+  const [beamType, setBeamType] = useState<'mullion' | 'transom'>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.beamType ?? 'mullion';
+      } catch (e) { return 'mullion'; }
+    }
+    return 'mullion';
   });
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -1883,12 +1980,16 @@ export function App() {
   const sectionProps = useMemo(() => {
     if (sectionType === 'solid') {
       return calculateRectangularProperties(width, height);
+    } else if (sectionType === 'channel') {
+      return calculateChannelProperties(width, height, thickness);
+    } else if (sectionType === 'l-plate') {
+      return calculateLPlateProperties(width, height, thickness);
     }
     return calculateHollowRectangularProperties(width, height, thickness);
   }, [width, height, thickness, sectionType]);
 
   const activeCombination = useMemo(() => 
-    combinations.find(c => c.id === activeCombinationId) || combinations[0] || { id: 'default', name: 'Default', factors: { dead: 1, live: 0, wind: 0, snow: 0, seismic: 0 } }
+    combinations.find(c => c.id === activeCombinationId) || combinations[0] || { id: 'default', name: 'Default', description: 'Default fallback combination.', factors: { dead: 1, live: 0, wind: 0, snow: 0, seismic: 0 } }
   , [combinations, activeCombinationId]);
 
   const factoredLoads = useMemo(() => {
@@ -2038,6 +2139,7 @@ export function App() {
     const newComb: Combination = {
       id: Math.random().toString(36).substr(2, 9),
       name: 'New Combination',
+      description: 'Custom user-defined load combination.',
       factors: { dead: 1.0, live: 0, wind: 0, snow: 0, seismic: 0 }
     };
     setCombinations([...combinations, newComb]);
@@ -2052,6 +2154,10 @@ export function App() {
 
   const updateCombinationName = (id: string, name: string) => {
     setCombinations(combinations.map(c => c.id === id ? { ...c, name } : c));
+  };
+
+  const updateCombinationDescription = (id: string, description: string) => {
+    setCombinations(combinations.map(c => c.id === id ? { ...c, description } : c));
   };
 
   const removeCombination = (id: string) => {
@@ -2440,6 +2546,7 @@ export function App() {
                         thickness={3.5}
                         sectionType="hollow"
                         supportCondition="simply_supported"
+                        unitSystem="metric"
                       />
                     </div>
                     <CardContent className="p-6 bg-white">
@@ -2500,7 +2607,7 @@ export function App() {
             >
               <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-0 print:block overflow-hidden">
                 {/* Left Column: Inputs */}
-                <div className="lg:col-span-4 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/30 no-scrollbar print:hidden">
+                <div className="lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/30 no-scrollbar print:hidden">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
                     {/* Project Information */}
                     <Card className="shadow-sm border-slate-200 overflow-hidden">
@@ -2670,7 +2777,11 @@ export function App() {
                     setWidth(preset.dimensions.width);
                     setHeight(preset.dimensions.height);
                     setThickness(preset.dimensions.thickness);
-                    setSectionType('hollow');
+                    if ((preset as any).sectionType) {
+                      setSectionType((preset as any).sectionType);
+                    } else {
+                      setSectionType('hollow');
+                    }
                     setNotification({ message: `Applied ${preset.name} preset`, type: 'success' });
                   }}
                 />
@@ -2733,7 +2844,19 @@ export function App() {
                               <Table>
                                 <TableHeader>
                                   <TableRow className="bg-slate-50">
-                                    <TableHead className="w-[250px]">Name</TableHead>
+                                    <TableHead className="w-[250px]">
+                                      <div className="flex items-center gap-1">
+                                        Name & Description
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <HelpCircle className="h-3 w-3 text-slate-400" />
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top" className="text-[10px] max-w-[200px]">
+                                            Define the name and a brief description for each load combination.
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </div>
+                                    </TableHead>
                                     {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
                                       <TableHead key={key} className="text-center px-2">
                                         <div className="text-[10px] uppercase text-slate-400">{key}</div>
@@ -2746,11 +2869,18 @@ export function App() {
                                 <TableBody>
                                   {combinations.map((comb) => (
                                     <TableRow key={comb.id} className={cn(activeCombinationId === comb.id && "bg-blue-50/50")}>
-                                      <TableCell>
+                                      <TableCell className="space-y-1.5">
                                         <Input 
                                           value={comb.name} 
                                           onChange={(e) => updateCombinationName(comb.id, e.target.value)}
                                           className="h-8 font-medium"
+                                          placeholder="Name"
+                                        />
+                                        <Input 
+                                          value={comb.description} 
+                                          onChange={(e) => updateCombinationDescription(comb.id, e.target.value)}
+                                          className="h-7 text-[10px] text-slate-500 italic"
+                                          placeholder="Description"
                                         />
                                       </TableCell>
                                       {Object.keys(LOAD_CATEGORIES).map((key) => (
@@ -2808,70 +2938,79 @@ export function App() {
                   </CardHeader>
                   <CardContent className="p-2 sm:p-3 space-y-1.5">
                     {combinations.map(comb => (
-                      <div key={comb.id} className={cn(
-                        "p-2 border rounded-lg transition-all group relative",
-                        activeCombinationId === comb.id 
-                          ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/30 shadow-sm" 
-                          : "bg-white hover:border-slate-300 hover:bg-slate-50/30"
-                      )}>
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex-1 min-w-0 mr-1.5">
-                            <Input 
-                              value={comb.name ?? ''} 
-                              onChange={(e) => updateCombinationName(comb.id, e.target.value)}
-                              className="h-5 text-[10px] font-bold border-none bg-transparent p-0 focus-visible:ring-0 truncate text-slate-700 placeholder:text-slate-300"
-                              placeholder="Combination Name"
-                            />
-                          </div>
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-5 w-5 text-slate-400 hover:text-blue-600 hover:bg-blue-100/50"
-                              onClick={() => duplicateCombination(comb.id)}
-                              title="Duplicate"
-                            >
-                              <Copy className="h-2.5 w-2.5" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-5 w-5 text-slate-400 hover:text-rose-500 hover:bg-rose-100/50"
-                              onClick={() => removeCombination(comb.id)}
-                              disabled={combinations.length <= 1}
-                              title="Delete"
-                            >
-                              <Trash2 className="h-2.5 w-2.5" />
-                            </Button>
-                            <div className="ml-1">
-                              <Button 
-                                variant={activeCombinationId === comb.id ? "default" : "outline"} 
-                                size="sm" 
-                                className={cn(
-                                  "h-5 text-[8px] px-1.5 font-black uppercase tracking-tighter",
-                                  activeCombinationId === comb.id ? "bg-blue-600 hover:bg-blue-700" : "text-slate-400 border-slate-200"
-                                )}
-                                onClick={() => setActiveCombinationId(comb.id)}
-                              >
-                                {activeCombinationId === comb.id ? "Active" : "Select"}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-5 gap-0.5 bg-slate-100/80 rounded-sm p-0.5 sm:p-1">
-                          {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
-                            <div key={key} className="text-center border-r border-slate-200/50 last:border-none px-0.5">
-                              <div className="text-[5px] sm:text-[6px] uppercase text-slate-500 font-black leading-none mb-0.5">{key[0]}</div>
-                              <div className={cn(
-                                "text-[8px] sm:text-[9px] font-mono font-bold leading-none",
-                                comb.factors[key as keyof typeof LOAD_CATEGORIES] > 0 ? "text-blue-600" : "text-slate-400"
-                              )}>
-                                {comb.factors[key as keyof typeof LOAD_CATEGORIES]}
+                      <Tooltip key={comb.id}>
+                        <TooltipTrigger>
+                          <div className={cn(
+                            "p-2 border rounded-lg transition-all group relative cursor-help",
+                            activeCombinationId === comb.id 
+                              ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/30 shadow-sm" 
+                              : "bg-white hover:border-slate-300 hover:bg-slate-50/30"
+                          )}>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex-1 min-w-0 mr-1.5">
+                                <Input 
+                                  value={comb.name ?? ''} 
+                                  onChange={(e) => updateCombinationName(comb.id, e.target.value)}
+                                  className="h-5 text-[10px] font-bold border-none bg-transparent p-0 focus-visible:ring-0 truncate text-slate-700 placeholder:text-slate-300"
+                                  placeholder="Combination Name"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-5 w-5 text-slate-400 hover:text-blue-600 hover:bg-blue-100/50"
+                                  onClick={(e) => { e.stopPropagation(); duplicateCombination(comb.id); }}
+                                  title="Duplicate"
+                                >
+                                  <Copy className="h-2.5 w-2.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-5 w-5 text-slate-400 hover:text-rose-500 hover:bg-rose-100/50"
+                                  onClick={(e) => { e.stopPropagation(); removeCombination(comb.id); }}
+                                  disabled={combinations.length <= 1}
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-2.5 w-2.5" />
+                                </Button>
+                                <div className="ml-1">
+                                  <Button 
+                                    variant={activeCombinationId === comb.id ? "default" : "outline"} 
+                                    size="sm" 
+                                    className={cn(
+                                      "h-5 text-[8px] px-1.5 font-black uppercase tracking-tighter",
+                                      activeCombinationId === comb.id ? "bg-blue-600 hover:bg-blue-700" : "text-slate-400 border-slate-200"
+                                    )}
+                                    onClick={(e) => { e.stopPropagation(); setActiveCombinationId(comb.id); }}
+                                  >
+                                    {activeCombinationId === comb.id ? "Active" : "Select"}
+                                  </Button>
+                                </div>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                            <div className="grid grid-cols-5 gap-0.5 bg-slate-100/80 rounded-sm p-0.5 sm:p-1">
+                              {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
+                                <div key={key} className="text-center border-r border-slate-200/50 last:border-none px-0.5">
+                                  <div className="text-[5px] sm:text-[6px] uppercase text-slate-500 font-black leading-none mb-0.5">{key[0]}</div>
+                                  <div className={cn(
+                                    "text-[8px] sm:text-[9px] font-mono font-bold leading-none",
+                                    comb.factors[key as keyof typeof LOAD_CATEGORIES] > 0 ? "text-blue-600" : "text-slate-400"
+                                  )}>
+                                    {comb.factors[key as keyof typeof LOAD_CATEGORIES]}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-[200px] p-2 space-y-1">
+                          <p className="font-bold text-[10px] text-blue-600">{comb.name}</p>
+                          <p className="text-[9px] text-slate-500 leading-relaxed">{comb.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     ))}
                   </CardContent>
                 </Card>
@@ -2960,14 +3099,26 @@ export function App() {
                       </div>
                     </div>
 
+                    <div className="grid gap-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-slate-400">Beam Type</Label>
+                      <Tabs value={beamType} onValueChange={(v: any) => setBeamType(v)} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 h-8">
+                          <TabsTrigger value="mullion" className="text-[10px]">Mullion (Vertical)</TabsTrigger>
+                          <TabsTrigger value="transom" className="text-[10px]">Transom (Horizontal)</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
+
                     <Separator className="my-1" />
 
                     <div className="grid gap-1.5">
                       <Label className="text-[10px] uppercase font-bold text-slate-400">{t.sectionType}</Label>
                       <Tabs value={sectionType} onValueChange={(v: any) => setSectionType(v)} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 h-8">
+                        <TabsList className="grid w-full grid-cols-4 h-8">
                           <TabsTrigger value="solid" className="text-[10px]">{t.solid}</TabsTrigger>
                           <TabsTrigger value="hollow" className="text-[10px]">{t.hollow}</TabsTrigger>
+                          <TabsTrigger value="channel" className="text-[10px]">Channel</TabsTrigger>
+                          <TabsTrigger value="l-plate" className="text-[10px]">L-Plate</TabsTrigger>
                         </TabsList>
                       </Tabs>
                     </div>
@@ -2978,11 +3129,18 @@ export function App() {
                         <NumericInputWithControls 
                           id="width" 
                           min={toDisplay(1, 'length')}
-                          max={toDisplay(5000, 'length')}
-                          step={unitSystem === 'metric' ? 10 : 0.5}
+                          max={toDisplay(1000, 'length')}
+                          step={unitSystem === 'metric' ? 1 : 0.1}
                           precision={unitSystem === 'metric' ? 0 : 2}
                           value={toDisplay(width ?? 0, 'length')} 
                           onChange={(val) => setWidth(fromDisplay(val, 'length'))}
+                        />
+                        <Slider 
+                          value={[toDisplay(width ?? 0, 'length')]} 
+                          onValueChange={(vals) => setWidth(fromDisplay(vals[0], 'length'))} 
+                          min={toDisplay(1, 'length')} 
+                          max={toDisplay(1000, 'length')} 
+                          step={0.1}
                         />
                       </div>
                       <div className="grid gap-1.5">
@@ -2990,11 +3148,18 @@ export function App() {
                         <NumericInputWithControls 
                           id="height" 
                           min={toDisplay(1, 'length')}
-                          max={toDisplay(5000, 'length')}
-                          step={unitSystem === 'metric' ? 10 : 0.5}
+                          max={toDisplay(1000, 'length')}
+                          step={unitSystem === 'metric' ? 1 : 0.1}
                           precision={unitSystem === 'metric' ? 0 : 2}
                           value={toDisplay(height ?? 0, 'length')} 
                           onChange={(val) => setHeight(fromDisplay(val, 'length'))}
+                        />
+                        <Slider 
+                          value={[toDisplay(height ?? 0, 'length')]} 
+                          onValueChange={(vals) => setHeight(fromDisplay(vals[0], 'length'))} 
+                          min={toDisplay(1, 'length')} 
+                          max={toDisplay(1000, 'length')} 
+                          step={0.1}
                         />
                       </div>
                     </div>
@@ -3006,10 +3171,17 @@ export function App() {
                           id="thickness" 
                           min={toDisplay(0.1, 'length')}
                           max={toDisplay(Math.min(width, height) / 2.1, 'length')}
-                          step={unitSystem === 'metric' ? 1 : 0.05}
+                          step={unitSystem === 'metric' ? 0.1 : 0.01}
                           precision={unitSystem === 'metric' ? 1 : 3}
                           value={toDisplay(thickness ?? 0, 'length')} 
                           onChange={(val) => setThickness(fromDisplay(val, 'length'))}
+                        />
+                        <Slider 
+                          value={[toDisplay(thickness ?? 0, 'length')]} 
+                          onValueChange={(vals) => setThickness(fromDisplay(vals[0], 'length'))} 
+                          min={toDisplay(0.1, 'length')} 
+                          max={toDisplay(Math.min(width, height) / 2.1, 'length')} 
+                          step={0.1}
                         />
                       </div>
                     )}
@@ -3359,7 +3531,7 @@ export function App() {
                 {/* Right Column: Results & Visuals */}
                 <div className={cn(
                   "h-full overflow-y-auto p-3 sm:p-4 space-y-4 no-scrollbar print:block",
-                  isBiViewMode ? "lg:col-span-12" : "lg:col-span-8"
+                  isBiViewMode ? "lg:col-span-12" : "lg:col-span-8 xl:col-span-9"
                 )}>
                   {/* Print Only Header */}
                   <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-6">
@@ -3745,11 +3917,13 @@ export function App() {
                 u={u}
                 unitSystem={unitSystem}
                 sectionType={sectionType}
+                beamType={beamType}
                 width={width}
                 height={height}
                 thickness={thickness}
                 material={material}
                 safetyFactor={safetyFactor}
+                activeCombination={activeCombination}
                 t={t}
               />
             </motion.div>
@@ -3764,70 +3938,189 @@ export function App() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="max-w-4xl mx-auto px-4 py-16"
+              className="max-w-5xl mx-auto px-4 py-16"
             >
               <div className="space-y-12">
                 <div className="space-y-4 text-center">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-widest mb-2">
+                    <BookOpen className="w-3 h-3" />
+                    Engineering Documentation
+                  </div>
                   <h2 className="text-4xl font-black tracking-tight text-slate-900">{t.navDocs}</h2>
                   <p className="text-slate-500 max-w-2xl mx-auto">
-                    Technical documentation and engineering assumptions used in FacadeCalc structural engine.
+                    Technical specifications, engineering assumptions, and calculation methodologies used in the FacadeCalc structural engine.
                   </p>
                 </div>
 
-                <div className="grid gap-8">
-                  <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-blue-600" />
-                      {t.assumptions}
-                    </h3>
-                    <ul className="space-y-3 text-slate-600 text-sm list-disc pl-5">
-                      <li>Simply supported beam model (pin-pin connection).</li>
-                      <li>Euler-Bernoulli beam theory for small deflections.</li>
-                      <li>Linear elastic material behavior within yield limits.</li>
-                      <li>Shear deformation is neglected (valid for high span-to-depth ratios).</li>
-                      <li>Self-weight is automatically included based on material density.</li>
-                    </ul>
-                  </section>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2 space-y-8">
+                    {/* Methodology */}
+                    <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-6">
+                      <h3 className="text-xl font-bold flex items-center gap-3 text-slate-900">
+                        <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+                          <Activity className="w-5 h-5" />
+                        </div>
+                        Calculation Methodology
+                      </h3>
+                      <div className="space-y-4 text-slate-600 text-sm leading-relaxed">
+                        <p>
+                          FacadeCalc utilizes the <strong>Euler-Bernoulli Beam Theory</strong> for calculating the structural response of facade members. This model assumes that "plane sections remain plane" and is highly accurate for members where the span-to-depth ratio is greater than 10.
+                        </p>
+                        <div className="grid sm:grid-cols-2 gap-4 pt-2">
+                          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                            <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Bending Analysis</h4>
+                            <p className="text-xs">Internal moments (M) and shear forces (V) are calculated using static equilibrium equations based on the support conditions and applied loads.</p>
+                          </div>
+                          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                            <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Deflection Integration</h4>
+                            <p className="text-xs">Deflections are derived by double-integrating the curvature equation: <code className="bg-white px-1 rounded">d²v/dx² = -M(x) / EI</code>.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
 
-                  <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                      <Scale className="w-5 h-5 text-amber-600" />
-                      {t.limits}
-                    </h3>
-                    <div className="grid sm:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <div className="text-xs font-bold text-slate-400 uppercase">Deflection Limit</div>
-                        <div className="text-sm font-medium text-slate-700">L/175 or 20mm (whichever is less)</div>
-                        <p className="text-xs text-slate-500">Standard industry limit for glass support members.</p>
+                    {/* Design Criteria */}
+                    <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-6">
+                      <h3 className="text-xl font-bold flex items-center gap-3 text-slate-900">
+                        <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
+                          <Scale className="w-5 h-5" />
+                        </div>
+                        Design Criteria & Limits
+                      </h3>
+                      <div className="grid sm:grid-cols-2 gap-8">
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Serviceability (SLS)</h4>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-50">
+                              <span className="text-sm text-slate-600">Standard Limit</span>
+                              <span className="text-sm font-bold text-slate-900">L / 175</span>
+                            </div>
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-50">
+                              <span className="text-sm text-slate-600">Absolute Max</span>
+                              <span className="text-sm font-bold text-slate-900">20 mm</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 italic">Commonly used for glass support members to prevent visual discomfort and seal failure.</p>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Strength (ULS)</h4>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-50">
+                              <span className="text-sm text-slate-600">Safety Factor (γ)</span>
+                              <span className="text-sm font-bold text-slate-900">1.5 - 2.0</span>
+                            </div>
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-50">
+                              <span className="text-sm text-slate-600">Allowable Stress</span>
+                              <span className="text-sm font-bold text-slate-900">fy / γ</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 italic">Ensures the material remains within the linear-elastic range with an appropriate margin of safety.</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <div className="text-xs font-bold text-slate-400 uppercase">Stress Limit</div>
-                        <div className="text-sm font-medium text-slate-700">Yield Strength / Safety Factor</div>
-                        <p className="text-xs text-slate-500">Allowable stress design (ASD) approach.</p>
-                      </div>
-                    </div>
-                  </section>
+                    </section>
 
-                  <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                      <FileCode className="w-5 h-5 text-green-600" />
-                      {t.codes}
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                        <span className="text-sm font-bold">China (National)</span>
-                        <span className="text-xs text-slate-500">GB 50009, GB/T 5237</span>
+                    {/* Calculus Criteria */}
+                    <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-6">
+                      <h3 className="text-xl font-bold flex items-center gap-3 text-slate-900">
+                        <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
+                          <Calculator className="w-5 h-5" />
+                        </div>
+                        Calculus & Engineering Constants
+                      </h3>
+                      <div className="space-y-6">
+                        <div className="grid sm:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-bold text-slate-900">Moment of Inertia (I)</h4>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              The <strong>Second Moment of Area</strong>. It represents the geometric stiffness of the section—how the material is distributed relative to the neutral axis. 
+                              In calculus, it is the integral of the square of the distance from the axis:
+                              <code className="block mt-1 p-2 bg-slate-50 rounded border border-slate-100 font-mono text-[10px]">I = ∫ y² dA</code>
+                              For a rectangular section: <code className="inline-block px-1 bg-slate-100 rounded">I = (b × h³) / 12</code>.
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-bold text-slate-900">Section Modulus (W)</h4>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              A geometric property that represents the <strong>strength</strong> of the section. It is the ratio of the Moment of Inertia to the distance to the extreme fiber (y_max).
+                              It is used to calculate the maximum bending stress: 
+                              <code className="block mt-1 p-2 bg-slate-50 rounded border border-slate-100 font-mono text-[10px]">W = I / y_max  →  σ = M / W</code>
+                              A higher W-value allows the beam to carry more moment without exceeding the yield strength.
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-bold text-slate-900">Bending Moment (M)</h4>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              The internal torque that causes bending. Calculated by integrating the shear force:
+                              <code className="block mt-1 p-2 bg-slate-50 rounded border border-slate-100 font-mono text-[10px]">M(x) = ∫ V(x) dx</code>
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-bold text-slate-900">Shear Force (V)</h4>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              The internal force acting perpendicular to the beam axis. Calculated by integrating the load:
+                              <code className="block mt-1 p-2 bg-slate-50 rounded border border-slate-100 font-mono text-[10px]">V(x) = ∫ q(x) dx</code>
+                            </p>
+                          </div>
+                        </div>
+                        <Separator />
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Load Integration Logic</h4>
+                          <p className="text-xs text-slate-500">
+                            The engine performs numerical integration across the beam length. For complex loads like trapezoidal distributions, the engine calculates the equivalent point load and centroid to maintain static equilibrium.
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                        <span className="text-sm font-bold">Eurocode</span>
-                        <span className="text-xs text-slate-500">EN 1991, EN 1999</span>
+                    </section>
+                  </div>
+
+                  <div className="space-y-8">
+                    {/* Supported Standards */}
+                    <section className="p-6 rounded-3xl bg-slate-900 text-white shadow-xl space-y-6">
+                      <h3 className="text-lg font-bold flex items-center gap-3">
+                        <Globe className="w-5 h-5 text-blue-400" />
+                        Supported Standards
+                      </h3>
+                      <div className="space-y-6 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
+                        {Array.from(new Set(CODES_OF_PRACTICE.map(c => c.region))).map(region => (
+                          <div key={region} className="space-y-3">
+                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                              <span className="h-px flex-1 bg-blue-900/50"></span>
+                              {region}
+                            </h4>
+                            <div className="space-y-2">
+                              {CODES_OF_PRACTICE.filter(c => c.region === region).map(item => (
+                                <div key={item.country} className="p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                                  <div className="text-xs font-bold mb-1">{item.country}</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {item.codes.map((code, idx) => (
+                                      <span key={idx} className="text-[8px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded border border-blue-500/30">
+                                        {code.split(' (')[0]}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                        <span className="text-sm font-bold">ASCE / AA</span>
-                        <span className="text-xs text-slate-500">ASCE 7-22, ADM 2020</span>
-                      </div>
-                    </div>
-                  </section>
+                    </section>
+
+                    {/* Assumptions */}
+                    <section className="p-6 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-4">
+                      <h3 className="text-sm font-bold flex items-center gap-2 text-slate-900">
+                        <AlertCircle className="w-4 h-4 text-red-500" />
+                        Key Assumptions
+                      </h3>
+                      <ul className="space-y-2 text-[11px] text-slate-500 list-disc pl-4">
+                        <li>Linear elastic material behavior.</li>
+                        <li>Small deflection theory (Δ &lt;&lt; L).</li>
+                        <li>No axial-flexural interaction (P-Delta).</li>
+                        <li>Member is laterally restrained against buckling.</li>
+                        <li>Connections are idealized as pins or fixed.</li>
+                      </ul>
+                    </section>
+                  </div>
                 </div>
               </div>
             </motion.div>
