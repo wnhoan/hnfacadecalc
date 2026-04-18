@@ -46,6 +46,7 @@ import {
   ArrowDown,
   Undo2,
   Redo2,
+  Zap,
   Image as ImageIcon,
   Paperclip
 } from 'lucide-react';
@@ -468,6 +469,114 @@ const TRANSLATIONS = {
   }
 };
 
+// Mapping for automatic design code selection based on location input in multiple languages
+const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[] }> = {
+  'Hong Kong': {
+    codes: ['Hong Kong'],
+    matches: ['hong kong', 'hk', 'kowloon', 'lantau', '香港', '九龙', '九龍', '大屿山', '大嶼山']
+  },
+  'Shanghai': {
+    codes: ['Shanghai'],
+    matches: ['shanghai', 'pudong', 'puxi', 'jingan', 'xuhui', '上海', '浦东', '浦西', '静安', '徐汇']
+  },
+  'Shenzhen': {
+    codes: ['Shenzhen'],
+    matches: ['shenzhen', 'futian', 'nanshan', 'baoan', 'luohu', '深圳', '福田', '南山', '宝安', '罗湖']
+  },
+  'Guangzhou': {
+    codes: ['Guangzhou'],
+    matches: ['guangzhou', 'tianhe', 'yuexiu', 'haizhu', 'panyu', '广州', '廣州', '天河', '越秀', '海珠', '番禺']
+  },
+  'Macau': {
+    codes: ['Macau'],
+    matches: ['macau', 'macao', 'taipa', '澳门', '澳門', '氹仔']
+  },
+  'Singapore': {
+    codes: ['Singapore'],
+    matches: ['singapore', 'sg', 'changi', 'jurong', 'sentosa', '新加坡']
+  },
+  'Malaysia': {
+    codes: ['Malaysia'],
+    matches: ['malaysia', 'kuala lumpur', 'kl', 'penang', 'johor', 'selangor', 'putrajaya', '马来西亚', '馬來西亞', '吉隆坡', '槟城', '柔佛']
+  },
+  'Thailand': {
+    codes: ['Thailand'],
+    matches: ['thailand', 'bangkok', 'phuket', 'chiang mai', 'pattaya', 'samui', '泰国', '泰國', '曼谷', '普吉', '清迈', '芭提雅']
+  },
+  'Vietnam': {
+    codes: ['Vietnam'],
+    matches: ['vietnam', 'hanoi', 'ho chi minh', 'hcmc', 'da nang', '越南', '河内', '胡志明', '岘港']
+  },
+  'United Kingdom': {
+    codes: ['United Kingdom'],
+    matches: ['united kingdom', 'uk', 'england', 'london', 'manchester', 'birmingham', 'leeds', 'glasgow', '英国', '英國', '伦敦', '曼彻斯特']
+  },
+  'United States': {
+    codes: ['United States'],
+    matches: ['united states', 'usa', 'us ', 'america', 'new york', 'los angeles', 'chicago', 'houston', 'miami', '美国', '美國', '纽约', '洛杉矶']
+  },
+  'Canada': {
+    codes: ['Canada'],
+    matches: ['canada', 'toronto', 'vancouver', 'montreal', 'ottawa', 'calgary', '加拿大', '多伦多', '温哥华']
+  },
+  'Australia': {
+    codes: ['Australia'],
+    matches: ['australia', 'au ', 'sydney', 'melbourne', 'brisbane', 'perth', 'adelaide', '澳大利亚', '澳洲', '悉尼', '墨尔本']
+  },
+  'New Zealand': {
+    codes: ['New Zealand'],
+    matches: ['new zealand', 'nz', 'auckland', 'wellington', 'christchurch', '新西兰', '新西蘭', '奥克兰']
+  },
+  'Japan': {
+    codes: ['Japan'],
+    matches: ['japan', 'jp', 'tokyo', 'osaka', 'kyoto', 'yokohama', 'nagoya', '日本', '东京', '東京', '大阪']
+  },
+  'South Korea': {
+    codes: ['South Korea'],
+    matches: ['korea', 'south korea', 'seoul', 'busan', 'incheon', '韩国', '韓國', '首尔', '釜山']
+  },
+  'India': {
+    codes: ['India'],
+    matches: ['india', 'mumbai', 'delhi', 'bangalore', 'chennai', 'kolkata', '印度', '孟买', '德里']
+  },
+  'UAE': {
+    codes: ['UAE / Dubai'],
+    matches: ['uae', 'united arab emirates', 'dubai', 'abu dhabi', 'sharjah', '阿联酋', '迪拜', '阿布扎比']
+  },
+  'Saudi Arabia': {
+    codes: ['Saudi Arabia'],
+    matches: ['saudi', 'saudi arabia', 'ksa', 'riyadh', 'jeddah', 'dammam', '沙特', '利雅得', '吉达']
+  },
+  'South Africa': {
+    codes: ['South Africa'],
+    matches: ['south africa', 'za', 'cape town', 'johannesburg', 'joburg', 'pretoria', 'durban', '南非', '开普敦']
+  },
+  'Germany': {
+    codes: ['Germany'],
+    matches: ['germany', 'de', 'berlin', 'munich', 'hamburg', 'frankfurt', 'stuttgart', '德国', '德國', '柏林', '慕尼黑']
+  },
+  'France': {
+    codes: ['France'],
+    matches: ['france', 'fr', 'paris', 'lyon', 'marseille', 'bordeaux', '法国', '法國', '巴黎', '里昂']
+  },
+  'Italy': {
+    codes: ['Italy'],
+    matches: ['italy', 'it ', 'rome', 'milan', 'venice', 'florence', 'naples', '意大利', '義大利', '罗马', '米兰']
+  },
+  'Brazil': {
+    codes: ['Brazil'],
+    matches: ['brazil', 'brasil', 'rio de janeiro', 'sao paulo', 'brasilia', 'curitiba', '巴西', '里约', '圣保罗']
+  },
+  'Eurocodes': {
+    codes: ['Eurocodes (EU-General)'],
+    matches: ['europe', 'eu ', 'spain', 'netherlands', 'belgium', 'austria', 'sweden', 'madrid', 'amsterdam', '欧洲', '歐洲', '西班牙', '荷兰', '比利时']
+  },
+  'China National': {
+    codes: ['China (National)'],
+    matches: ['china', 'beijing', 'tianjin', 'nanjing', 'wuhan', 'chengdu', 'xian', '中国', '中國', '北京', '天津', '南京', '武汉', '成都', '西安']
+  }
+};
+
 const CODES_OF_PRACTICE = [
   // EUROPE
   { region: 'Europe', country: 'Eurocodes (EU-General)', codes: ['EN 1990 (Basis)', 'EN 1991 (Actions)', 'EN 1993 (Steel)', 'EN 1999 (Aluminum)', 'EN 1998 (Seismic)'] },
@@ -650,6 +759,7 @@ interface HistoryState {
   width: number;
   height: number;
   thickness: number;
+  thickness2: number;
   supportCondition: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous';
   intermediateSupports: number[];
   safetyFactor: number;
@@ -681,6 +791,7 @@ const createNewProject = (id: string, title: string): Project => ({
   width: 65,
   height: 150,
   thickness: 3.5,
+  thickness2: 3.5,
   supportCondition: 'simply_supported',
   intermediateSupports: [],
   safetyFactor: 1.5,
@@ -696,7 +807,11 @@ const createNewProject = (id: string, title: string): Project => ({
 const getProjectResults = (project: Project) => {
   const sectionProps = project.sectionType === 'solid' 
     ? calculateRectangularProperties(project.width, project.height)
-    : calculateHollowRectangularProperties(project.width, project.height, project.thickness);
+    : project.sectionType === 'channel'
+    ? calculateChannelProperties(project.width, project.height, project.thickness, project.thickness2)
+    : project.sectionType === 'l-plate'
+    ? calculateLPlateProperties(project.width, project.height, project.thickness, project.thickness2)
+    : calculateHollowRectangularProperties(project.width, project.height, project.thickness, project.thickness2);
 
   const activeCombination = project.combinations.find(c => c.id === project.activeCombinationId) || project.combinations[0];
   
@@ -992,6 +1107,7 @@ const ProjectResultsView = ({
                 width={project.width} 
                 height={project.height} 
                 thickness={project.thickness} 
+                thickness2={project.thickness2 || project.thickness}
                 sectionType={project.sectionType} 
                 supportCondition={project.supportCondition}
                 intermediateSupports={project.intermediateSupports}
@@ -1011,35 +1127,35 @@ const PRESET_PROFILES = [
     name: 'Mullion M150 (50x150)',
     extruder: 'Standard Extrusions Ltd',
     url: 'https://picsum.photos/seed/mullion1/400/300',
-    dimensions: { width: 50, height: 150, thickness: 3 }
+    dimensions: { width: 50, height: 150, thickness: 3, thickness2: 3 }
   },
   {
     id: 'transom-50-80',
     name: 'Transom T80 (50x80)',
     extruder: 'Standard Extrusions Ltd',
     url: 'https://picsum.photos/seed/transom1/400/300',
-    dimensions: { width: 50, height: 80, thickness: 2.5 }
+    dimensions: { width: 50, height: 80, thickness: 2.5, thickness2: 2.5 }
   },
   {
     id: 'heavy-mullion-60-200',
     name: 'Heavy Mullion H200 (60x200)',
     extruder: 'Industrial Profiles Corp',
     url: 'https://picsum.photos/seed/heavy1/400/300',
-    dimensions: { width: 60, height: 200, thickness: 4 }
+    dimensions: { width: 60, height: 200, thickness: 4, thickness2: 4 }
   },
   {
     id: 'slim-mullion-40-120',
     name: 'Slim Mullion S120 (40x120)',
     extruder: 'Architectural Systems',
     url: 'https://picsum.photos/seed/slim1/400/300',
-    dimensions: { width: 40, height: 120, thickness: 2.5 }
+    dimensions: { width: 40, height: 120, thickness: 2.5, thickness2: 2.5 }
   },
   {
     id: 'channel-40-100',
     name: 'C-Channel C100 (40x100)',
     extruder: 'Structural Steel Co',
     url: 'https://picsum.photos/seed/channel1/400/300',
-    dimensions: { width: 40, height: 100, thickness: 5 },
+    dimensions: { width: 40, height: 100, thickness: 5, thickness2: 5 },
     sectionType: 'channel'
   },
   {
@@ -1047,7 +1163,7 @@ const PRESET_PROFILES = [
     name: 'L-Plate L50 (50x50)',
     extruder: 'Structural Steel Co',
     url: 'https://picsum.photos/seed/lplate1/400/300',
-    dimensions: { width: 50, height: 50, thickness: 5 },
+    dimensions: { width: 50, height: 50, thickness: 5, thickness2: 5 },
     sectionType: 'l-plate'
   }
 ];
@@ -1205,6 +1321,7 @@ const CalculusStepsCard = ({
   width,
   height,
   thickness,
+  thickness2,
   material,
   safetyFactor,
   activeCombination,
@@ -1225,6 +1342,7 @@ const CalculusStepsCard = ({
   width: number;
   height: number;
   thickness: number;
+  thickness2: number;
   material: string;
   safetyFactor: number;
   activeCombination: Combination;
@@ -1284,20 +1402,20 @@ const CalculusStepsCard = ({
                     </>
                   ) : sectionType === 'channel' ? (
                     <>
-                      <div className="bg-white p-2 rounded border border-slate-200">A = 2wt + (h-2t)t</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">I = (wh³)/12 - ((w-t)(h-2t)³)/12</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">A = 2wt_f + (h-2t_f)t_w</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">I = (wh³)/12 - ((w-t_w)(h-2t_f)³)/12</div>
                       <div className="bg-white p-2 rounded border border-slate-200">W = I / (h / 2)</div>
                     </>
                   ) : sectionType === 'l-plate' ? (
                     <>
-                      <div className="bg-white p-2 rounded border border-slate-200">A = wt + (h-t)t</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">A = wt_h + (h-t_h)t_v</div>
                       <div className="bg-white p-2 rounded border border-slate-200">I = Σ(I_i + A_i·d_i²)</div>
                       <div className="bg-white p-2 rounded border border-slate-200">W = I / y_max</div>
                     </>
                   ) : (
                     <>
-                      <div className="bg-white p-2 rounded border border-slate-200">A = (w × h) - (w_i × h_i)</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">I = ((w × h³) - (w_i × h_i³)) / 12</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">A = (w × h) - (w - 2t_x)(h - 2t_y)</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">I = (wh³ - (w-2t_x)(h-2t_y)³) / 12</div>
                       <div className="bg-white p-2 rounded border border-slate-200">W = I / (h / 2)</div>
                     </>
                   )}
@@ -1674,6 +1792,16 @@ export function App() {
     }
     return 3.5;
   });
+  const [thickness2, setThickness2] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.thickness2 ?? data.thickness ?? 3.5;
+      } catch (e) { return 3.5; }
+    }
+    return 3.5;
+  });
   const [supportCondition, setSupportCondition] = useState<'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous'>(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
@@ -1913,126 +2041,33 @@ export function App() {
   });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
-  // Auto-switch design code based on location
+  // Auto-switch design code based on location (Multilingual Support)
   React.useEffect(() => {
     if (!projectLocation) return;
     
-    const loc = projectLocation.toLowerCase();
-    
-    // Hong Kong
-    if (loc.includes('hong kong') || loc.includes('hk') || loc.includes('kowloon') || loc.includes('lantau') || loc.includes('香港') || loc.includes('九龙') || loc.includes('大屿山')) {
-      setSelectedCodeId('Hong Kong');
-    } 
-    // Shanghai
-    else if (loc.includes('shanghai') || loc.includes('pudong') || loc.includes('puxi') || loc.includes('上海') || loc.includes('浦东') || loc.includes('浦西')) {
-      setSelectedCodeId('Shanghai');
-    } 
-    // Shenzhen
-    else if (loc.includes('shenzhen') || loc.includes('futian') || loc.includes('nanshan') || loc.includes('baoan') || loc.includes('深圳') || loc.includes('福田') || loc.includes('南山') || loc.includes('宝安')) {
-      setSelectedCodeId('Shenzhen');
-    } 
-    // Guangzhou
-    else if (loc.includes('guangzhou') || loc.includes('tianhe') || loc.includes('yuexiu') || loc.includes('haizhu') || loc.includes('广州') || loc.includes('天河') || loc.includes('越秀') || loc.includes('海珠')) {
-      setSelectedCodeId('Guangzhou');
-    } 
-    // Thailand
-    else if (loc.includes('thailand') || loc.includes('bangkok') || loc.includes('phuket') || loc.includes('chiang mai') || loc.includes('pattaya') || loc.includes('泰国') || loc.includes('曼谷') || loc.includes('普吉') || loc.includes('清迈') || loc.includes('芭提雅')) {
-      setSelectedCodeId('Thailand');
-    } 
-    // Malaysia
-    else if (loc.includes('malaysia') || loc.includes('kuala lumpur') || loc.includes('kl') || loc.includes('penang') || loc.includes('johor') || loc.includes('马来西亚') || loc.includes('吉隆坡') || loc.includes('槟城') || loc.includes('柔佛')) {
-      setSelectedCodeId('Malaysia');
-    } 
-    // England / UK
-    else if (loc.includes('england') || loc.includes('uk') || loc.includes('london') || loc.includes('manchester') || loc.includes('birmingham') || loc.includes('united kingdom') || loc.includes('英国') || loc.includes('伦敦') || loc.includes('曼彻斯特') || loc.includes('伯明翰')) {
-      setSelectedCodeId('United Kingdom');
-    } 
-    // US / Canada
-    else if (loc.includes('usa') || loc.includes('us ') || loc.includes('america') || loc.includes('united states') || loc.includes('new york') || loc.includes('美国')) {
-      setSelectedCodeId('United States');
+    const loc = projectLocation.toLowerCase().trim();
+    let foundCode = '';
+
+    // Search through the mapping for multilingual matches
+    for (const key in LOCATION_CODE_MAPPING) {
+      const entry = LOCATION_CODE_MAPPING[key];
+      if (entry.matches.some(match => loc.includes(match.toLowerCase()))) {
+        foundCode = entry.codes[0];
+        break;
+      }
     }
-    else if (loc.includes('canada') || loc.includes('toronto') || loc.includes('vancouver') || loc.includes('加拿大')) {
-      setSelectedCodeId('Canada');
+
+    if (foundCode && foundCode !== selectedCodeId) {
+      setSelectedCodeId(foundCode);
+      
+      // Optional: Inform user of auto-detection
+      setNotification({
+        message: `Auto-detected location: ${projectLocation}. Applied ${foundCode} design standards.`,
+        type: 'success'
+      });
+      setTimeout(() => setNotification(null), 3000);
     }
-    // Oceania
-    else if (loc.includes('australia') || loc.includes('sydney') || loc.includes('melbourne') || loc.includes('au ') || loc.includes('澳大利亚')) {
-      setSelectedCodeId('Australia');
-    }
-    else if (loc.includes('new zealand') || loc.includes('auckland') || loc.includes('nz') || loc.includes('新西兰')) {
-      setSelectedCodeId('New Zealand');
-    }
-    // Middle East
-    else if (loc.includes('uae') || loc.includes('dubai') || loc.includes('abu dhabi') || loc.includes('阿联酋')) {
-      setSelectedCodeId('UAE / Dubai');
-    }
-    else if (loc.includes('saudi') || loc.includes('riyadh') || loc.includes('ksa') || loc.includes('沙特')) {
-      setSelectedCodeId('Saudi Arabia');
-    }
-    // Africa
-    else if (loc.includes('south africa') || loc.includes('cape town') || loc.includes('joburg') || loc.includes('南非')) {
-      setSelectedCodeId('South Africa');
-    }
-    // Japan
-    else if (loc.includes('japan') || loc.includes('tokyo') || loc.includes('osaka') || loc.includes('kyoto') || loc.includes('日本') || loc.includes('东京') || loc.includes('大阪')) {
-      setSelectedCodeId('Japan');
-    }
-    // South Korea
-    else if (loc.includes('korea') || loc.includes('seoul') || loc.includes('busan') || loc.includes('韩国') || loc.includes('首尔') || loc.includes('釜山')) {
-      setSelectedCodeId('South Korea');
-    }
-    // Vietnam
-    else if (loc.includes('vietnam') || loc.includes('hanoi') || loc.includes('ho chi minh') || loc.includes('hcmc') || loc.includes('越南') || loc.includes('河内')) {
-      setSelectedCodeId('Vietnam');
-    }
-    // Philippines
-    else if (loc.includes('philippines') || loc.includes('manila') || loc.includes('cebu') || loc.includes('菲律宾') || loc.includes('马尼拉')) {
-      setSelectedCodeId('Philippines');
-    }
-    // Indonesia
-    else if (loc.includes('indonesia') || loc.includes('jakarta') || loc.includes('bali') || loc.includes('印度尼西亚') || loc.includes('雅加达')) {
-      setSelectedCodeId('Indonesia');
-    }
-    // India
-    else if (loc.includes('india') || loc.includes('mumbai') || loc.includes('delhi') || loc.includes('bangalore') || loc.includes('印度') || loc.includes('孟买')) {
-      setSelectedCodeId('India');
-    }
-    // Brazil
-    else if (loc.includes('brazil') || loc.includes('rio') || loc.includes('sao paulo') || loc.includes('巴西') || loc.includes('圣保罗')) {
-      setSelectedCodeId('Brazil');
-    }
-    // Mexico
-    else if (loc.includes('mexico') || loc.includes('mexico city') || loc.includes('墨西哥')) {
-      setSelectedCodeId('Mexico');
-    }
-    // Egypt
-    else if (loc.includes('egypt') || loc.includes('cairo') || loc.includes('alexandria') || loc.includes('埃及') || loc.includes('开罗')) {
-      setSelectedCodeId('Egypt');
-    }
-    // Germany
-    else if (loc.includes('germany') || loc.includes('berlin') || loc.includes('munich') || loc.includes('frankfurt') || loc.includes('德国') || loc.includes('柏林')) {
-      setSelectedCodeId('Germany');
-    }
-    // France
-    else if (loc.includes('france') || loc.includes('paris') || loc.includes('lyon') || loc.includes('法国') || loc.includes('巴黎')) {
-      setSelectedCodeId('France');
-    }
-    // Italy
-    else if (loc.includes('italy') || loc.includes('rome') || loc.includes('milan') || loc.includes('意大利') || loc.includes('罗马')) {
-      setSelectedCodeId('Italy');
-    }
-    // Eurocodes (General fallback)
-    else if (
-      loc.includes('europe') || loc.includes('eu') || loc.includes('spain') || loc.includes('netherlands') || loc.includes('belgium') ||
-      loc.includes('madrid') || loc.includes('amsterdam') ||
-      loc.includes('欧洲') || loc.includes('西班牙') || loc.includes('荷兰') || loc.includes('比利时')
-    ) {
-      setSelectedCodeId('Eurocodes (EU-General)');
-    } 
-    // China (National)
-    else if (loc.includes('china') || loc.includes('beijing') || loc.includes('chengdu') || loc.includes('hangzhou') || loc.includes('nanjing') || loc.includes('wuhan') || loc.includes('prc') || loc.includes('中国') || loc.includes('北京') || loc.includes('成都') || loc.includes('杭州') || loc.includes('南京') || loc.includes('武汉')) {
-      setSelectedCodeId('China (National)');
-    }
-  }, [projectLocation]);
+  }, [projectLocation, selectedCodeId]);
 
   // History State for Undo/Redo
   const [past, setPast] = useState<HistoryState[]>([]);
@@ -2053,6 +2088,7 @@ export function App() {
     width,
     height,
     thickness,
+    thickness2,
     supportCondition,
     intermediateSupports,
     safetyFactor,
@@ -2079,6 +2115,7 @@ export function App() {
     setWidth(state.width);
     setHeight(state.height);
     setThickness(state.thickness);
+    setThickness2(state.thickness2 ?? state.thickness);
     setSupportCondition(state.supportCondition);
     setIntermediateSupports(state.intermediateSupports ?? []);
     setSafetyFactor(state.safetyFactor);
@@ -2273,12 +2310,12 @@ export function App() {
     if (sectionType === 'solid') {
       return calculateRectangularProperties(width, height);
     } else if (sectionType === 'channel') {
-      return calculateChannelProperties(width, height, thickness);
+      return calculateChannelProperties(width, height, thickness, thickness2);
     } else if (sectionType === 'l-plate') {
-      return calculateLPlateProperties(width, height, thickness);
+      return calculateLPlateProperties(width, height, thickness, thickness2);
     }
-    return calculateHollowRectangularProperties(width, height, thickness);
-  }, [width, height, thickness, sectionType]);
+    return calculateHollowRectangularProperties(width, height, thickness, thickness2);
+  }, [width, height, thickness, thickness2, sectionType]);
 
   const activeCombination = useMemo(() => 
     combinations.find(c => c.id === activeCombinationId) || combinations[0] || { id: 'default', name: 'Default', description: 'Default fallback combination.', factors: { dead: 1, live: 0, wind: 0, snow: 0, seismic: 0 } }
@@ -2840,6 +2877,7 @@ export function App() {
                         width={65}
                         height={150}
                         thickness={3.5}
+                        thickness2={3.5}
                         sectionType="hollow"
                         supportCondition="simply_supported"
                         intermediateSupports={[]}
@@ -2928,7 +2966,19 @@ export function App() {
                     </div>
                     <div className="grid gap-1.5">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="proj-loc" className="text-[10px] uppercase font-bold text-slate-400">Location</Label>
+                        <div className="flex items-center gap-1">
+                          <Label htmlFor="proj-loc" className="text-[10px] uppercase font-bold text-slate-400">Location</Label>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <HelpCircle className="w-2.5 h-2.5 text-slate-300 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-[10px]">Input location in any language (English, Chinese, Thai, etc.). Design codes will be auto-selected.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
                         <Dialog open={isLocationMapOpen} onOpenChange={setIsLocationMapOpen}>
                           <DialogTrigger render={<Button variant="ghost" className="h-4 px-1 text-[9px] text-blue-500 font-black flex items-center gap-1 hover:bg-blue-50" />}>
                             <Globe className="w-2.5 h-2.5" />
@@ -2950,6 +3000,25 @@ export function App() {
                         />
                         <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                       </div>
+                      {(() => {
+                        const loc = projectLocation.toLowerCase().trim();
+                        let foundKey = "";
+                        for (const key in LOCATION_CODE_MAPPING) {
+                          if (LOCATION_CODE_MAPPING[key].matches.some(match => loc.includes(match.toLowerCase()))) {
+                            foundKey = key;
+                            break;
+                          }
+                        }
+                        if (foundKey) {
+                          return (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 border border-blue-100 rounded text-[9px] text-blue-700 font-bold animate-in fade-in slide-in-from-top-1">
+                              <Zap className="w-2.5 h-2.5" />
+                              AUTO-DETECTED: {foundKey} Standard Applied
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="grid gap-1.5">
@@ -3089,6 +3158,7 @@ export function App() {
                     setWidth(preset.dimensions.width);
                     setHeight(preset.dimensions.height);
                     setThickness(preset.dimensions.thickness);
+                    setThickness2(preset.dimensions.thickness2 ?? preset.dimensions.thickness);
                     if ((preset as any).sectionType) {
                       setSectionType((preset as any).sectionType);
                     } else {
@@ -3524,25 +3594,40 @@ export function App() {
                       </div>
                     </div>
 
-                    {sectionType === 'hollow' && (
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="thickness" className="text-[10px] uppercase font-bold text-slate-400">{t.thickness} ({u.length})</Label>
-                        <NumericInputWithControls 
-                          id="thickness" 
-                          min={toDisplay(0.1, 'length')}
-                          max={toDisplay(Math.min(width, height) / 2.1, 'length')}
-                          step={unitSystem === 'metric' ? 0.1 : 0.01}
-                          precision={unitSystem === 'metric' ? 1 : 3}
-                          value={toDisplay(thickness ?? 0, 'length')} 
-                          onChange={(val) => setThickness(fromDisplay(val, 'length'))}
-                        />
-                        <Slider 
-                          value={[toDisplay(thickness ?? 0, 'length')]} 
-                          onValueChange={(vals) => setThickness(fromDisplay(vals[0], 'length'))} 
-                          min={toDisplay(0.1, 'length')} 
-                          max={toDisplay(Math.min(width, height) / 2.1, 'length')} 
-                          step={0.1}
-                        />
+                    {sectionType !== 'solid' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-1.5">
+                          <Label htmlFor="thickness" className="text-[10px] uppercase font-bold text-slate-400">
+                            {sectionType === 'hollow' ? 'Width Thickness (tx)' : 
+                             sectionType === 'channel' ? 'Web Thickness (tw)' : 
+                             'Horiz. Thickness (th)'} ({u.length})
+                          </Label>
+                          <NumericInputWithControls 
+                            id="thickness" 
+                            min={toDisplay(0.1, 'length')}
+                            max={toDisplay(Math.max(width, height) / 2.1, 'length')}
+                            step={unitSystem === 'metric' ? 0.1 : 0.01}
+                            precision={unitSystem === 'metric' ? 1 : 3}
+                            value={toDisplay(thickness ?? 0, 'length')} 
+                            onChange={(val) => setThickness(fromDisplay(val, 'length'))}
+                          />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label htmlFor="thickness2" className="text-[10px] uppercase font-bold text-slate-400">
+                            {sectionType === 'hollow' ? 'Height Thickness (ty)' : 
+                             sectionType === 'channel' ? 'Flange Thickness (tf)' : 
+                             'Vert. Thickness (tv)'} ({u.length})
+                          </Label>
+                          <NumericInputWithControls 
+                            id="thickness2" 
+                            min={toDisplay(0.1, 'length')}
+                            max={toDisplay(Math.min(width, height) / 2.1, 'length')}
+                            step={unitSystem === 'metric' ? 0.1 : 0.01}
+                            precision={unitSystem === 'metric' ? 1 : 3}
+                            value={toDisplay(thickness2 ?? 0, 'length')} 
+                            onChange={(val) => setThickness2(fromDisplay(val, 'length'))}
+                          />
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -4349,6 +4434,7 @@ export function App() {
                 width={width}
                 height={height}
                 thickness={thickness}
+                thickness2={thickness2}
                 material={material}
                 safetyFactor={safetyFactor}
                 activeCombination={activeCombination}

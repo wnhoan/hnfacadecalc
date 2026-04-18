@@ -463,15 +463,16 @@ export function calculateRectangularProperties(width: number, height: number) {
   return { area, momentOfInertia, sectionModulus };
 }
 
-export function calculateHollowRectangularProperties(width: number, height: number, thickness: number) {
+export function calculateHollowRectangularProperties(width: number, height: number, thicknessX: number, thicknessY: number) {
   const w = Math.max(0, width);
   const h = Math.max(0, height);
-  const t = Math.max(0, thickness);
+  const tx = Math.max(0, thicknessX);
+  const ty = Math.max(0, thicknessY);
   
-  const innerWidth = w - 2 * t;
-  const innerHeight = h - 2 * t;
+  const innerWidth = w - 2 * tx;
+  const innerHeight = h - 2 * ty;
   
-  if (innerWidth <= 0 || innerHeight <= 0 || t <= 0) {
+  if (innerWidth <= 0 || innerHeight <= 0 || tx <= 0 || ty <= 0) {
     return calculateRectangularProperties(w, h);
   }
 
@@ -481,58 +482,62 @@ export function calculateHollowRectangularProperties(width: number, height: numb
   return { area, momentOfInertia, sectionModulus };
 }
 
-export function calculateChannelProperties(width: number, height: number, thickness: number) {
+export function calculateChannelProperties(width: number, height: number, thicknessWeb: number, thicknessFlange: number) {
   const w = Math.max(0, width);
   const h = Math.max(0, height);
-  const t = Math.max(0, thickness);
+  const tw = Math.max(0, thicknessWeb); // Thickness of the vertical web
+  const tf = Math.max(0, thicknessFlange); // Thickness of the horizontal flanges
 
-  if (t <= 0 || w <= t || h <= 2 * t) {
+  if (tw <= 0 || tf <= 0 || w <= tw || h <= 2 * tf) {
     return calculateRectangularProperties(w, h);
   }
 
   // Channel area: 2 flanges + 1 web
-  // Area = 2 * (w * t) + (h - 2t) * t
-  const area = 2 * w * t + (h - 2 * t) * t;
+  // Area = 2 * (w * tf) + (h - 2tf) * tw
+  const area = 2 * w * tf + (h - 2 * tf) * tw;
 
   // Moment of Inertia (Ix) - assuming bending about major axis (horizontal)
-  // I = (w * h^3)/12 - ((w - t) * (h - 2t)^3)/12
-  const momentOfInertia = (w * Math.pow(h, 3)) / 12 - ((w - t) * Math.pow(h - 2 * t, 3)) / 12;
+  // I = (w * h^3)/12 - ((w - tw) * (h - 2tf)^3)/12
+  const momentOfInertia = (w * Math.pow(h, 3)) / 12 - ((w - tw) * Math.pow(h - 2 * tf, 3)) / 12;
   const sectionModulus = h > 0 ? momentOfInertia / (h / 2) : 0;
 
   return { area, momentOfInertia, sectionModulus };
 }
 
-export function calculateLPlateProperties(width: number, height: number, thickness: number) {
+export function calculateLPlateProperties(width: number, height: number, thicknessHorizontal: number, thicknessVertical: number) {
   const w = Math.max(0, width);
   const h = Math.max(0, height);
-  const t = Math.max(0, thickness);
+  const th = Math.max(0, thicknessHorizontal); // Thickness of the horizontal leg
+  const tv = Math.max(0, thicknessVertical);   // Thickness of the vertical leg
 
-  if (t <= 0 || w <= t || h <= t) {
+  if (th <= 0 || tv <= 0 || w <= tv || h <= th) {
+    // Fallback if thicknesses are too large or zero
     return calculateRectangularProperties(w, h);
   }
 
   // L-plate area: horizontal leg + vertical leg
-  // Area = w*t + (h-t)*t
-  const area = w * t + (h - t) * t;
+  // Area = w*th + (h-th)*tv
+  const area = w * th + (h - th) * tv;
 
-  // Centroid y_c from bottom
-  // A1 = w*t, y1 = t/2
-  // A2 = (h-t)*t, y2 = t + (h-t)/2 = (h+t)/2
-  const a1 = w * t;
-  const y1 = t / 2;
-  const a2 = (h - t) * t;
-  const y2 = (h + t) / 2;
+  // Centroid y_c from bottom (base of horizontal leg)
+  // A1 (horizontal): w * th, y1 = th / 2
+  // A2 (vertical): tv * (h-th), y2 = th + (h-th) / 2 = (h + th) / 2
+  const a1 = w * th;
+  const y1 = th / 2;
+  const a2 = (h - th) * tv;
+  const y2 = (h + th) / 2;
   const yc = (a1 * y1 + a2 * y2) / area;
 
   // Moment of Inertia (Ix) about centroid
-  // I1 = w*t^3/12 + a1*(yc-y1)^2
-  // I2 = t*(h-t)^3/12 + a2*(yc-y2)^2
-  const i1 = (w * Math.pow(t, 3)) / 12 + a1 * Math.pow(yc - y1, 2);
-  const i2 = (t * Math.pow(h - t, 3)) / 12 + a2 * Math.pow(yc - y2, 2);
+  // I1 = w*th^3/12 + a1*(yc-y1)^2
+  // I2 = tv*(h-th)^3/12 + a2*(yc-y2)^2
+  const i1 = (w * Math.pow(th, 3)) / 12 + a1 * Math.pow(yc - y1, 2);
+  const i2 = (tv * Math.pow(h - th, 3)) / 12 + a2 * Math.pow(yc - y2, 2);
   const momentOfInertia = i1 + i2;
 
   // Section Modulus (Wx)
-  const sectionModulus = Math.max(yc, h - yc) > 0 ? momentOfInertia / Math.max(yc, h - yc) : 0;
+  const y_max = Math.max(yc, h - yc);
+  const sectionModulus = y_max > 0 ? momentOfInertia / y_max : 0;
 
   return { area, momentOfInertia, sectionModulus };
 }

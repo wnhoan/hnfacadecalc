@@ -8,6 +8,7 @@ interface BeamVisualizer3DProps {
   width: number;
   height: number;
   thickness: number;
+  thickness2: number;
   sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate';
   supportCondition?: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous';
   materialColor?: string;
@@ -36,7 +37,8 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
   length, 
   width, 
   height, 
-  thickness, 
+  thickness: tx, 
+  thickness2: ty,
   sectionType,
   supportCondition = 'simply_supported',
   materialColor = '#94a3b8',
@@ -52,24 +54,28 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
 
     if (sectionType === 'channel') {
       // Channel shape (C-shape)
+      const tw = tx; // Web thickness
+      const tf = ty; // Flange thickness
       // Start at bottom right of web
-      shape.moveTo(-hw + thickness, -hh);
+      shape.moveTo(-hw + tw, -hh);
       shape.lineTo(hw, -hh);
-      shape.lineTo(hw, -hh + thickness);
-      shape.lineTo(-hw + thickness, -hh + thickness);
-      shape.lineTo(-hw + thickness, hh - thickness);
-      shape.lineTo(hw, hh - thickness);
+      shape.lineTo(hw, -hh + tf);
+      shape.lineTo(-hw + tw, -hh + tf);
+      shape.lineTo(-hw + tw, hh - tf);
+      shape.lineTo(hw, hh - tf);
       shape.lineTo(hw, hh);
       shape.lineTo(-hw, hh);
       shape.lineTo(-hw, -hh);
       shape.closePath();
     } else if (sectionType === 'l-plate') {
       // L-plate shape (Angle)
+      const th = tx; // Horizontal leg thickness
+      const tv = ty; // Vertical leg thickness
       shape.moveTo(-hw, -hh);
       shape.lineTo(hw, -hh);
-      shape.lineTo(hw, -hh + thickness);
-      shape.lineTo(-hw + thickness, -hh + thickness);
-      shape.lineTo(-hw + thickness, hh);
+      shape.lineTo(hw, -hh + th);
+      shape.lineTo(-hw + tv, -hh + th);
+      shape.lineTo(-hw + tv, hh);
       shape.lineTo(-hw, hh);
       shape.lineTo(-hw, -hh);
       shape.closePath();
@@ -81,10 +87,10 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
       shape.lineTo(-hw, hh);
       shape.lineTo(-hw, -hh);
 
-      if (sectionType === 'hollow' && thickness > 0) {
+      if (sectionType === 'hollow' && tx > 0 && ty > 0) {
         const hole = new THREE.Path();
-        const ihw = hw - thickness;
-        const ihh = hh - thickness;
+        const ihw = hw - tx;
+        const ihh = hh - ty;
         
         if (ihw > 0 && ihh > 0) {
           hole.moveTo(-ihw, -ihh);
@@ -104,7 +110,7 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
     };
 
     return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-  }, [length, width, height, thickness, sectionType]);
+  }, [length, width, height, tx, ty, sectionType]);
 
   return (
     <group rotation={[0, -Math.PI / 2, 0]} position={[-length / 2, 0, 0]}>
