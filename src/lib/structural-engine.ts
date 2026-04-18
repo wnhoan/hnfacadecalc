@@ -10,8 +10,9 @@ export interface BeamProperties {
   yieldStrength: number; // MPa
   sectionModulus: number; // mm3
   safetyFactor: number;
-  supportCondition?: 'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned';
+  supportCondition?: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous';
   beamType?: 'mullion' | 'transom';
+  intermediateSupports?: number[]; // positions of pinned supports
 }
 
 export interface Load {
@@ -146,186 +147,266 @@ export function calculateBeam(
   let v0 = 0;
   let theta0 = 0;
 
-  // Solve for reactions based on support conditions
+  // Linear system solver (Gaussian elimination)
+  const solveLinearSystem = (A: number[][], b: number[]) => {
+    const n = b.length;
+    for (let i = 0; i < n; i++) {
+      let max = i;
+      for (let j = i + 1; j < n; j++) if (Math.abs(A[j][i]) > Math.abs(A[max][i])) max = j;
+      [A[i], A[max]] = [A[max], A[i]];
+      [b[i], b[max]] = [b[max], b[i]];
+      for (let j = i + 1; j < n; j++) {
+        const factor = A[j][i] / A[i][i];
+        b[j] -= factor * b[i];
+        for (let k = i; k < n; k++) A[j][k] -= factor * A[i][k];
+      }
+    }
+    const x = new Array(n).fill(0);
+    for (let i = n - 1; i >= 0; i--) {
+      let sum = 0;
+      for (let j = i + 1; j < n; j++) sum += A[i][j] * x[j];
+      x[i] = (b[i] - sum) / A[i][i];
+    }
+    return x;
+  };
+
+  const getBoundaryErrors = (R0_test: number, M0_test: number, theta0_test: number) => {
+    const forces = getInternalForces(R0_test, M0_test);
+    const defls = getDeflection(forces, 0, theta0_test);
+    let finalSlope = theta0_test;
+    for (let i = 0; i < steps; i++) {
+      finalSlope += (-(forces[i].moment + forces[i + 1].moment) / (2 * EI)) * dx;
+    }
+    return { forces, defls, finalSlope };
+  };
+
+  // Define support points and constraints
+  const supportPoints: { x: number, type: 'pinned' | 'fixed' }[] = [];
   if (supportCondition === 'simply_supported') {
-    // Reactions at x=0: R0. M0 = 0.
-    // Boundary conditions: v(0) = 0, v(L) = 0.
-    // We need to find R0 such that M(L) = 0 (pinned at L).
-    // Actually, for simply supported, R0 is statically determinate.
+    supportPoints.push({ x: 0, type: 'pinned' }, { x: length, type: 'pinned' });
+  } else if (supportCondition === 'cantilever') {
+    supportPoints.push({ x: 0, type: 'fixed' });
+  } else if (supportCondition === 'fixed_fixed') {
+    supportPoints.push({ x: 0, type: 'fixed' }, { x: length, type: 'fixed' });
+  } else if (supportCondition === 'fixed_pinned' || supportCondition === 'propped_cantilever') {
+    supportPoints.push({ x: 0, type: 'fixed' }, { x: length, type: 'pinned' });
+  } else if (supportCondition === 'continuous') {
+    supportPoints.push({ x: 0, type: 'pinned' }, { x: length, type: 'pinned' });
+    (props.intermediateSupports || []).forEach(pos => {
+      if (pos > 0 && pos < length) supportPoints.push({ x: pos, type: 'pinned' });
+    });
+  }
+
+  // General approach: Unknowns R0, M0, theta0. Compatibility v(x_i) = 0, theta(x_i) = 0.
+  // v(x) = v_base(x, R0=0, M0=0, v0=0, theta0=0) + R0*f1(x) + M0*f2(x) + theta0*x
+  // We have 3 primary unknowns (R0, M0, theta0). v0 is always 0 for all our cases (start is supported).
+  
+  const getCompatibilityAt = (R: number, M: number, T: number) => {
+    const { defls, finalSlope, forces } = getBoundaryErrors(R, M, T);
+    const errors: number[] = [];
+    supportPoints.forEach(sp => {
+      const idx = Math.round((sp.x / length) * steps);
+      errors.push(defls[idx]);
+      if (sp.type === 'fixed') {
+        // Find slope at x
+        let slope = T;
+        for (let i = 0; i < idx; i++) {
+          slope += (-(forces[i].moment + forces[i + 1].moment) / (2 * EI)) * dx;
+        }
+        errors.push(slope);
+      }
+    });
+
+    // Also need to satisfy boundary conditions at L if they are not at 0
+    const endSupport = supportPoints.find(sp => Math.abs(sp.x - length) < 1e-3);
+    if (!endSupport) {
+      // It's a cantilever free end? Actually cantilever is fixed at 0.
+      // If it's cantilever, only fixed at 0 is in supportPoints.
+    }
+    
+    return errors;
+  };
+
+  const b_vec = getCompatibilityAt(0, 0, 0).map(v => -v);
+  const n = b_vec.length;
+  
+  // We need to match number of unknowns to number of compatibility constraints.
+  // Actually, for statically indeterminate beams, we have R0, M0, theta0.
+  // We can solve this as a $n \times n$ system if $n=3$, or similar.
+  // Wait, if $n < 3$, some of R0, M0 might be 0.
+  
+  if (n === 1) {
+    // Single constraint (pinned at 0, free everywhere else? unusual)
+    // For cantilever, n=2 (v0=0, theta0=0). But v0 is fixed 0.
+    // Let's refine.
+  }
+
+  // Fallback to original logic if system is complex, but let's try to improve.
+  // Simply supported: 2 supports (x=0, x=L). Compatibility v(L)=0. 1 unknown theta0. M0=0.
+  // Global equilibrium for simply supported: R0 is solved statically.
+  
+  if (supportCondition === 'simply_supported') {
     let totalLoad = 0;
     let totalMomentAbout0 = 0;
     loads.forEach(l => {
-      if (l.type === 'udl') {
-        const W = l.value * length;
-        totalLoad += W;
-        totalMomentAbout0 += W * (length / 2);
-      } else if (l.type === 'point') {
-        totalLoad += l.value;
-        totalMomentAbout0 += l.value * (l.position ?? length / 2);
-      } else if (l.type === 'trapezoidal') {
+      if (l.type === 'udl') { totalLoad += l.value * length; totalMomentAbout0 += l.value * length * (length / 2); }
+      else if (l.type === 'point') { totalLoad += l.value; totalMomentAbout0 += l.value * (l.position ?? length / 2); }
+      else if (l.type === 'trapezoidal') {
         const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
         const W = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
-        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 
-          ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value)))
-          : L_load / 2;
-        totalLoad += W;
-        totalMomentAbout0 += W * ((l.start ?? 0) + x_c_rel);
+        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value))) : L_load / 2;
+        totalLoad += W; totalMomentAbout0 += W * ((l.start ?? 0) + x_c_rel);
       }
     });
     const R_L = totalMomentAbout0 / length;
     R0 = totalLoad - R_L;
     M0 = 0;
-    v0 = 0;
-    // Find theta0 such that v(L) = 0
-    const forces = getInternalForces(R0, M0);
-    const v_base = getDeflection(forces, 0, 0);
+    const v_base = getDeflection(getInternalForces(R0, M0), 0, 0);
     theta0 = -v_base[steps] / length;
   } else if (supportCondition === 'cantilever') {
-    // Fixed at x=0. Free at x=L.
-    // Reactions at x=0: R0, M0.
-    // Boundary conditions: v(0) = 0, v'(0) = 0.
-    // R0 and M0 are statically determinate.
-    let totalLoad = 0;
-    let totalMomentAbout0 = 0;
+    let sumP = 0, sumPa = 0;
     loads.forEach(l => {
-      if (l.type === 'udl') {
-        const W = l.value * length;
-        totalLoad += W;
-        totalMomentAbout0 += W * (length / 2);
-      } else if (l.type === 'point') {
-        totalLoad += l.value;
-        totalMomentAbout0 += l.value * (l.position ?? length / 2);
-      } else if (l.type === 'trapezoidal') {
+      if (l.type === 'udl') { sumP += l.value * length; sumPa += l.value * length * (length / 2); }
+      else if (l.type === 'point') { sumP += l.value; sumPa += l.value * (l.position ?? length / 2); }
+      else if (l.type === 'trapezoidal') {
         const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
         const W = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
-        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 
-          ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value)))
-          : L_load / 2;
-        totalLoad += W;
-        totalMomentAbout0 += W * ((l.start ?? 0) + x_c_rel);
+        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value))) : L_load / 2;
+        sumP += W; sumPa += W * ((l.start ?? 0) + x_c_rel);
       }
     });
-    R0 = totalLoad;
-    M0 = -totalMomentAbout0;
-    v0 = 0;
-    theta0 = 0;
-  } else if (supportCondition === 'fixed_pinned') {
-    // Fixed at x=0, Pinned at x=L.
-    // v(0)=0, v'(0)=0, v(L)=0.
-    // Unknowns: R0, M0.
-    // We can use superposition or solve for redundant R_L.
-    // Let's solve for R_L such that v(L) = 0.
-    // M(x) = M_cantilever(x) + R_L * (L - x)
-    // Wait, let's use the R0, M0 approach.
-    // M1 + R2*L = Sum(P * (L - a)) => M0 + R_L*L = Sum(P*a)
-    // R0 + R_L = Sum(P)
-    // M0 = Sum(P*a) - R_L*L
-    // R0 = Sum(P) - R_L
+    R0 = sumP; M0 = -sumPa; theta0 = 0; v0 = 0;
+  } else {
+    // General indeterminate case using influence coefficients
+    // Unknowns: reactions at secondary supports, M0, R0, theta0.
+    // For propped cantilever: Fixed at 0, Pinned at L.
+    // DOF: theta0=0, v0=0 (fixed at 0). Reaction R0, M0 at 0. Redundant RL at L.
     
-    let sumP = 0;
-    let sumPa = 0;
-    loads.forEach(l => {
-      let P = 0, a = 0;
-      if (l.type === 'udl') { P = l.value * length; a = length / 2; }
-      else if (l.type === 'point') { P = l.value; a = l.position ?? length / 2; }
-      else if (l.type === 'trapezoidal') {
-        const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
-        P = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
-        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 
-          ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value)))
-          : L_load / 2;
-        a = (l.start ?? 0) + x_c_rel;
-      }
-      sumP += P;
-      sumPa += P * a;
-    });
-
-    // Solve for R_L such that v(L) = 0
-    // v(L) is linear in R_L. Let's use two points.
-    const getVL = (RL_test: number) => {
-      const R0_test = sumP - RL_test;
-      const M0_test = sumPa - RL_test * length;
-      const forces = getInternalForces(R0_test, M0_test);
-      const defls = getDeflection(forces, 0, 0);
-      return defls[steps];
-    };
-
-    const v1 = getVL(0);
-    const v2 = getVL(sumP);
-    
-    if (Math.abs(v1 - v2) > 1e-20) {
-      const RL = (v1 / (v1 - v2)) * sumP;
+    // For simplicity, let's just implement the requested cases squarely using compatibility.
+    if (supportCondition === 'fixed_fixed') {
+      let sumP = 0, sumPa = 0;
+      loads.forEach(l => {
+        if (l.type === 'udl') { sumP += l.value * length; sumPa += l.value * length * (length / 2); }
+        else if (l.type === 'point') { sumP += l.value; sumPa += l.value * (l.position ?? length / 2); }
+        else if (l.type === 'trapezoidal') {
+          const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
+          const W = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
+          const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value))) : L_load / 2;
+          sumP += W; sumPa += W * ((l.start ?? 0) + x_c_rel);
+        }
+      });
+      const errors = getBoundaryErrors(0, 0, 0);
+      const A = [[length*length/2/EI, length/EI], [length*length*length/6/EI, length*length/2/EI]];
+      const b = [-errors.finalSlope, -errors.defls[steps]];
+      const reactions = solveLinearSystem(A, b); // [R_L, M_L]
+      const R_L = reactions[0], M_L = reactions[1];
+      R0 = sumP - R_L;
+      M0 = sumPa - R_L * length - M_L;
+      theta0 = 0;
+    } else if (supportCondition === 'fixed_pinned' || supportCondition === 'propped_cantilever') {
+      // Fixed at 0, Pinned at L
+      let sumP = 0, sumPa = 0;
+      loads.forEach(l => {
+        if (l.type === 'udl') { sumP += l.value * length; sumPa += l.value * length * (length / 2); }
+        else if (l.type === 'point') { sumP += l.value; sumPa += l.value * (l.position ?? length / 2); }
+        else if (l.type === 'trapezoidal') {
+          const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
+          const W = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
+          const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value))) : L_load / 2;
+          sumP += W; sumPa += W * ((l.start ?? 0) + x_c_rel);
+        }
+      });
+      const errors = getBoundaryErrors(0, 0, 0);
+      const RL = errors.defls[steps] / (length * length * length / (3 * EI));
       R0 = sumP - RL;
       M0 = sumPa - RL * length;
-    } else {
-      // Fallback to simply supported if solver fails
-      const R_L = sumPa / length;
-      R0 = sumP - R_L;
-      M0 = 0;
-    }
-    v0 = 0;
-    theta0 = 0;
-  } else if (supportCondition === 'fixed_fixed') {
-    // Fixed at x=0, Fixed at x=L.
-    // v(0)=0, v'(0)=0, v(L)=0, v'(L)=0.
-    // Unknowns: R0, M0.
-    let sumP = 0;
-    let sumPa = 0;
-    loads.forEach(l => {
-      let P = 0, a = 0;
-      if (l.type === 'udl') { P = l.value * length; a = length / 2; }
-      else if (l.type === 'point') { P = l.value; a = l.position ?? length / 2; }
-      else if (l.type === 'trapezoidal') {
-        const L_load = Math.max(0, (l.end ?? length) - (l.start ?? 0));
-        P = 0.5 * (l.value + (l.value2 ?? l.value)) * L_load;
-        const x_c_rel = (l.value + (l.value2 ?? l.value)) !== 0 
-          ? (L_load / 3) * ((l.value + 2 * (l.value2 ?? l.value)) / (l.value + (l.value2 ?? l.value)))
-          : L_load / 2;
-        a = (l.start ?? 0) + x_c_rel;
+      theta0 = 0;
+    } else if (supportCondition === 'continuous') {
+      // Multi-span case. Pinned at 0, L, and mid points.
+      // Unknowns: theta0, and reactions R_i at intermediate and end supports.
+      // System size: 1 (theta0) + intermediate_supports.length + 1 (RL).
+      const secondarySupports = (props.intermediateSupports || []).filter(x => x > 0 && x < length).concat([length]);
+      const nUnk = secondarySupports.length + 1; // +1 for theta0
+      
+      const sumP = loads.reduce((s, l) => {
+         if (l.type === 'udl') return s + l.value * length;
+         if (l.type === 'point') return s + l.value;
+         if (l.type === 'trapezoidal') return s + 0.5 * (l.value + (l.value2 ?? l.value)) * Math.max(0, (l.end ?? length) - (l.start ?? 0));
+         return s;
+      }, 0);
+
+      // We need to find theta0 and reactions R_i at x_i such that v(x_i) = 0.
+      // For pinned at 0, we can solve R0 from global moment equilibrium about L? No, let's use influence matrix.
+      // v(x) = v_loads(x, R0 solved statically for simply supported beam [0, L]) + sum Ri_actual * v_unit_i(x) + theta0_actual * x
+      
+      // Easier: Static R0 from simple span [0, L]
+      // v_total(x) = v_simple(x) + sum( R_internal_i * f_i(x) )
+      // where f_i(x) is deflection at x due to unit load at x_i on simply supported beam [0,L].
+      const intSupports = (props.intermediateSupports || []).filter(x => x > 0 && x < length);
+      if (intSupports.length === 0) {
+        // Fallback to simply supported
+        return calculateBeam({ ...props, supportCondition: 'simply_supported' }, loads, steps);
       }
-      sumP += P;
-      sumPa += P * a;
-    });
+      
+      const getDeflectionSimple = (x_load: number, x_query: number) => {
+        const a = Math.min(x_load, length - x_load); // dist to closer support
+        const L = length;
+        const b = L - x_load;
+        const P = 1;
+        if (x_query <= x_load) return (P * b * x_query / (6 * L * EI)) * (L * L - b * b - x_query * x_query);
+        else return (P * x_load * (L - x_query) / (6 * L * EI)) * (2 * L * x_query - x_query * x_query - x_load * x_load);
+      };
 
-    // We need to find R0 and M0 such that v(L)=0 and v'(L)=0.
-    // This is a 2x2 system.
-    // v(L) = v_base(L) + R0 * f1 + M0 * f2
-    // v'(L) = v'_base(L) + R0 * g1 + M0 * g2
-    // But we can just use the numerical engine to find the influence coefficients.
-    
-    const getBoundaryErrors = (R0_test: number, M0_test: number) => {
-      const forces = getInternalForces(R0_test, M0_test);
-      const defls = getDeflection(forces, 0, 0);
-      // v'(L) = integral(-M/EI)
-      let finalSlope = 0;
-      for (let i = 0; i < steps; i++) {
-        finalSlope += (-(forces[i].moment + forces[i+1].moment) / (2 * EI)) * dx;
+      const resSimple = calculateBeam({ ...props, supportCondition: 'simply_supported' }, loads, steps);
+      const A_mat = intSupports.map(xi => intSupports.map(xj => getDeflectionSimple(xj, xi)));
+      const b_col = intSupports.map(xi => {
+        const idx = Math.round((xi / length) * steps);
+        return -resSimple.points[idx].deflection;
+      });
+      
+      const R_internals = solveLinearSystem(A_mat, b_col);
+      
+      // Final results
+      const finalRes = resSimple;
+      for (let i = 0; i <= steps; i++) {
+        const x = (length * i) / steps;
+        let dR = 0, dM = 0, dV = 0;
+        R_internals.forEach((Ri, j) => {
+          const xi = intSupports[j];
+          dR += Ri * getDeflectionSimple(xi, x);
+          // Moment and Shear from unit load at xi on simple beam
+          // R0_unit = (L-xi)/L, RL_unit = xi/L
+          const R0_unit = (length - xi) / length;
+          if (x <= xi) {
+            dM += Ri * (R0_unit * x);
+            dV += Ri * R0_unit;
+          } else {
+            dM += Ri * (R0_unit * x - 1 * (x - xi));
+            dV += Ri * (R0_unit - 1);
+          }
+        });
+        finalRes.points[i].deflection += dR;
+        finalRes.points[i].moment += dM;
+        finalRes.points[i].shear += dV;
+        finalRes.points[i].stress = sectionModulus > 0 ? Math.abs(finalRes.points[i].moment) / sectionModulus : 0;
       }
-      return { vL: defls[steps], thetaL: finalSlope };
-    };
-
-    // Solve system:
-    // f(R0, M0) = vL = 0
-    // g(R0, M0) = thetaL = 0
-    const base = getBoundaryErrors(0, 0);
-    const dR = getBoundaryErrors(1000, 0);
-    const dM = getBoundaryErrors(0, 1000000);
-
-    const dvL_dR = (dR.vL - base.vL) / 1000;
-    const dvL_dM = (dM.vL - base.vL) / 1000000;
-    const dthetaL_dR = (dR.thetaL - base.thetaL) / 1000;
-    const dthetaL_dM = (dM.thetaL - base.thetaL) / 1000000;
-
-    // Matrix:
-    // [ dvL_dR  dvL_dM ] [ R0 ] = [ -base.vL ]
-    // [ dthetaL_dR dthetaL_dM ] [ M0 ] = [ -base.thetaL ]
-    const det = dvL_dR * dthetaL_dM - dvL_dM * dthetaL_dR;
-    if (Math.abs(det) > 1e-20) {
-      R0 = ((-base.vL) * dthetaL_dM - (dvL_dM) * (-base.thetaL)) / det;
-      M0 = (dvL_dR * (-base.thetaL) - (-base.vL) * dthetaL_dR) / det;
+      
+      // Recalculate summary
+      const maxDef = Math.max(...finalRes.points.map(p => Math.abs(p.deflection)));
+      const maxMom = Math.max(...finalRes.points.map(p => Math.abs(p.moment)));
+      const maxShe = Math.max(...finalRes.points.map(p => Math.abs(p.shear)));
+      const maxStr = Math.max(...finalRes.points.map(p => p.stress));
+      finalRes.summary.maxDeflection = maxDef;
+      finalRes.summary.maxMoment = maxMom;
+      finalRes.summary.maxShear = maxShe;
+      finalRes.summary.maxStress = maxStr;
+      finalRes.summary.deflectionRatio = maxDef > 0.0001 ? `L/${Math.round(length/maxDef)}` : 'N/A';
+      const allowableStress = yieldStrength / Math.max(0.1, props.safetyFactor);
+      const deflectionLimitRatio = props.beamType === 'transom' ? 240 : 175;
+      finalRes.summary.status = (maxStr <= allowableStress && (length/maxDef) >= deflectionLimitRatio) ? 'pass' : 'fail';
+      
+      return finalRes;
     }
-    v0 = 0;
-    theta0 = 0;
   }
 
   const finalForces = getInternalForces(R0, M0);

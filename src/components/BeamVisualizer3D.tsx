@@ -9,9 +9,10 @@ interface BeamVisualizer3DProps {
   height: number;
   thickness: number;
   sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate';
-  supportCondition?: 'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned';
+  supportCondition?: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous';
   materialColor?: string;
   unitSystem?: 'metric' | 'imperial';
+  intermediateSupports?: number[];
 }
 
 const SupportIndicator: React.FC<{ type: 'pin' | 'fixed', position: [number, number, number] }> = ({ type, position }) => {
@@ -39,7 +40,8 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
   sectionType,
   supportCondition = 'simply_supported',
   materialColor = '#94a3b8',
-  unitSystem = 'metric'
+  unitSystem = 'metric',
+  intermediateSupports = []
 }) => {
   const u = unitSystem === 'metric' ? 'mm' : 'in';
   
@@ -131,9 +133,18 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
           <SupportIndicator type="fixed" position={[0, 0, length]} />
         </>
       )}
-      {supportCondition === 'fixed_pinned' && (
+      {(supportCondition === 'fixed_pinned' || supportCondition === 'propped_cantilever') && (
         <>
           <SupportIndicator type="fixed" position={[0, 0, 0]} />
+          <SupportIndicator type="pin" position={[0, -height / 2 - 20, length]} />
+        </>
+      )}
+      {supportCondition === 'continuous' && (
+        <>
+          <SupportIndicator type="pin" position={[0, -height / 2 - 20, 0]} />
+          {intermediateSupports?.map((pos, idx) => (
+            <SupportIndicator key={idx} type="pin" position={[0, -height / 2 - 20, pos]} />
+          ))}
           <SupportIndicator type="pin" position={[0, -height / 2 - 20, length]} />
         </>
       )}

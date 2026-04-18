@@ -38,6 +38,8 @@ import {
   Languages,
   Menu,
   X,
+  MapPin,
+  Search,
   HelpCircle,
   Scale,
   FileCode,
@@ -111,7 +113,9 @@ import {
   Tooltip as ChartTooltip, 
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  ReferenceLine,
+  Label as RechartsLabel
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { BeamVisualizer3D } from './components/BeamVisualizer3D';
@@ -255,6 +259,8 @@ const TRANSLATIONS = {
     cantilever: 'Cantilever',
     fixedFixed: 'Fixed-Fixed',
     fixedPinned: 'Fixed-Pinned',
+    proppedCantilever: 'Propped Cantilever',
+    continuous: 'Continuous Beam',
     seismic: 'Seismic Analysis',
     seismicRegion: 'Seismic Region',
     seismicCoeff: 'Seismic Coeff (Cs)',
@@ -314,6 +320,8 @@ const TRANSLATIONS = {
     cantilever: '悬臂',
     fixedFixed: '双端固定',
     fixedPinned: '一端固定一端简支',
+    proppedCantilever: '支承悬臂梁',
+    continuous: '连续梁',
     seismic: '地震分析',
     seismicRegion: '地震区域',
     seismicCoeff: '地震系数 (Cs)',
@@ -373,6 +381,8 @@ const TRANSLATIONS = {
     cantilever: 'คานยื่น',
     fixedFixed: 'ยึดแน่นทั้งสองด้าน',
     fixedPinned: 'ยึดแน่นหนึ่งด้าน',
+    proppedCantilever: 'คานยื่นแบบมีจุดรองรับ',
+    continuous: 'คานต่อเนื่อง',
     seismic: 'การวิเคราะห์แผ่นดินไหว',
     seismicRegion: 'ภูมิภาคแผ่นดินไหว',
     seismicCoeff: 'สัมประสิทธิ์แผ่นดินไหว (Cs)',
@@ -432,6 +442,8 @@ const TRANSLATIONS = {
     cantilever: 'Cantilever',
     fixedFixed: 'Tetap-Tetap',
     fixedPinned: 'Tetap-Pin',
+    proppedCantilever: 'Propped Cantilever',
+    continuous: 'Rasuk Berterusan',
     seismic: 'Analisis Seismik',
     seismicRegion: 'Wilayah Seismik',
     seismicCoeff: 'Pekali Seismik (Cs)',
@@ -457,23 +469,53 @@ const TRANSLATIONS = {
 };
 
 const CODES_OF_PRACTICE = [
-  { region: 'Europe', country: 'Eurocodes (EU)', codes: ['EN 1990 (Basis)', 'EN 1991 (Actions)', 'EN 1993 (Steel)', 'EN 1999 (Aluminum)', 'EN 1998 (Seismic)'] },
-  { region: 'Europe', country: 'United Kingdom', codes: ['BS EN 1991 (Actions)', 'BS EN 1993 (Steel)', 'BS EN 1999 (Aluminum)', 'BS EN 1998 (Seismic)'] },
+  // EUROPE
+  { region: 'Europe', country: 'Eurocodes (EU-General)', codes: ['EN 1990 (Basis)', 'EN 1991 (Actions)', 'EN 1993 (Steel)', 'EN 1999 (Aluminum)', 'EN 1998 (Seismic)'] },
+  { region: 'Europe', country: 'United Kingdom', codes: ['BS EN 1991 (UK NA)', 'BS EN 1993 (Steel)', 'BS EN 1999 (Aluminum)', 'BS EN 1998 (Seismic)', 'BS 6399 (Legacy Wind)'] },
+  { region: 'Europe', country: 'Germany', codes: ['DIN EN 1991 (NA)', 'DIN EN 1993 (Steel)', 'DIN EN 1999 (Aluminum)', 'DIN 18008 (Glass)'] },
+  { region: 'Europe', country: 'France', codes: ['NF EN 1991 (NA)', 'NF EN 1993 (Steel)', 'NF EN 1999 (Aluminum)', 'NF DTU 39 (Glass)'] },
+  { region: 'Europe', country: 'Italy', codes: ['UNI EN 1991 (NA)', 'NTC 2018 (National Code)', 'CNR-DT 210 (Glass)'] },
+
+  // ASIA PACIFIC - EAST ASIA
   { region: 'Asia', country: 'China (National)', codes: ['GB 50009 (Loads)', 'JGJ 102 (Curtain Wall)', 'GB 50011 (Seismic)', 'GB 50017 (Steel)'] },
-  { region: 'Asia', country: 'Hong Kong', codes: ['CoP for Glass 2018', 'CoP on Wind 2019', 'CoP for Seismic Design 2024'] },
+  { region: 'Asia', country: 'Japan', codes: ['AIJ (Loads)', 'BCJ (Building Code)', 'JIS G 3101 (Steel)', 'JASS 14 (Curtain Wall)'] },
+  { region: 'Asia', country: 'South Korea', codes: ['KDS 41 (Building)', 'KDS 14 (Steel)', 'KBC 2022'] },
+  { region: 'Asia', country: 'Hong Kong', codes: ['CoP for Glass 2018', 'CoP on Wind 2019', 'CoP for Seismic Design 2024', 'CoP for Structural Steel 2011'] },
+  { region: 'Asia', country: 'Macau', codes: ['RCAM (Actions)', 'REAE (Seismic)', 'RSM (Steel)'] },
+  { region: 'Asia', country: 'Taiwan', codes: ['Building Structural Design', 'Wind Load Standards', 'Steel Structure Code'] },
   { region: 'Asia', country: 'Shanghai', codes: ['DGJ08-56 (Curtain Wall)', 'DGJ08-11 (Loads)', 'DGJ08-9 (Steel)'] },
   { region: 'Asia', country: 'Shenzhen', codes: ['SZJG 48 (Glass)', 'SZJG 54 (Metal/Stone)', 'SJG 15 (Wind)'] },
   { region: 'Asia', country: 'Guangzhou', codes: ['DBJ/T 15-30 (Curtain Wall)', 'DBJ 15-101 (Wind)', 'GZJG (Guidelines)'] },
+
+  // ASIA PACIFIC - SOUTHEAST ASIA
+  { region: 'Asia', country: 'Singapore', codes: ['SS EN 1991 (Actions)', 'SS EN 1993 (Steel)', 'SS EN 1999 (Aluminum)', 'BC1:2023 (Steel)'] },
+  { region: 'Asia', country: 'Malaysia', codes: ['MS 1553 (Wind)', 'MS EN 1991 (EC1)', 'MS EN 1998 (Seismic)', 'UBBL 2021'] },
   { region: 'Asia', country: 'Thailand', codes: ['EIT 1011-46 (Steel)', 'DPT 1311-50 (Wind)', 'DPT 1301/1302 (Seismic)'] },
-  { region: 'Asia', country: 'Malaysia', codes: ['MS 1553 (Wind)', 'MS EN 1991 (EC1)', 'MS EN 1998 (Seismic)'] },
-  { region: 'Asia', country: 'Singapore', codes: ['SS EN 1991 (Actions)', 'SS EN 1993 (Steel)', 'SS EN 1999 (Aluminum)'] },
-  { region: 'North America', country: 'United States', codes: ['ASCE 7-22 (Loads)', 'AISC 360-22 (Steel)', 'ADM 2020 (Aluminum)', 'ASTM E1300 (Glass)'] },
-  { region: 'North America', country: 'Canada', codes: ['NBCC 2020 (Loads)', 'CSA S16 (Steel)', 'CSA S157 (Aluminum)', 'CAN/CGSB 12.20 (Glass)'] },
+  { region: 'Asia', country: 'Vietnam', codes: ['TCVN 2737:2023 (Loads)', 'TCVN 5575:2012 (Steel)', 'TCVN 9386:2012 (Seismic)'] },
+  { region: 'Asia', country: 'Philippines', codes: ['NSCP 2015 (Vol 1)', 'ASEP Guidelines', 'DPWH Standards'] },
+  { region: 'Asia', country: 'Indonesia', codes: ['SNI 1727:2020 (Loads)', 'SNI 1726:2019 (Seismic)', 'SNI 1729:2020 (Steel)'] },
+
+  // ASIA PACIFIC - SOUTH ASIA
+  { region: 'Asia', country: 'India', codes: ['IS 875 (Loads)', 'IS 800 (Steel)', 'IS 1893 (Seismic)', 'IS 16231 (Glass)'] },
+
+  // AMERICAS
+  { region: 'Americas', country: 'United States', codes: ['ASCE 7-22 (Loads)', 'AISC 360-22 (Steel)', 'ADM 2020 (Aluminum)', 'ASTM E1300 (Glass)', 'IBC 2024'] },
+  { region: 'Americas', country: 'Canada', codes: ['NBCC 2020 (Loads)', 'CSA S16 (Steel)', 'CSA S157 (Aluminum)', 'CAN/CGSB 12.20 (Glass)'] },
+  { region: 'Americas', country: 'Brazil', codes: ['NBR 6123 (Wind)', 'NBR 8800 (Steel)', 'NBR 7199 (Glass)', 'NBR 14762 (Cold-Formed)'] },
+  { region: 'Americas', country: 'Mexico', codes: ['NTC-EDIF (Building)', 'CFE (Wind/Seismic)', 'IMCA (Steel)'] },
+
+  // OCEANIA
   { region: 'Oceania', country: 'Australia', codes: ['AS/NZS 1170 (Loads)', 'AS 4100 (Steel)', 'AS/NZS 1664 (Aluminum)', 'AS 1288 (Glass)'] },
   { region: 'Oceania', country: 'New Zealand', codes: ['AS/NZS 1170 (Loads)', 'NZS 3404 (Steel)', 'AS/NZS 1664 (Aluminum)', 'NZS 4223 (Glass)'] },
-  { region: 'Middle East', country: 'UAE / Dubai', codes: ['DBC (Loads)', 'ASCE 7 (Wind)', 'AISC 360 (Steel)', 'ADM (Aluminum)'] },
+
+  // MIDDLE EAST
+  { region: 'Middle East', country: 'UAE / Dubai', codes: ['DBC (Loads)', 'Dubai Wind Code', 'AISC 360 (Steel)', 'ADM (Aluminum)'] },
   { region: 'Middle East', country: 'Saudi Arabia', codes: ['SBC 301 (Loads)', 'SBC 304 (Steel)', 'SBC 306 (Aluminum)'] },
+  { region: 'Middle East', country: 'Qatar', codes: ['QCS 2014', 'BS EN / ASCE 7 References'] },
+
+  // AFRICA
   { region: 'Africa', country: 'South Africa', codes: ['SANS 10160 (Loads)', 'SANS 10162 (Steel)', 'SANS 10137 (Glass)'] },
+  { region: 'Africa', country: 'Egypt', codes: ['ECP 201 (Loads)', 'ECP 205 (Steel)', 'Egyptian Building Code'] },
 ];
 
 const UNITS = {
@@ -555,6 +597,45 @@ const safeParseNumber = (val: string | number, fallback: number = 0, min: number
   return Math.min(Math.max(num, min), max);
 };
 
+const getCriticalPoints = (results: any, unitSystem: string, u: any, toDisplay: any) => {
+  if (!results || results.points.length === 0) return null;
+  
+  const maxDeflectionPoint = results.points.reduce((max: any, p: any) => Math.abs(p.deflection) > Math.abs(max.deflection) ? p : max, results.points[0]);
+  const maxMomentPoint = results.points.reduce((max: any, p: any) => Math.abs(p.moment) > Math.abs(max.moment) ? p : max, results.points[0]);
+  const maxShearPoint = results.points.reduce((max: any, p: any) => Math.abs(p.shear) > Math.abs(max.shear) ? p : max, results.points[0]);
+  const maxStressPoint = results.points.reduce((max: any, p: any) => p.stress > max.stress ? p : max, results.points[0]);
+
+  return {
+    deflection: [{ 
+      x: Number(toDisplay(maxDeflectionPoint.x, 'length').toFixed(2)), 
+      y: Number(toDisplay(maxDeflectionPoint.deflection, 'length').toFixed(3)), 
+      label: `Δ_max: ${toDisplay(maxDeflectionPoint.deflection, 'length').toFixed(2)} ${u.length}` 
+    }],
+    moment: [{ 
+      x: Number(toDisplay(maxMomentPoint.x, 'length').toFixed(2)), 
+      y: Number(toDisplay(maxMomentPoint.moment, 'moment').toFixed(2)), 
+      label: `M_max: ${unitSystem === 'metric' ? (maxMomentPoint.moment / 1000000).toFixed(2) + ' kNm' : (toDisplay(maxMomentPoint.moment, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1) + ' lb-ft'}` 
+    }],
+    shear: [
+      { 
+        x: Number(toDisplay(results.points[0].x ?? 0, 'length').toFixed(2)), 
+        y: Number(toDisplay(results.points[0].shear ?? 0, 'force').toFixed(2)), 
+        label: `R_left: ${unitSystem === 'metric' ? ((results.points[0].shear ?? 0) / 1000).toFixed(2) + ' kN' : (toDisplay(results.points[0].shear ?? 0, 'force') / 1000).toFixed(2) + ' kip'}` 
+      },
+      { 
+        x: Number(toDisplay(results.points[results.points.length-1].x ?? 0, 'length').toFixed(2)), 
+        y: Number(toDisplay(results.points[results.points.length-1].shear ?? 0, 'force').toFixed(2)), 
+        label: `R_right: ${unitSystem === 'metric' ? (-(results.points[results.points.length-1].shear ?? 0) / 1000).toFixed(2) + ' kN' : (toDisplay(-(results.points[results.points.length-1].shear ?? 0), 'force') / 1000).toFixed(2) + ' kip'}` 
+      }
+    ],
+    stress: [{ 
+      x: Number(toDisplay(maxStressPoint.x ?? 0, 'length').toFixed(2)), 
+      y: Number(toDisplay(maxStressPoint.stress ?? 0, 'stress').toFixed(2)), 
+      label: `σ_max: ${(maxStressPoint.stress ?? 0).toFixed(2)} MPa` 
+    }]
+  };
+};
+
 interface HistoryState {
   projectTitle: string;
   projectLocation: string;
@@ -569,7 +650,8 @@ interface HistoryState {
   width: number;
   height: number;
   thickness: number;
-  supportCondition: 'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned';
+  supportCondition: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous';
+  intermediateSupports: number[];
   safetyFactor: number;
   selectedCodeId: string;
   loads: Load[];
@@ -587,8 +669,8 @@ interface Project extends HistoryState {
 const createNewProject = (id: string, title: string): Project => ({
   id,
   projectTitle: title,
-  projectLocation: '',
-  projectDescription: '',
+  projectLocation: 'Shanghai, China',
+  projectDescription: 'Structural analysis for Shanghai facade project.',
   projectDate: new Date().toISOString().split('T')[0],
   projectTime: new Date().toTimeString().split(' ')[0].slice(0, 5),
   projectAttachment: '',
@@ -600,8 +682,9 @@ const createNewProject = (id: string, title: string): Project => ({
   height: 150,
   thickness: 3.5,
   supportCondition: 'simply_supported',
+  intermediateSupports: [],
   safetyFactor: 1.5,
-  selectedCodeId: 'China (National)',
+  selectedCodeId: 'Shanghai',
   loads: [{ id: '1', type: 'udl', category: 'dead', value: 0.5 }],
   combinations: DEFAULT_COMBINATIONS,
   activeCombinationId: 'c1',
@@ -632,6 +715,7 @@ const getProjectResults = (project: Project) => {
     safetyFactor: project.safetyFactor,
     supportCondition: project.supportCondition,
     beamType: project.beamType,
+    intermediateSupports: project.intermediateSupports,
   };
 
   try {
@@ -663,7 +747,8 @@ const ProjectResultsView = ({
   activeTab, 
   setActiveTab,
   isChartExpanded,
-  setIsChartExpanded
+  setIsChartExpanded,
+  criticalPoints
 }: { 
   project: Project; 
   results: any; 
@@ -675,6 +760,7 @@ const ProjectResultsView = ({
   setActiveTab: (v: string) => void;
   isChartExpanded: boolean;
   setIsChartExpanded: (v: boolean) => void;
+  criticalPoints: any;
 }) => {
   const governingCriteria = results.summary.utilizationStress >= results.summary.utilizationDeflection ? 'Stress' : 'Deflection';
   const maxUtilization = Math.max(0, results.summary.utilizationStress || 0, results.summary.utilizationDeflection || 0);
@@ -778,39 +864,39 @@ const ProjectResultsView = ({
       </Card>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        <SummaryCard 
-          label={t.maxDeflection} 
-          value={`${toDisplay(results.summary.maxDeflection, 'length').toFixed(unitSystem === 'metric' ? 2 : 4)} ${u.length}`} 
-          subValue={results.summary.deflectionRatio}
-          icon={<Maximize2 className="w-4 h-4 text-blue-500" />}
-          status={results.summary.utilizationDeflection > 1 ? 'fail' : 'pass'}
-          progress={results.summary.utilizationDeflection}
-          tooltip="Maximum vertical displacement of the beam under applied loads."
-        />
-        <SummaryCard 
-          label={t.maxStress} 
-          value={`${toDisplay(results.summary.maxStress, 'stress').toFixed(unitSystem === 'metric' ? 2 : 4)} ${u.stress}`} 
-          icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
-          status={results.summary.utilizationStress > 1 ? 'fail' : 'pass'}
-          progress={results.summary.utilizationStress}
-          tooltip="Maximum internal stress in the material. Must be less than the allowable yield strength."
-        />
-        <SummaryCard 
-          label={t.maxMoment} 
-          value={unitSystem === 'metric' 
-            ? `${(results.summary.maxMoment / 1000000).toFixed(2)} kNm` 
-            : `${(toDisplay(results.summary.maxMoment, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1)} lb-ft`} 
-          icon={<Layout className="w-4 h-4 text-purple-500" />}
-          tooltip="Maximum bending moment occurring along the beam span."
-        />
-        <SummaryCard 
-          label={t.maxShear} 
-          value={unitSystem === 'metric'
-            ? `${(results.summary.maxShear / 1000).toFixed(2)} kN`
-            : `${(toDisplay(results.summary.maxShear, 'force') / 1000).toFixed(2)} kip`} 
-          icon={<ChevronRight className="w-4 h-4 text-green-500" />}
-          tooltip="Maximum internal shear force acting perpendicular to the beam axis."
-        />
+      <SummaryCard 
+        label={t.maxDeflection} 
+        value={`${toDisplay(results.summary.maxDeflection ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4)} ${u.length}`} 
+        subValue={results.summary.deflectionRatio}
+        icon={<Maximize2 className="w-4 h-4 text-blue-500" />}
+        status={(results.summary.utilizationDeflection ?? 0) > 1 ? 'fail' : 'pass'}
+        progress={results.summary.utilizationDeflection ?? 0}
+        tooltip="Maximum vertical displacement of the beam under applied loads."
+      />
+      <SummaryCard 
+        label={t.maxStress} 
+        value={`${toDisplay(results.summary.maxStress ?? 0, 'stress').toFixed(unitSystem === 'metric' ? 2 : 4)} ${u.stress}`} 
+        icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
+        status={(results.summary.utilizationStress ?? 0) > 1 ? 'fail' : 'pass'}
+        progress={results.summary.utilizationStress ?? 0}
+        tooltip="Maximum internal stress in the material. Must be less than the allowable yield strength."
+      />
+      <SummaryCard 
+        label={t.maxMoment} 
+        value={unitSystem === 'metric' 
+          ? `${((results.summary.maxMoment ?? 0) / 1000000).toFixed(2)} kNm` 
+          : `${(toDisplay(results.summary.maxMoment ?? 0, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1)} lb-ft`} 
+        icon={<Layout className="w-4 h-4 text-purple-500" />}
+        tooltip="Maximum bending moment occurring along the beam span."
+      />
+      <SummaryCard 
+        label={t.maxShear} 
+        value={unitSystem === 'metric'
+          ? `${((results.summary.maxShear ?? 0) / 1000).toFixed(2)} kN`
+          : `${(toDisplay(results.summary.maxShear ?? 0, 'force') / 1000).toFixed(2)} kip`} 
+        icon={<ChevronRight className="w-4 h-4 text-green-500" />}
+        tooltip="Maximum internal shear force acting perpendicular to the beam axis."
+      />
       </div>
 
       <Card className="shadow-sm border-slate-200 overflow-hidden">
@@ -845,6 +931,8 @@ const ProjectResultsView = ({
                 invert
                 unitSystem={unitSystem as any}
                 u={u}
+                criticalPoints={criticalPoints?.deflection}
+                chartType="line"
               />
             </TabsContent>
             <TabsContent value="moment" className="h-full m-0">
@@ -857,6 +945,7 @@ const ProjectResultsView = ({
                 formatter={(v) => unitSystem === 'metric' ? (v / 1000000).toFixed(2) + ' kNm' : (v * CONVERSION.lbin_to_lbft).toFixed(1) + ' lb-ft'}
                 unitSystem={unitSystem as any}
                 u={u}
+                criticalPoints={criticalPoints?.moment}
               />
             </TabsContent>
             <TabsContent value="shear" className="h-full m-0">
@@ -869,6 +958,7 @@ const ProjectResultsView = ({
                 formatter={(v) => unitSystem === 'metric' ? (v / 1000).toFixed(2) + ' kN' : (v / 1000).toFixed(2) + ' kip'}
                 unitSystem={unitSystem as any}
                 u={u}
+                criticalPoints={criticalPoints?.shear}
               />
             </TabsContent>
             <TabsContent value="stress" className="h-full m-0">
@@ -881,6 +971,7 @@ const ProjectResultsView = ({
                 formatter={(v) => v.toFixed(unitSystem === 'metric' ? 1 : 0) + ' ' + u.stress}
                 unitSystem={unitSystem as any}
                 u={u}
+                criticalPoints={criticalPoints?.stress}
               />
             </TabsContent>
             <TabsContent value="utilization" className="h-full m-0">
@@ -903,6 +994,7 @@ const ProjectResultsView = ({
                 thickness={project.thickness} 
                 sectionType={project.sectionType} 
                 supportCondition={project.supportCondition}
+                intermediateSupports={project.intermediateSupports}
                 unitSystem={unitSystem as any}
               />
             </TabsContent>
@@ -1017,12 +1109,10 @@ const ReferenceAttachmentCard = ({
           </div>
           <div className="flex items-center gap-1">
             <DropdownMenu>
-              <DropdownMenuTrigger render={
-                <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                  <Box className="w-3 h-3" />
-                  Presets
-                </Button>
-              } />
+              <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-7 text-[10px] gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1 bg-transparent border-none cursor-pointer">
+                <Box className="w-3 h-3" />
+                Presets
+              </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Standard Profiles</DropdownMenuLabel>
@@ -1118,7 +1208,9 @@ const CalculusStepsCard = ({
   material,
   safetyFactor,
   activeCombination,
-  t
+  t,
+  criticalPoints,
+  toDisplay
 }: {
   options: { section: boolean; loads: boolean; analysis: boolean; stress: boolean };
   setOptions: (v: any) => void;
@@ -1137,6 +1229,8 @@ const CalculusStepsCard = ({
   safetyFactor: number;
   activeCombination: Combination;
   t: any;
+  criticalPoints?: any;
+  toDisplay: any;
 }) => {
   const toggleOption = (key: keyof typeof options) => {
     setOptions({ ...options, [key]: !options[key] });
@@ -1211,11 +1305,11 @@ const CalculusStepsCard = ({
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] font-medium text-slate-500 italic">Calculations:</p>
-                <div className="font-mono text-[11px] space-y-1.5">
-                  <div className="bg-white p-2 rounded border border-slate-200">A = {sectionProps.area.toFixed(2)} mm²</div>
-                  <div className="bg-white p-2 rounded border border-slate-200">I = {sectionProps.momentOfInertia.toExponential(4)} mm⁴</div>
-                  <div className="bg-white p-2 rounded border border-slate-200">W = {sectionProps.sectionModulus.toExponential(4)} mm³</div>
-                </div>
+                    <div className="font-mono text-[11px] space-y-1.5">
+                      <div className="bg-white p-2 rounded border border-slate-200">A = {(sectionProps.area ?? 0).toFixed(2)} mm²</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">I = {(sectionProps.momentOfInertia ?? 0).toExponential(4)} mm⁴</div>
+                      <div className="bg-white p-2 rounded border border-slate-200">W = {(sectionProps.sectionModulus ?? 0).toExponential(4)} mm³</div>
+                    </div>
               </div>
             </div>
             
@@ -1269,9 +1363,9 @@ const CalculusStepsCard = ({
                   {factoredLoads.map((load, idx) => (
                     <TableRow key={idx} className="hover:bg-slate-100/50 border-slate-100">
                       <TableCell className="py-2 text-[10px] font-medium text-slate-700 capitalize">{load.type} ({load.category})</TableCell>
-                      <TableCell className="py-2 text-[10px] font-mono text-right">{load.value.toFixed(2)}</TableCell>
+                      <TableCell className="py-2 text-[10px] font-mono text-right">{(load.value ?? 0).toFixed(2)}</TableCell>
                       <TableCell className="py-2 text-[10px] font-mono text-center text-blue-600 font-bold">×</TableCell>
-                      <TableCell className="py-2 text-[10px] font-mono text-right font-bold text-slate-900">{load.value.toFixed(2)}</TableCell>
+                      <TableCell className="py-2 text-[10px] font-mono text-right font-bold text-slate-900">{(load.value ?? 0).toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1289,20 +1383,20 @@ const CalculusStepsCard = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
               <div className="space-y-2">
                 <p className="text-[10px] font-medium text-slate-500 italic">Key Results:</p>
-                <div className="font-mono text-[11px] space-y-1.5">
-                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                    <span>Max Moment (M_max):</span>
-                    <span className="font-bold text-blue-600">{(results.summary.maxMoment / 1000000).toFixed(3)} kNm</span>
+                  <div className="font-mono text-[11px] space-y-1.5">
+                    <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                      <span>Max Moment (M_max):</span>
+                      <span className="font-bold text-blue-600">{((results.summary.maxMoment ?? 0) / 1000000).toFixed(3)} kNm</span>
+                    </div>
+                    <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                      <span>Max Shear (V_max):</span>
+                      <span className="font-bold text-blue-600">{((results.summary.maxShear ?? 0) / 1000).toFixed(3)} kN</span>
+                    </div>
+                    <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                      <span>Max Deflection (Δ_max):</span>
+                      <span className="font-bold text-blue-600">{(results.summary.maxDeflection ?? 0).toFixed(3)} mm</span>
+                    </div>
                   </div>
-                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                    <span>Max Shear (V_max):</span>
-                    <span className="font-bold text-blue-600">{(results.summary.maxShear / 1000).toFixed(3)} kN</span>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                    <span>Max Deflection (Δ_max):</span>
-                    <span className="font-bold text-blue-600">{results.summary.maxDeflection.toFixed(3)} mm</span>
-                  </div>
-                </div>
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] font-medium text-slate-500 italic">Verification:</p>
@@ -1324,6 +1418,34 @@ const CalculusStepsCard = ({
                 </div>
               </div>
             </div>
+
+            {/* Deflection Chart */}
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Deflection Visualization</h5>
+                <div className="text-[10px] font-mono text-blue-600 font-bold">
+                  Δ_max = {(results.summary.maxDeflection ?? 0).toFixed(3)} mm
+                </div>
+              </div>
+              <div className="h-48 bg-white rounded-xl border border-slate-200 p-2 overflow-hidden shadow-inner">
+                <ChartContainer 
+                  data={results.points.map((p: any) => ({ 
+                    ...p, 
+                    x: toDisplay(p.x, 'length'), 
+                    deflection: toDisplay(p.deflection, 'length') 
+                  }))} 
+                  dataKey="deflection" 
+                  color="#3B82F6" 
+                  unit={u.length} 
+                  label={t.deflection}
+                  invert
+                  unitSystem={unitSystem as any}
+                  u={u}
+                  criticalPoints={criticalPoints?.deflection}
+                  chartType="line"
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -1335,37 +1457,37 @@ const CalculusStepsCard = ({
             </h4>
             <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress Calculation</p>
-                  <div className="font-mono text-xs space-y-1">
-                    <p>σ = M_max / W</p>
-                    <p>σ = {(results.summary.maxMoment).toFixed(0)} / {sectionProps.sectionModulus.toFixed(0)}</p>
-                    <p className="text-blue-600 font-bold">σ = {results.summary.maxStress.toFixed(2)} MPa</p>
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress Calculation</p>
+                    <div className="font-mono text-xs space-y-1">
+                      <p>σ = M_max / W</p>
+                      <p>σ = {(results.summary.maxMoment ?? 0).toFixed(0)} / {(sectionProps.sectionModulus ?? 0).toFixed(0)}</p>
+                      <p className="text-blue-600 font-bold">σ = {(results.summary.maxStress ?? 0).toFixed(2)} MPa</p>
+                    </div>
                   </div>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Allowable Stress</p>
-                  <div className="font-mono text-xs space-y-1">
-                    <p>σ_allow = fy / Safety Factor (γ)</p>
-                    <p>σ_allow = {beamProps.yieldStrength} / {safetyFactor}</p>
-                    <p className="text-green-600 font-bold">σ_allow = {(beamProps.yieldStrength / safetyFactor).toFixed(2)} MPa</p>
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Allowable Stress</p>
+                    <div className="font-mono text-xs space-y-1">
+                      <p>σ_allow = fy / Safety Factor (γ)</p>
+                      <p>σ_allow = {beamProps.yieldStrength} / {safetyFactor}</p>
+                      <p className="text-green-600 font-bold">σ_allow = {(beamProps.yieldStrength / safetyFactor).toFixed(2)} MPa</p>
+                    </div>
                   </div>
-                </div>
               </div>
               <div className={cn(
                 "p-3 rounded-lg border flex items-center justify-between",
-                results.summary.maxStress <= (beamProps.yieldStrength / safetyFactor) 
+                (results.summary.maxStress ?? 0) <= (beamProps.yieldStrength / safetyFactor) 
                   ? "bg-green-50 border-green-200 text-green-700" 
                   : "bg-red-50 border-red-200 text-red-700"
               )}>
                 <div className="flex items-center gap-2">
-                  {results.summary.maxStress <= (beamProps.yieldStrength / safetyFactor) ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  {(results.summary.maxStress ?? 0) <= (beamProps.yieldStrength / safetyFactor) ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                   <span className="text-xs font-bold uppercase tracking-tight">
-                    {results.summary.maxStress <= (beamProps.yieldStrength / safetyFactor) ? "Stress Check Passed" : "Stress Check Failed"}
+                    {(results.summary.maxStress ?? 0) <= (beamProps.yieldStrength / safetyFactor) ? "Stress Check Passed" : "Stress Check Failed"}
                   </span>
                 </div>
                 <span className="text-xs font-mono font-bold">
-                  {(results.summary.maxStress / (beamProps.yieldStrength / safetyFactor) * 100).toFixed(1)}% Utilization
+                  {((results.summary.maxStress ?? 0) / (beamProps.yieldStrength / safetyFactor) * 100).toFixed(1)}% Utilization
                 </span>
               </div>
             </div>
@@ -1375,6 +1497,110 @@ const CalculusStepsCard = ({
     </Card>
   );
 };
+
+const REGIONS = [
+  { 
+    id: 'asia', 
+    name: 'Asia Pacific', 
+    icon: <Globe className="w-4 h-4" />,
+    cities: ['Shanghai', 'Hong Kong', 'Macau', 'Beijing', 'Singapore', 'Kuala Lumpur', 'Sydney', 'Melbourne', 'Auckland'] 
+  },
+  { 
+    id: 'europe', 
+    name: 'Europe & UK', 
+    icon: <Box className="w-4 h-4" />,
+    cities: ['London', 'Berlin', 'Paris', 'Rome', 'Madrid', 'Amsterdam', 'Brussels', 'Munich'] 
+  },
+  { 
+    id: 'americas', 
+    name: 'Americas', 
+    icon: <PlusCircle className="w-4 h-4" />,
+    cities: ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Toronto', 'Vancouver', 'Mexico City'] 
+  },
+  { 
+    id: 'mideast', 
+    name: 'Middle East & Africa', 
+    icon: <Layers className="w-4 h-4" />,
+    cities: ['Dubai', 'Abu Dhabi', 'Riyadh', 'Jeddah', 'Doha', 'Cape Town', 'Johannesburg'] 
+  },
+];
+
+function KeyMapDialog({ onSelect }: { onSelect: (location: string) => void }) {
+  return (
+    <DialogContent className="max-w-2xl bg-white border-2 border-slate-200 shadow-2xl rounded-3xl overflow-hidden p-0">
+      <div className="bg-slate-900 p-6 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 blur-3xl -translate-y-1/2 translate-x-1/2 rounded-full" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-600/10 blur-2xl translate-y-1/2 -translate-x-1/2 rounded-full" />
+        
+        <DialogHeader className="relative z-10">
+          <DialogTitle className="flex items-center gap-3 text-2xl font-black italic tracking-tighter">
+            <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-900/40">
+              <Globe className="w-6 h-6 text-white" />
+            </div>
+            LOCATION KEY MAP
+          </DialogTitle>
+          <DialogDescription className="text-slate-400 font-medium">
+            Select a project location to automatically configure region-specific design codes and climatic parameters.
+          </DialogDescription>
+        </DialogHeader>
+      </div>
+      
+      <div className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {REGIONS.map((region) => (
+            <div key={region.id} className="space-y-4">
+              <div className="flex items-center gap-2 border-b-2 border-slate-100 pb-2">
+                <span className="bg-slate-100 p-1.5 rounded-lg text-slate-500">
+                  {region.icon}
+                </span>
+                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
+                  {region.name}
+                </h4>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {region.cities.map((city) => (
+                  <Button 
+                    key={city}
+                    variant="ghost"
+                    className="justify-start h-10 text-[11px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all border border-transparent hover:border-blue-100"
+                    onClick={() => onSelect(city)}
+                  >
+                    <MapPin className="w-3.5 h-3.5 mr-2 text-slate-400 group-hover:text-blue-500" />
+                    {city}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="mt-8 bg-blue-50/50 p-5 rounded-3xl border border-blue-100/50 flex items-start gap-4">
+          <div className="bg-blue-600 p-2 rounded-xl shadow-md">
+            <Info className="w-4 h-4 text-white" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold text-blue-900 uppercase tracking-tight">Pro Tip: Smart Configuration</p>
+            <p className="text-[11px] text-blue-700/80 leading-relaxed font-medium">
+              Picking a city from this map instantly maps your project to international standards like <strong>Eurocodes</strong>, <strong>ASCE 7</strong>, or <strong>GB50009</strong>. This syncs wind pressures, snow loads, and material safety factors automatically.
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-t border-slate-100">
+        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+          <Activity className="w-3 h-3" />
+          Real-time Sync Active
+        </div>
+        <DialogFooter>
+          <Button variant="outline" className="rounded-xl font-bold text-xs h-9" onClick={() => (document.querySelector('[data-state="open"]') as any)?.click()}>
+            Close Map
+          </Button>
+        </DialogFooter>
+      </div>
+    </DialogContent>
+  );
+}
 
 export function App() {
   // Beam State
@@ -1448,7 +1674,7 @@ export function App() {
     }
     return 3.5;
   });
-  const [supportCondition, setSupportCondition] = useState<'simply_supported' | 'cantilever' | 'fixed_fixed' | 'fixed_pinned'>(() => {
+  const [supportCondition, setSupportCondition] = useState<'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous'>(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
       try {
@@ -1457,6 +1683,16 @@ export function App() {
       } catch (e) { return 'simply_supported'; }
     }
     return 'simply_supported';
+  });
+  const [intermediateSupports, setIntermediateSupports] = useState<number[]>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.intermediateSupports ?? [];
+      } catch (e) { return []; }
+    }
+    return [];
   });
   const [safetyFactor, setSafetyFactor] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -1473,10 +1709,10 @@ export function App() {
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        return data.selectedCodeId ?? 'China (National)';
-      } catch (e) { return 'China (National)'; }
+        return data.selectedCodeId ?? 'Shanghai';
+      } catch (e) { return 'Shanghai'; }
     }
-    return 'China (National)';
+    return 'Shanghai';
   });
   const [hoveredLoad, setHoveredLoad] = useState<Load | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -1515,6 +1751,7 @@ export function App() {
     return 'c1';
   });
   const [isCombinationManagerOpen, setIsCombinationManagerOpen] = useState(false);
+  const [isLocationMapOpen, setIsLocationMapOpen] = useState(false);
   const [showAllCodes, setShowAllCodes] = useState(false);
   const [showCalculusSteps, setShowCalculusSteps] = useState(false);
   const [calcStepOptions, setCalcStepOptions] = useState({
@@ -1522,6 +1759,11 @@ export function App() {
     loads: true,
     analysis: true,
     stress: true
+  });
+  const [visualAnalysisOptions, setVisualAnalysisOptions] = useState({
+    deflection: true,
+    stress: true,
+    loads: true
   });
   const [activeTab, setActiveTab] = useState('deflection');
   const [isChartExpanded, setIsChartExpanded] = useState(false);
@@ -1562,30 +1804,30 @@ export function App() {
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        return data.projectTitle ?? 'Untitled Project';
-      } catch (e) { return 'Untitled Project'; }
+        return data.projectTitle ?? 'Shanghai Project';
+      } catch (e) { return 'Shanghai Project'; }
     }
-    return 'Untitled Project';
+    return 'Shanghai Project';
   });
   const [projectLocation, setProjectLocation] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        return data.projectLocation ?? '';
-      } catch (e) { return ''; }
+        return data.projectLocation ?? 'Shanghai, China';
+      } catch (e) { return 'Shanghai, China'; }
     }
-    return '';
+    return 'Shanghai, China';
   });
   const [projectDescription, setProjectDescription] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        return data.projectDescription ?? '';
-      } catch (e) { return ''; }
+        return data.projectDescription ?? 'Structural analysis for Shanghai facade project.';
+      } catch (e) { return 'Structural analysis for Shanghai facade project.'; }
     }
-    return '';
+    return 'Structural analysis for Shanghai facade project.';
   });
   const [projectAttachment, setProjectAttachment] = useState<string>(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -1730,14 +1972,61 @@ export function App() {
     else if (loc.includes('south africa') || loc.includes('cape town') || loc.includes('joburg') || loc.includes('南非')) {
       setSelectedCodeId('South Africa');
     }
-    // Europe / Eurocodes
+    // Japan
+    else if (loc.includes('japan') || loc.includes('tokyo') || loc.includes('osaka') || loc.includes('kyoto') || loc.includes('日本') || loc.includes('东京') || loc.includes('大阪')) {
+      setSelectedCodeId('Japan');
+    }
+    // South Korea
+    else if (loc.includes('korea') || loc.includes('seoul') || loc.includes('busan') || loc.includes('韩国') || loc.includes('首尔') || loc.includes('釜山')) {
+      setSelectedCodeId('South Korea');
+    }
+    // Vietnam
+    else if (loc.includes('vietnam') || loc.includes('hanoi') || loc.includes('ho chi minh') || loc.includes('hcmc') || loc.includes('越南') || loc.includes('河内')) {
+      setSelectedCodeId('Vietnam');
+    }
+    // Philippines
+    else if (loc.includes('philippines') || loc.includes('manila') || loc.includes('cebu') || loc.includes('菲律宾') || loc.includes('马尼拉')) {
+      setSelectedCodeId('Philippines');
+    }
+    // Indonesia
+    else if (loc.includes('indonesia') || loc.includes('jakarta') || loc.includes('bali') || loc.includes('印度尼西亚') || loc.includes('雅加达')) {
+      setSelectedCodeId('Indonesia');
+    }
+    // India
+    else if (loc.includes('india') || loc.includes('mumbai') || loc.includes('delhi') || loc.includes('bangalore') || loc.includes('印度') || loc.includes('孟买')) {
+      setSelectedCodeId('India');
+    }
+    // Brazil
+    else if (loc.includes('brazil') || loc.includes('rio') || loc.includes('sao paulo') || loc.includes('巴西') || loc.includes('圣保罗')) {
+      setSelectedCodeId('Brazil');
+    }
+    // Mexico
+    else if (loc.includes('mexico') || loc.includes('mexico city') || loc.includes('墨西哥')) {
+      setSelectedCodeId('Mexico');
+    }
+    // Egypt
+    else if (loc.includes('egypt') || loc.includes('cairo') || loc.includes('alexandria') || loc.includes('埃及') || loc.includes('开罗')) {
+      setSelectedCodeId('Egypt');
+    }
+    // Germany
+    else if (loc.includes('germany') || loc.includes('berlin') || loc.includes('munich') || loc.includes('frankfurt') || loc.includes('德国') || loc.includes('柏林')) {
+      setSelectedCodeId('Germany');
+    }
+    // France
+    else if (loc.includes('france') || loc.includes('paris') || loc.includes('lyon') || loc.includes('法国') || loc.includes('巴黎')) {
+      setSelectedCodeId('France');
+    }
+    // Italy
+    else if (loc.includes('italy') || loc.includes('rome') || loc.includes('milan') || loc.includes('意大利') || loc.includes('罗马')) {
+      setSelectedCodeId('Italy');
+    }
+    // Eurocodes (General fallback)
     else if (
-      loc.includes('europe') || loc.includes('eu') || loc.includes('germany') || loc.includes('france') || 
-      loc.includes('italy') || loc.includes('spain') || loc.includes('netherlands') || loc.includes('belgium') ||
-      loc.includes('berlin') || loc.includes('paris') || loc.includes('rome') || loc.includes('madrid') || loc.includes('amsterdam') ||
-      loc.includes('欧洲') || loc.includes('德国') || loc.includes('法国') || loc.includes('意大利') || loc.includes('西班牙') || loc.includes('荷兰') || loc.includes('比利时')
+      loc.includes('europe') || loc.includes('eu') || loc.includes('spain') || loc.includes('netherlands') || loc.includes('belgium') ||
+      loc.includes('madrid') || loc.includes('amsterdam') ||
+      loc.includes('欧洲') || loc.includes('西班牙') || loc.includes('荷兰') || loc.includes('比利时')
     ) {
-      setSelectedCodeId('Eurocodes (EU)');
+      setSelectedCodeId('Eurocodes (EU-General)');
     } 
     // China (National)
     else if (loc.includes('china') || loc.includes('beijing') || loc.includes('chengdu') || loc.includes('hangzhou') || loc.includes('nanjing') || loc.includes('wuhan') || loc.includes('prc') || loc.includes('中国') || loc.includes('北京') || loc.includes('成都') || loc.includes('杭州') || loc.includes('南京') || loc.includes('武汉')) {
@@ -1760,10 +2049,12 @@ export function App() {
     length,
     material,
     sectionType,
+    beamType,
     width,
     height,
     thickness,
     supportCondition,
+    intermediateSupports,
     safetyFactor,
     selectedCodeId,
     loads,
@@ -1789,6 +2080,7 @@ export function App() {
     setHeight(state.height);
     setThickness(state.thickness);
     setSupportCondition(state.supportCondition);
+    setIntermediateSupports(state.intermediateSupports ?? []);
     setSafetyFactor(state.safetyFactor);
     setSelectedCodeId(state.selectedCodeId);
     setLoads(state.loads);
@@ -2024,11 +2316,17 @@ export function App() {
           maxShear: 0,
           maxStress: 0,
           deflectionRatio: 'N/A',
-          status: 'fail' as const
+          status: 'fail' as const,
+          utilizationStress: 0,
+          utilizationDeflection: 0
         }
       };
     }
   }, [beamProps, factoredLoads, length, activeCombination]);
+
+  const criticalPoints = useMemo(() => 
+    getCriticalPoints(results, unitSystem, u, toDisplay)
+  , [results, unitSystem, u, toDisplay]);
 
   const addLoad = (type: Load['type'] = 'point', category: Load['category'] = 'dead', value?: number) => {
     const newLoad: Load = {
@@ -2084,11 +2382,11 @@ export function App() {
       `Stress (${u.stress})`
     ];
     const rows = results.points.map(p => [
-      toDisplay(p.x, 'length').toFixed(2),
-      toDisplay(p.deflection, 'length').toFixed(4),
-      toDisplay(p.moment, 'moment').toFixed(2),
-      toDisplay(p.shear, 'force').toFixed(2),
-      toDisplay(p.stress, 'stress').toFixed(4)
+      toDisplay(p.x ?? 0, 'length').toFixed(2),
+      toDisplay(p.deflection ?? 0, 'length').toFixed(4),
+      toDisplay(p.moment ?? 0, 'moment').toFixed(2),
+      toDisplay(p.shear ?? 0, 'force').toFixed(2),
+      toDisplay(p.stress ?? 0, 'stress').toFixed(4)
     ]);
     
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
@@ -2427,12 +2725,10 @@ export function App() {
                   <span className="hidden lg:inline">{t.saveProject}</span>
                 </Button>
                 <DropdownMenu>
-                  <DropdownMenuTrigger render={
-                    <Button variant="outline" size="sm" className="h-8 text-xs gap-2">
-                      <Download className="w-3.5 h-3.5" />
-                      <span className="hidden lg:inline">{t.print}</span>
-                    </Button>
-                  } />
+                  <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 text-xs gap-2 px-3 py-1 bg-transparent border border-input hover:bg-accent hover:text-accent-foreground cursor-pointer">
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden lg:inline">{t.print}</span>
+                  </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuItem onClick={() => window.print()} className="gap-2">
                       <Printer className="w-4 h-4 text-slate-500" />
@@ -2546,6 +2842,7 @@ export function App() {
                         thickness={3.5}
                         sectionType="hollow"
                         supportCondition="simply_supported"
+                        intermediateSupports={[]}
                         unitSystem="metric"
                       />
                     </div>
@@ -2630,14 +2927,29 @@ export function App() {
                       />
                     </div>
                     <div className="grid gap-1.5">
-                      <Label htmlFor="proj-loc" className="text-[10px] uppercase font-bold text-slate-400">Location</Label>
-                      <Input 
-                        id="proj-loc"
-                        value={projectLocation}
-                        onChange={(e) => setProjectLocation(e.target.value)}
-                        placeholder="City, Country..."
-                        className="bg-white h-8 text-sm"
-                      />
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="proj-loc" className="text-[10px] uppercase font-bold text-slate-400">Location</Label>
+                        <Dialog open={isLocationMapOpen} onOpenChange={setIsLocationMapOpen}>
+                          <DialogTrigger render={<Button variant="ghost" className="h-4 px-1 text-[9px] text-blue-500 font-black flex items-center gap-1 hover:bg-blue-50" />}>
+                            <Globe className="w-2.5 h-2.5" />
+                            KEY MAP
+                          </DialogTrigger>
+                          <KeyMapDialog onSelect={(loc) => {
+                            setProjectLocation(loc);
+                            setIsLocationMapOpen(false);
+                          }} />
+                        </Dialog>
+                      </div>
+                      <div className="relative">
+                        <Input 
+                          id="proj-loc"
+                          value={projectLocation}
+                          onChange={(e) => setProjectLocation(e.target.value)}
+                          placeholder="City, Country..."
+                          className="bg-white h-8 text-sm pl-8"
+                        />
+                        <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="grid gap-1.5">
@@ -2938,79 +3250,75 @@ export function App() {
                   </CardHeader>
                   <CardContent className="p-2 sm:p-3 space-y-1.5">
                     {combinations.map(comb => (
-                      <Tooltip key={comb.id}>
-                        <TooltipTrigger>
-                          <div className={cn(
-                            "p-2 border rounded-lg transition-all group relative cursor-help",
-                            activeCombinationId === comb.id 
-                              ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/30 shadow-sm" 
-                              : "bg-white hover:border-slate-300 hover:bg-slate-50/30"
-                          )}>
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex-1 min-w-0 mr-1.5">
-                                <Input 
-                                  value={comb.name ?? ''} 
-                                  onChange={(e) => updateCombinationName(comb.id, e.target.value)}
-                                  className="h-5 text-[10px] font-bold border-none bg-transparent p-0 focus-visible:ring-0 truncate text-slate-700 placeholder:text-slate-300"
-                                  placeholder="Combination Name"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </div>
-                              <div className="flex items-center gap-0.5 shrink-0">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-5 w-5 text-slate-400 hover:text-blue-600 hover:bg-blue-100/50"
-                                  onClick={(e) => { e.stopPropagation(); duplicateCombination(comb.id); }}
-                                  title="Duplicate"
-                                >
-                                  <Copy className="h-2.5 w-2.5" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-5 w-5 text-slate-400 hover:text-rose-500 hover:bg-rose-100/50"
-                                  onClick={(e) => { e.stopPropagation(); removeCombination(comb.id); }}
-                                  disabled={combinations.length <= 1}
-                                  title="Delete"
-                                >
-                                  <Trash2 className="h-2.5 w-2.5" />
-                                </Button>
-                                <div className="ml-1">
-                                  <Button 
-                                    variant={activeCombinationId === comb.id ? "default" : "outline"} 
-                                    size="sm" 
-                                    className={cn(
-                                      "h-5 text-[8px] px-1.5 font-black uppercase tracking-tighter",
-                                      activeCombinationId === comb.id ? "bg-blue-600 hover:bg-blue-700" : "text-slate-400 border-slate-200"
-                                    )}
-                                    onClick={(e) => { e.stopPropagation(); setActiveCombinationId(comb.id); }}
-                                  >
-                                    {activeCombinationId === comb.id ? "Active" : "Select"}
-                                  </Button>
-                                </div>
-                              </div>
+                      <div 
+                        key={comb.id}
+                        className={cn(
+                          "p-2 border rounded-lg transition-all group relative",
+                          activeCombinationId === comb.id 
+                            ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/30 shadow-sm" 
+                            : "bg-white hover:border-slate-300 hover:bg-slate-50/30"
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex-1 min-w-0 mr-1.5 flex items-center gap-1.5">
+                            <Input 
+                              value={comb.name ?? ''} 
+                              onChange={(e) => updateCombinationName(comb.id, e.target.value)}
+                              className="h-5 text-[10px] font-bold border-none bg-transparent p-0 focus-visible:ring-0 truncate text-slate-700 placeholder:text-slate-300 flex-1"
+                              placeholder="Combination Name"
+                            />
+                            <Tooltip>
+                              <TooltipTrigger className="bg-transparent border-none p-0 cursor-help flex items-center shrink-0">
+                                <Info className="h-3 w-3 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-[200px] p-2 space-y-1">
+                                <p className="font-bold text-[10px] text-blue-600">{comb.name || 'Combination Detail'}</p>
+                                <p className="text-[9px] text-slate-500 leading-relaxed">{comb.description || 'No description provided'}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <div 
+                              className="h-5 w-5 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-100/50 rounded transition-colors cursor-pointer"
+                              onClick={() => duplicateCombination(comb.id)}
+                              title="Duplicate"
+                            >
+                              <Copy className="h-2.5 w-2.5" />
                             </div>
-                            <div className="grid grid-cols-5 gap-0.5 bg-slate-100/80 rounded-sm p-0.5 sm:p-1">
-                              {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
-                                <div key={key} className="text-center border-r border-slate-200/50 last:border-none px-0.5">
-                                  <div className="text-[5px] sm:text-[6px] uppercase text-slate-500 font-black leading-none mb-0.5">{key[0]}</div>
-                                  <div className={cn(
-                                    "text-[8px] sm:text-[9px] font-mono font-bold leading-none",
-                                    comb.factors[key as keyof typeof LOAD_CATEGORIES] > 0 ? "text-blue-600" : "text-slate-400"
-                                  )}>
-                                    {comb.factors[key as keyof typeof LOAD_CATEGORIES]}
-                                  </div>
-                                </div>
-                              ))}
+                            <div 
+                              className="h-5 w-5 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-100/50 rounded transition-colors cursor-pointer"
+                              onClick={() => removeCombination(comb.id)}
+                              title="Delete"
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </div>
+                            <div className="ml-1">
+                              <div 
+                                className={cn(
+                                  "h-5 text-[8px] px-1.5 font-black uppercase tracking-tighter flex items-center justify-center rounded border transition-colors cursor-pointer",
+                                  activeCombinationId === comb.id ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700" : "text-slate-400 border-slate-200 hover:bg-slate-50"
+                                )}
+                                onClick={() => setActiveCombinationId(comb.id)}
+                              >
+                                {activeCombinationId === comb.id ? "Active" : "Select"}
+                              </div>
                             </div>
                           </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="max-w-[200px] p-2 space-y-1">
-                          <p className="font-bold text-[10px] text-blue-600">{comb.name}</p>
-                          <p className="text-[9px] text-slate-500 leading-relaxed">{comb.description}</p>
-                        </TooltipContent>
-                      </Tooltip>
+                        </div>
+                        <div className="grid grid-cols-5 gap-0.5 bg-slate-100/80 rounded-sm p-0.5 sm:p-1">
+                          {Object.entries(LOAD_CATEGORIES).map(([key]) => (
+                            <div key={key} className="text-center border-r border-slate-200/50 last:border-none px-0.5">
+                              <div className="text-[5px] sm:text-[6px] uppercase text-slate-500 font-black leading-none mb-0.5">{key[0]}</div>
+                              <div className={cn(
+                                "text-[8px] sm:text-[9px] font-mono font-bold leading-none",
+                                comb.factors[key as keyof typeof LOAD_CATEGORIES] > 0 ? "text-blue-600" : "text-slate-400"
+                              )}>
+                                {comb.factors[key as keyof typeof LOAD_CATEGORIES]}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </CardContent>
                 </Card>
@@ -3092,11 +3400,63 @@ export function App() {
                           <SelectContent>
                             <SelectItem value="simply_supported" className="text-xs">{t.simplySupported}</SelectItem>
                             <SelectItem value="cantilever" className="text-xs">{t.cantilever}</SelectItem>
+                            <SelectItem value="propped_cantilever" className="text-xs">{t.proppedCantilever}</SelectItem>
                             <SelectItem value="fixed_fixed" className="text-xs">{t.fixedFixed}</SelectItem>
                             <SelectItem value="fixed_pinned" className="text-xs">{t.fixedPinned}</SelectItem>
+                            <SelectItem value="continuous" className="text-xs">{t.continuous}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {supportCondition === 'continuous' && (
+                        <div className="grid gap-1.5 p-2 bg-blue-50/50 rounded-md border border-blue-100">
+                          <Label className="text-[10px] uppercase font-bold text-blue-600 flex items-center justify-between">
+                            Intermediate Supports (mm)
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-4 w-4 text-blue-600 hover:bg-blue-100"
+                              onClick={() => {
+                                const newPos = Math.round(length / 2);
+                                if (!intermediateSupports.includes(newPos)) {
+                                  setIntermediateSupports([...intermediateSupports, newPos].sort((a, b) => a - b));
+                                }
+                              }}
+                            >
+                              <PlusCircle className="h-3 w-3" />
+                            </Button>
+                          </Label>
+                          <div className="space-y-1.5">
+                            {intermediateSupports.map((pos, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <NumericInputWithControls
+                                  id={`support-${idx}`}
+                                  value={toDisplay(pos, 'length')}
+                                  min={0.1}
+                                  max={toDisplay(length, 'length') - 0.1}
+                                  onChange={(val) => {
+                                    const newSupports = [...intermediateSupports];
+                                    newSupports[idx] = fromDisplay(val, 'length');
+                                    setIntermediateSupports(newSupports.sort((a, b) => a - b));
+                                  }}
+                                  className="h-7 text-xs"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-slate-400 hover:text-rose-500"
+                                  onClick={() => setIntermediateSupports(intermediateSupports.filter((_, i) => i !== idx))}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ))}
+                            {intermediateSupports.length === 0 && (
+                              <div className="text-[10px] text-slate-400 italic text-center py-1">No mid-supports added</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid gap-1.5">
@@ -3221,10 +3581,8 @@ export function App() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Tooltip>
-                    <TooltipTrigger>
-                      <Label className="text-[9px] uppercase font-bold text-slate-400 cursor-help hover:text-blue-600 transition-colors flex items-center gap-1">
+                    <TooltipTrigger className="text-[9px] uppercase font-bold text-slate-400 cursor-help hover:text-blue-600 transition-colors flex items-center gap-1 bg-transparent border-none p-0 inline-flex">
                         Young's Modulus (E) <HelpCircle className="w-2.5 h-2.5" />
-                      </Label>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-[200px] text-[10px]">
                       <p><strong>Elastic Modulus (E)</strong>: A measure of material stiffness. It defines the relationship between stress and strain. Higher E means a stiffer material.</p>
@@ -3236,10 +3594,8 @@ export function App() {
                 </div>
                 <div className="space-y-1">
                   <Tooltip>
-                    <TooltipTrigger>
-                      <Label className="text-[9px] uppercase font-bold text-slate-400 cursor-help hover:text-blue-600 transition-colors flex items-center gap-1">
+                    <TooltipTrigger className="text-[9px] uppercase font-bold text-slate-400 cursor-help hover:text-blue-600 transition-colors flex items-center gap-1 bg-transparent border-none p-0 inline-flex">
                         Yield Strength (σy) <HelpCircle className="w-2.5 h-2.5" />
-                      </Label>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-[200px] text-[10px]">
                       <p><strong>Yield Strength</strong>: The stress level at which a material begins to deform plastically. Beyond this point, deformation is permanent.</p>
@@ -3251,10 +3607,8 @@ export function App() {
                 </div>
                 <div className="space-y-1">
                   <Tooltip>
-                    <TooltipTrigger>
-                      <Label className="text-[9px] uppercase font-bold text-slate-400 cursor-help hover:text-blue-600 transition-colors flex items-center gap-1">
+                    <TooltipTrigger className="text-[9px] uppercase font-bold text-slate-400 cursor-help hover:text-blue-600 transition-colors flex items-center gap-1 bg-transparent border-none p-0 inline-flex">
                         Poisson's Ratio (ν) <HelpCircle className="w-2.5 h-2.5" />
-                      </Label>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-[200px] text-[10px]">
                       <p><strong>Poisson's Ratio</strong>: The ratio of transverse strain to axial strain. For most metals, it is around 0.3.</p>
@@ -3545,8 +3899,8 @@ export function App() {
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Design Code:</span> <span className="text-blue-700 font-bold">{selectedCodeId}</span></div>
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{MATERIALS[material].name}</span></div>
-                          <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{toDisplay(length, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}</span></div>
-                          <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{sectionType === 'hollow' ? `${toDisplay(width, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(thickness, 'length').toFixed(unitSystem === 'metric' ? 1 : 3)}${u.length}` : `${toDisplay(width, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}${u.length}`}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{sectionType === 'hollow' ? `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 1 : 3)}${u.length}` : `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}${u.length}`}</span></div>
                         </div>
                       </div>
                       <div className={cn(
@@ -3575,6 +3929,7 @@ export function App() {
                   setActiveTab={setActiveTab}
                   isChartExpanded={isChartExpanded}
                   setIsChartExpanded={setIsChartExpanded}
+                  criticalPoints={criticalPoints}
                 />
               </div>
               <div className="space-y-4">
@@ -3606,6 +3961,7 @@ export function App() {
                     setActiveTab={setActiveTab}
                     isChartExpanded={isChartExpanded}
                     setIsChartExpanded={setIsChartExpanded}
+                    criticalPoints={getCriticalPoints(getProjectResults(projects.find(p => p.id === comparisonProjectId)!), unitSystem, u, toDisplay)}
                   />
                 ) : (
                   <div className="h-[400px] flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-slate-50 text-slate-400">
@@ -3627,19 +3983,40 @@ export function App() {
               setActiveTab={setActiveTab}
               isChartExpanded={isChartExpanded}
               setIsChartExpanded={setIsChartExpanded}
+              criticalPoints={criticalPoints}
             />
           )}
           
           {/* Beam Visualization */}
           <Card className="shadow-sm border-slate-200 overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-lg">{t.structuralModel}</CardTitle>
-              <CardDescription>Simplified representation of supports and loads</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between py-3">
+              <div>
+                <CardTitle className="text-sm font-bold uppercase tracking-tight text-slate-900">{t.structuralModel}</CardTitle>
+                <CardDescription className="text-[10px]">Physical model with real-time integration</CardDescription>
+              </div>
+              <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-slate-100">
+                  <span className="text-[9px] font-bold text-blue-600 uppercase">Deflection</span>
+                  <Switch 
+                    className="scale-75"
+                    checked={visualAnalysisOptions.deflection} 
+                    onCheckedChange={(v) => setVisualAnalysisOptions(prev => ({ ...prev, deflection: v }))} 
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-slate-100">
+                  <span className="text-[9px] font-bold text-amber-600 uppercase">Stress</span>
+                  <Switch 
+                    className="scale-75"
+                    checked={visualAnalysisOptions.stress} 
+                    onCheckedChange={(v) => setVisualAnalysisOptions(prev => ({ ...prev, stress: v }))} 
+                  />
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="h-64 relative flex items-center justify-center bg-slate-50 px-4 sm:px-8">
+            <CardContent className="h-72 relative flex items-center justify-center bg-slate-50 px-4 sm:px-8 overflow-hidden">
               <svg 
                 className="w-full h-full overflow-visible" 
-                viewBox="0 0 1000 250" 
+                viewBox="0 0 1000 300" 
                 preserveAspectRatio="xMidYMid meet"
               >
                 {/* Definitions for gradients and patterns */}
@@ -3649,28 +4026,98 @@ export function App() {
                     <stop offset="50%" stopColor="#cbd5e1" />
                     <stop offset="100%" stopColor="#94a3b8" />
                   </linearGradient>
+                  
+                  <linearGradient id="stressHeatmapGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    {(() => {
+                      const points = results.points;
+                      if (!points || points.length === 0) return <stop offset="0%" stopColor="#94a3b8" />;
+                      
+                      const samples = 10;
+                      const maxPossibleStress = beamProps.yieldStrength / safetyFactor || 1;
+                      const stops = [];
+                      
+                      for (let i = 0; i <= samples; i++) {
+                        const idx = Math.min(Math.floor((i / samples) * (points.length - 1)), points.length - 1);
+                        const p = points[idx];
+                        const utilization = p.stress / maxPossibleStress;
+                        
+                        // Stress coloring: Blue (low) -> Green (ok) -> Yellow (warning) -> Red (fail)
+                        let color = "#3b82f6"; // Default blue
+                        if (utilization > 0.9) color = "#ef4444"; // Red
+                        else if (utilization > 0.7) color = "#f59e0b"; // Amber
+                        else if (utilization > 0.4) color = "#10b981"; // Emerald
+                        else color = "#60a5fa"; // Soft blue
+                        
+                        stops.push(<stop key={i} offset={`${(i / samples) * 100}%`} stopColor={color} />);
+                      }
+                      return stops;
+                    })()}
+                  </linearGradient>
+
                   <pattern id="seismicPattern" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
                     <line x1="0" y1="0" x2="0" y2="8" stroke="#ef4444" strokeWidth="2" opacity="0.3" />
                   </pattern>
                 </defs>
 
+                {/* Ground Line */}
+                <line x1="0" y1="240" x2="1000" y2="240" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
+
+                {/* Deflection Curve (Plot) */}
+                {visualAnalysisOptions.deflection && results.points.length > 0 && (
+                  <path
+                    d={`M ${results.points.map(p => {
+                      const x = 50 + (p.x / length) * 900;
+                      // Exaggerate deflection for visibility: max 60px
+                      const maxD = results.summary.maxDeflection || 1;
+                      const scale = 80 / maxD;
+                      const y = 140 + (p.deflection * scale);
+                      return `${x} ${y}`;
+                    }).join(' L ')}`}
+                    fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    strokeDasharray="4 2"
+                    opacity="0.6"
+                    className="animate-pulse"
+                  />
+                )}
+
                 {/* Beam Body */}
                 <rect 
                   x="50" 
-                  y="120" 
+                  y={visualAnalysisOptions.deflection && results.summary.maxDeflection > 0 ? 134 : 134} 
                   width="900" 
                   height="12" 
-                  fill="url(#beamGradient)" 
+                  fill={visualAnalysisOptions.stress ? "url(#stressHeatmapGradient)" : "url(#beamGradient)"} 
                   rx="2"
-                  className="stroke-slate-400 stroke-1"
+                  className={cn(
+                    "stroke-slate-400 stroke-1 transition-all duration-500",
+                    visualAnalysisOptions.stress ? "opacity-90" : "opacity-100"
+                  )}
                 />
+                
+                {/* Elastic Curve Overlay (Deflection Shape) */}
+                {visualAnalysisOptions.deflection && results.points.length > 0 && (
+                  <path
+                    d={`M ${results.points.map(p => {
+                      const x = 50 + (p.x / length) * 900;
+                      const maxD = results.summary.maxDeflection || 1;
+                      const scale = 80 / maxD;
+                      const y = 140 + (p.deflection * scale);
+                      return `${x} ${y}`;
+                    }).join(' L ')}`}
+                    fill="none"
+                    stroke="#2563eb"
+                    strokeWidth="3"
+                    className="drop-shadow-sm"
+                  />
+                )}
 
                 {/* Supports */}
-                {/* Left Support (Pinned) */}
                 {/* Left Support */}
-                <g transform="translate(50, 120)">
+                <g transform="translate(50, 140)">
                   {supportCondition === 'simply_supported' || supportCondition === 'fixed_pinned' ? (
-                    <g transform="translate(0, 12)">
+                    <g transform="translate(0, 6)">
                       <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
                       <rect x="-20" y="25" width="40" height="4" fill="#1e293b" rx="1" />
                     </g>
@@ -3680,16 +4127,16 @@ export function App() {
                 </g>
 
                 {/* Right Support */}
-                <g transform="translate(950, 120)">
+                <g transform="translate(950, 140)">
                   {supportCondition === 'simply_supported' ? (
-                    <g transform="translate(0, 12)">
+                    <g transform="translate(0, 6)">
                       <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
                       <circle cx="-8" cy="28" r="3" fill="#1e293b" />
                       <circle cx="8" cy="28" r="3" fill="#1e293b" />
                       <rect x="-20" y="31" width="40" height="4" fill="#1e293b" rx="1" />
                     </g>
                   ) : supportCondition === 'fixed_pinned' ? (
-                    <g transform="translate(0, 12)">
+                    <g transform="translate(0, 6)">
                       <path d="M 0,0 L -15,25 L 15,25 Z" fill="#475569" />
                       <rect x="-20" y="25" width="40" height="4" fill="#1e293b" rx="1" />
                     </g>
@@ -3730,11 +4177,11 @@ export function App() {
                           onMouseLeave={() => setHoveredLoad(null)}
                         >
                           {/* Invisible wider hit area */}
-                          <line x1={x} y1={120 - h - 10} x2={x} y2={125} stroke="transparent" strokeWidth="20" />
+                          <line x1={x} y1={140 - h - 10} x2={x} y2={145} stroke="transparent" strokeWidth="20" />
                           
-                          <line x1={x} y1={120 - h} x2={x} y2={115} stroke={color} strokeWidth="3" strokeLinecap="round" className="transition-all group-hover:stroke-blue-400" />
-                          <path d={`M ${x-5},${115} L ${x},120 L ${x+5},${115}`} fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" className="transition-all group-hover:stroke-blue-400" />
-                          <circle cx={x} cy={120-h} r="4" fill={color} className="transition-all group-hover:r-6 group-hover:fill-blue-400" />
+                          <line x1={x} y1={140 - h} x2={x} y2={135} stroke={color} strokeWidth="3" strokeLinecap="round" className="transition-all group-hover:stroke-blue-400" />
+                          <path d={`M ${x-5},${135} L ${x},140 L ${x+5},${135}`} fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" className="transition-all group-hover:stroke-blue-400" />
+                          <circle cx={x} cy={140-h} r="4" fill={color} className="transition-all group-hover:r-6 group-hover:fill-blue-400" />
                         </g>
                       );
                     } else if (load.type === 'udl') {
@@ -3747,12 +4194,12 @@ export function App() {
                           onMouseMove={handleMouseMove}
                           onMouseLeave={() => setHoveredLoad(null)}
                         >
-                          <rect x="50" y={120 - h} width="900" height={h} fill={fillColor} stroke={color} strokeWidth="1.5" strokeDasharray={isSeismic ? "4 2" : "none"} className="transition-all group-hover:fill-blue-400/20 group-hover:stroke-blue-400" />
+                          <rect x="50" y={140 - h} width="900" height={h} fill={fillColor} stroke={color} strokeWidth="1.5" strokeDasharray={isSeismic ? "4 2" : "none"} className="transition-all group-hover:fill-blue-400/20 group-hover:stroke-blue-400" />
                           {/* Arrows for UDL */}
                           {[...Array(11)].map((_, i) => {
                             const ax = 50 + (i * 90);
                             return (
-                              <path key={i} d={`M ${ax-3},${115} L ${ax},120 L ${ax+3},${115}`} fill="none" stroke={color} strokeWidth="1.5" className="transition-all group-hover:stroke-blue-400" />
+                              <path key={i} d={`M ${ax-3},${135} L ${ax},140 L ${ax+3},${135}`} fill="none" stroke={color} strokeWidth="1.5" className="transition-all group-hover:stroke-blue-400" />
                             );
                           })}
                         </g>
@@ -3771,7 +4218,7 @@ export function App() {
                           onMouseLeave={() => setHoveredLoad(null)}
                         >
                           <path 
-                            d={`M ${x1},120 L ${x1},${120-h1} L ${x2},${120-h2} L ${x2},120 Z`} 
+                            d={`M ${x1},140 L ${x1},${140-h1} L ${x2},${140-h2} L ${x2},140 Z`} 
                             fill={fillColor} 
                             stroke={color} 
                             strokeWidth="1.5" 
@@ -3789,39 +4236,20 @@ export function App() {
                   <line x1="50" y1="-5" x2="50" y2="5" stroke="#94a3b8" strokeWidth="1" />
                   <line x1="950" y1="-5" x2="950" y2="5" stroke="#94a3b8" strokeWidth="1" />
                   <text x="500" y="20" textAnchor="middle" fill="#64748b" className="text-[14px] font-mono font-bold">
-                    L = {toDisplay(length, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}
+                    L = {toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}
                   </text>
                 </g>
               </svg>
             </CardContent>
-            <CardFooter className="bg-slate-50 border-t px-6 py-4">
-              <div className="w-full space-y-3">
-                <div className="flex items-center justify-between gap-4">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">{t.adjustSpan}</Label>
-                  <div className="flex items-center gap-2">
-                    <NumericInputWithControls 
-                      min={toDisplay(100, 'length')}
-                      max={toDisplay(50000, 'length')}
-                      step={unitSystem === 'metric' ? 100 : 1}
-                      precision={unitSystem === 'metric' ? 0 : 2}
-                      value={toDisplay(length ?? 0, 'length')} 
-                      onChange={(val) => setLength(fromDisplay(val, 'length'))}
-                      className="w-32"
-                    />
-                    <span className="text-xs font-bold text-slate-400">{u.length}</span>
-                  </div>
-                </div>
-                <Slider 
-                  value={[length ?? 3000]} 
-                  onValueChange={(vals) => setLength(vals[0] ?? 3000)} 
-                  min={100} 
-                  max={50000} 
-                  step={1}
-                />
-                <div className="flex justify-between text-[10px] text-slate-400 font-medium px-1">
-                  <span>{toDisplay(100, 'length').toFixed(unitSystem === 'metric' ? 0 : 1)} {u.length}</span>
-                  <span>{toDisplay(50000, 'length').toFixed(unitSystem === 'metric' ? 0 : 1)} {u.length}</span>
-                </div>
+            <CardFooter className="bg-slate-50 border-t py-2 px-6 flex items-center justify-between">
+              <div className="flex items-center gap-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500" /> Low Stress</div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500" /> safe</div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-500" /> Warning</div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500" /> Critical</div>
+              </div>
+              <div className="text-[10px] font-mono text-slate-500 italic">
+                {visualAnalysisOptions.deflection ? "Elastic Curve Visualization active (Scale: ~20x)" : "Show deflection for elastic curve"}
               </div>
             </CardFooter>
           </Card>
@@ -3925,6 +4353,8 @@ export function App() {
                 safetyFactor={safetyFactor}
                 activeCombination={activeCombination}
                 t={t}
+                criticalPoints={criticalPoints}
+                toDisplay={toDisplay}
               />
             </motion.div>
           )}
@@ -4230,7 +4660,7 @@ export function App() {
                         <>
                           <span>{(hoveredLoad as any).factoredValue.toFixed(2)}</span>
                           <span className="text-xs font-normal opacity-50">→</span>
-                          <span>{(hoveredLoad as any).factoredValue2.toFixed(2)}</span>
+                          <span>{((hoveredLoad as any).factoredValue2 ?? 0).toFixed(2)}</span>
                           <span className="text-[10px] font-normal opacity-50 ml-1">N/mm</span>
                         </>
                       ) : (
@@ -4355,7 +4785,19 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active, pr
   return CardContentWrapper;
 }
 
-function ChartContainer({ data, dataKey, color, unit, label, invert = false, formatter, unitSystem, u }: { 
+function ChartContainer({ 
+  data, 
+  dataKey, 
+  color, 
+  unit, 
+  label, 
+  invert = false, 
+  formatter, 
+  unitSystem, 
+  u, 
+  criticalPoints,
+  chartType = 'area'
+}: { 
   data: any[]; 
   dataKey: string; 
   color: string; 
@@ -4365,53 +4807,123 @@ function ChartContainer({ data, dataKey, color, unit, label, invert = false, for
   formatter?: (v: number) => string;
   unitSystem: 'metric' | 'imperial';
   u: any;
+  criticalPoints?: { x: number; y: number; label: string }[];
+  chartType?: 'area' | 'line';
 }) {
+  const commonAxisProps = {
+    x: (
+      <XAxis 
+        dataKey="x" 
+        type="number" 
+        domain={[0, 'dataMax' as any]} 
+        tick={{ fontSize: 10, fill: '#64748B' }}
+        axisLine={{ stroke: '#CBD5E1' }}
+        tickLine={false}
+        label={{ value: `Distance (${u.length})`, position: 'bottom', offset: 0, fontSize: 10, fill: '#64748B' }}
+      />
+    ),
+    y: (
+      <YAxis 
+        reversed={invert}
+        tick={{ fontSize: 10, fill: '#64748B' }}
+        axisLine={{ stroke: '#CBD5E1' }}
+        tickLine={false}
+        tickFormatter={(v) => formatter ? formatter(v) : (Number(v) || 0).toFixed(1)}
+        label={{ value: `${label} (${unit})`, angle: -90, position: 'insideLeft', offset: 10, fontSize: 10, fill: '#64748B' }}
+      />
+    ),
+    grid: <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />,
+    tooltip: (
+      <ChartTooltip 
+        contentStyle={{ 
+          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+          border: '1px solid #E2E8F0', 
+          borderRadius: '12px',
+          fontSize: '12px',
+          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+          backdropFilter: 'blur(4px)'
+        }}
+        formatter={(v: number) => [formatter ? formatter(v) : `${(Number(v) || 0).toFixed(3)} ${unit}`, label]}
+        labelFormatter={(v) => `Position: ${Number(v).toFixed(unitSystem === 'metric' ? 0 : 2)} ${u.length}`}
+      />
+    ),
+    referenceLines: (
+      <>
+        {criticalPoints?.map((cp, i) => (
+          <ReferenceLine 
+            key={i} 
+            x={cp.x} 
+            stroke={color} 
+            strokeDasharray="5 5" 
+            opacity={0.6}
+          >
+            <RechartsLabel 
+              value={cp.label} 
+              position="top" 
+              fill={color} 
+              fontSize={10} 
+              fontWeight="bold"
+              offset={10}
+            />
+          </ReferenceLine>
+        ))}
+        {criticalPoints?.map((cp, i) => (
+          <ReferenceLine 
+            key={`y-${i}`} 
+            y={cp.y} 
+            stroke={color} 
+            strokeDasharray="3 3" 
+            opacity={0.4}
+          />
+        ))}
+      </>
+    )
+  };
+
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
-        <defs>
-          <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
-            <stop offset="95%" stopColor={color} stopOpacity={0}/>
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-        <XAxis 
-          dataKey="x" 
-          type="number" 
-          domain={[0, 'dataMax']} 
-          tick={{ fontSize: 10, fill: '#94A3B8' }}
-          axisLine={{ stroke: '#E2E8F0' }}
-          tickLine={false}
-        />
-        <YAxis 
-          reversed={invert}
-          tick={{ fontSize: 10, fill: '#94A3B8' }}
-          axisLine={{ stroke: '#E2E8F0' }}
-          tickLine={false}
-          tickFormatter={(v) => formatter ? formatter(v) : v.toFixed(1)}
-        />
-        <ChartTooltip 
-          contentStyle={{ 
-            backgroundColor: '#FFF', 
-            border: '1px solid #E2E8F0', 
-            borderRadius: '8px',
-            fontSize: '12px',
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-          }}
-          formatter={(v: number) => [formatter ? formatter(v) : `${v.toFixed(2)} ${unit}`, label]}
-          labelFormatter={(v) => `Pos: ${v.toFixed(unitSystem === 'metric' ? 0 : 2)} ${u.length}`}
-        />
-        <Area 
-          type="monotone" 
-          dataKey={dataKey} 
-          stroke={color} 
-          strokeWidth={2}
-          fillOpacity={1} 
-          fill={`url(#gradient-${dataKey})`} 
-          animationDuration={500}
-        />
-      </AreaChart>
+      {chartType === 'area' ? (
+        <AreaChart data={data} margin={{ top: 25, right: 30, left: 10, bottom: 25 }}>
+          <defs>
+            <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
+              <stop offset="95%" stopColor={color} stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          {commonAxisProps.grid}
+          {commonAxisProps.x}
+          {commonAxisProps.y}
+          {commonAxisProps.tooltip}
+          <Area 
+            type="monotone" 
+            dataKey={dataKey} 
+            stroke={color} 
+            strokeWidth={3}
+            fillOpacity={1} 
+            fill={`url(#gradient-${dataKey})`} 
+            animationDuration={750}
+            activeDot={{ r: 6, stroke: '#FFF', strokeWidth: 2, fill: color }}
+          />
+          {commonAxisProps.referenceLines}
+        </AreaChart>
+      ) : (
+        <LineChart data={data} margin={{ top: 25, right: 30, left: 10, bottom: 25 }}>
+          {commonAxisProps.grid}
+          {commonAxisProps.x}
+          {commonAxisProps.y}
+          {commonAxisProps.tooltip}
+          <Line 
+            type="monotone" 
+            dataKey={dataKey} 
+            stroke={color} 
+            strokeWidth={3}
+            dot={false}
+            animationDuration={750}
+            activeDot={{ r: 6, stroke: '#FFF', strokeWidth: 2, fill: color }}
+          />
+          {commonAxisProps.referenceLines}
+        </LineChart>
+      )}
     </ResponsiveContainer>
   );
 }
@@ -4435,10 +4947,10 @@ function NumericInputWithControls({
   className?: string;
   id?: string;
 }) {
-  const [localValue, setLocalValue] = useState(value.toFixed(precision));
+  const [localValue, setLocalValue] = useState((value ?? 0).toFixed(precision));
 
   React.useEffect(() => {
-    setLocalValue(value.toFixed(precision));
+    setLocalValue((value ?? 0).toFixed(precision));
   }, [value, precision]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
