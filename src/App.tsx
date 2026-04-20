@@ -220,6 +220,31 @@ const SEISMIC_REGIONS = {
   hongkong: { name: 'Hong Kong (CoP)', coeff: 0.12, desc: 'ag=0.12g' },
   thailand: { name: 'Thailand (DPT)', coeff: 0.10, desc: 'Zone 1' },
   malaysia: { name: 'Malaysia (MS EN)', coeff: 0.07, desc: 'ag=0.07g' },
+  singapore: { name: 'Singapore (BC)', coeff: 0.05, desc: 'Low seismicity' },
+  usa_west: { name: 'US West (ASCE 7)', coeff: 0.30, desc: 'High Seismicity, Sds=1.0g' },
+  usa_east: { name: 'US East (ASCE 7)', coeff: 0.10, desc: 'Low Seismicity, Sds=0.33g' },
+  japan: { name: 'Japan (BCJ)', coeff: 0.40, desc: 'Z=1.0, Co=0.2' },
+  philippines: { name: 'Philippines (NSCP)', coeff: 0.35, desc: 'Zone 4, Cv=0.44' },
+};
+
+const LOCATION_SEISMIC_MAPPING: Record<string, keyof typeof SEISMIC_REGIONS> = {
+  'shanghai': 'china',
+  'beijing': 'china',
+  'hong kong': 'hongkong',
+  'bangkok': 'thailand',
+  'kuala lumpur': 'malaysia',
+  'singapore': 'singapore',
+  'london': 'eurocode',
+  'paris': 'eurocode',
+  'berlin': 'eurocode',
+  'vancouver': 'philippines', // Higher seismic
+  'los angeles': 'usa_west',
+  'san francisco': 'usa_west',
+  'new york': 'usa_east',
+  'tokyo': 'japan',
+  'osaka': 'japan',
+  'manila': 'philippines',
+  'jakarta': 'philippines', // Similar high seismic profile
 };
 
 const TRANSLATIONS = {
@@ -770,6 +795,7 @@ interface HistoryState {
   seismicRegion: keyof typeof SEISMIC_REGIONS;
   seismicCoeff: number;
   unitSystem: 'metric' | 'imperial';
+  projectNotes: string;
 }
 
 interface Project extends HistoryState {
@@ -801,7 +827,8 @@ const createNewProject = (id: string, title: string): Project => ({
   activeCombinationId: 'c1',
   seismicRegion: 'china',
   seismicCoeff: SEISMIC_REGIONS.china.coeff,
-  unitSystem: 'metric'
+  unitSystem: 'metric',
+  projectNotes: 'Initial structural calculation for project.'
 });
 
 const getProjectResults = (project: Project) => {
@@ -1645,33 +1672,33 @@ const REGIONS = [
 
 function KeyMapDialog({ onSelect }: { onSelect: (location: string) => void }) {
   return (
-    <DialogContent className="max-w-2xl bg-white border-2 border-slate-200 shadow-2xl rounded-3xl overflow-hidden p-0">
-      <div className="bg-slate-900 p-6 text-white relative overflow-hidden">
+    <DialogContent className="max-w-2xl bg-white border-2 border-slate-200 shadow-2xl rounded-3xl overflow-hidden p-0 max-h-[90vh] flex flex-col">
+      <div className="bg-slate-900 p-6 text-white relative overflow-hidden shrink-0">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 blur-3xl -translate-y-1/2 translate-x-1/2 rounded-full" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-600/10 blur-2xl translate-y-1/2 -translate-x-1/2 rounded-full" />
         
         <DialogHeader className="relative z-10">
-          <DialogTitle className="flex items-center gap-3 text-2xl font-black italic tracking-tighter">
-            <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-900/40">
-              <Globe className="w-6 h-6 text-white" />
+          <DialogTitle className="flex items-center gap-3 text-xl sm:text-2xl font-black italic tracking-tighter">
+            <div className="bg-blue-600 p-1.5 sm:p-2 rounded-xl shadow-lg shadow-blue-900/40">
+              <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             LOCATION KEY MAP
           </DialogTitle>
-          <DialogDescription className="text-slate-400 font-medium">
+          <DialogDescription className="text-slate-400 font-medium text-xs">
             Select a project location to automatically configure region-specific design codes and climatic parameters.
           </DialogDescription>
         </DialogHeader>
       </div>
       
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
           {REGIONS.map((region) => (
-            <div key={region.id} className="space-y-4">
+            <div key={region.id} className="space-y-3 sm:space-y-4">
               <div className="flex items-center gap-2 border-b-2 border-slate-100 pb-2">
                 <span className="bg-slate-100 p-1.5 rounded-lg text-slate-500">
                   {region.icon}
                 </span>
-                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
+                <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-widest">
                   {region.name}
                 </h4>
               </div>
@@ -1680,11 +1707,11 @@ function KeyMapDialog({ onSelect }: { onSelect: (location: string) => void }) {
                   <Button 
                     key={city}
                     variant="ghost"
-                    className="justify-start h-10 text-[11px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all border border-transparent hover:border-blue-100"
+                    className="justify-start h-9 sm:h-10 text-[10px] sm:text-[11px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all border border-transparent hover:border-blue-100 px-2"
                     onClick={() => onSelect(city)}
                   >
-                    <MapPin className="w-3.5 h-3.5 mr-2 text-slate-400 group-hover:text-blue-500" />
-                    {city}
+                    <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1.5 sm:mr-2 text-slate-400 group-hover:text-blue-500" />
+                    <span className="truncate">{city}</span>
                   </Button>
                 ))}
               </div>
@@ -1692,26 +1719,26 @@ function KeyMapDialog({ onSelect }: { onSelect: (location: string) => void }) {
           ))}
         </div>
         
-        <div className="mt-8 bg-blue-50/50 p-5 rounded-3xl border border-blue-100/50 flex items-start gap-4">
-          <div className="bg-blue-600 p-2 rounded-xl shadow-md">
-            <Info className="w-4 h-4 text-white" />
+        <div className="mt-6 sm:mt-8 bg-blue-50/50 p-4 sm:p-5 rounded-3xl border border-blue-100/50 flex items-start gap-3 sm:gap-4">
+          <div className="bg-blue-600 p-1.5 sm:p-2 rounded-xl shadow-md shrink-0">
+            <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
           </div>
           <div className="space-y-1">
-            <p className="text-[11px] font-bold text-blue-900 uppercase tracking-tight">Pro Tip: Smart Configuration</p>
-            <p className="text-[11px] text-blue-700/80 leading-relaxed font-medium">
-              Picking a city from this map instantly maps your project to international standards like <strong>Eurocodes</strong>, <strong>ASCE 7</strong>, or <strong>GB50009</strong>. This syncs wind pressures, snow loads, and material safety factors automatically.
+            <p className="text-[10px] sm:text-[11px] font-bold text-blue-900 uppercase tracking-tight">Pro Tip: Smart Configuration</p>
+            <p className="text-[10px] sm:text-[11px] text-blue-700/80 leading-relaxed font-medium">
+              Picking a city from this map instantly maps your project to international standards and <strong>seismic zones</strong>. This syncs wind pressures, snow loads, and seismic factors automatically.
             </p>
           </div>
         </div>
       </div>
       
-      <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-t border-slate-100">
-        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+      <div className="bg-slate-50 px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center border-t border-slate-100 shrink-0">
+        <div className="flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
           <Activity className="w-3 h-3" />
           Real-time Sync Active
         </div>
-        <DialogFooter>
-          <Button variant="outline" className="rounded-xl font-bold text-xs h-9" onClick={() => (document.querySelector('[data-state="open"]') as any)?.click()}>
+        <DialogFooter className="sm:justify-end">
+          <Button variant="outline" className="rounded-xl font-bold text-xs h-8 sm:h-9" onClick={() => (document.querySelector('[data-state="open"]') as any)?.click()}>
             Close Map
           </Button>
         </DialogFooter>
@@ -1988,6 +2015,17 @@ export function App() {
     return new Date().toTimeString().split(' ')[0].slice(0, 5);
   });
 
+  const [projectNotes, setProjectNotes] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.projectNotes ?? 'Structural calculation for this project.';
+      } catch (e) { return 'Structural calculation for this project.'; }
+    }
+    return 'Structural calculation for this project.';
+  });
+
   const t = TRANSLATIONS[lang];
   const u = UNITS[unitSystem];
 
@@ -2067,7 +2105,21 @@ export function App() {
       });
       setTimeout(() => setNotification(null), 3000);
     }
-  }, [projectLocation, selectedCodeId]);
+
+    // Seismic detection mapping
+    let foundSeismic: keyof typeof SEISMIC_REGIONS | '' = '';
+    for (const city in LOCATION_SEISMIC_MAPPING) {
+      if (loc.includes(city)) {
+        foundSeismic = LOCATION_SEISMIC_MAPPING[city];
+        break;
+      }
+    }
+
+    if (foundSeismic && foundSeismic !== seismicRegion) {
+      setSeismicRegion(foundSeismic);
+      setSeismicCoeff(SEISMIC_REGIONS[foundSeismic].coeff);
+    }
+  }, [projectLocation, selectedCodeId, seismicRegion]);
 
   // History State for Undo/Redo
   const [past, setPast] = useState<HistoryState[]>([]);
@@ -2098,7 +2150,8 @@ export function App() {
     activeCombinationId,
     seismicRegion,
     seismicCoeff,
-    unitSystem
+    unitSystem,
+    projectNotes
   });
 
   const applyState = (state: HistoryState) => {
@@ -2126,6 +2179,7 @@ export function App() {
     setSeismicRegion(state.seismicRegion);
     setSeismicCoeff(state.seismicCoeff);
     setUnitSystem(state.unitSystem ?? 'metric');
+    setProjectNotes(state.projectNotes ?? '');
   };
 
   const undo = () => {
@@ -2182,7 +2236,7 @@ export function App() {
     length, material, sectionType, width, height, thickness,
     supportCondition, safetyFactor, selectedCodeId,
     loads, combinations, activeCombinationId,
-    seismicRegion, seismicCoeff
+    seismicRegion, seismicCoeff, projectNotes
   ]);
 
   // Keyboard shortcuts for Undo/Redo
@@ -2200,7 +2254,7 @@ export function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [past, future, projectTitle, projectLocation, projectDescription, projectDate, length, material, sectionType, width, height, thickness, supportCondition, safetyFactor, selectedCodeId, loads, combinations, activeCombinationId, seismicRegion, seismicCoeff]);
+  }, [past, future, projectTitle, projectLocation, projectDescription, projectDate, length, material, sectionType, width, height, thickness, supportCondition, safetyFactor, selectedCodeId, loads, combinations, activeCombinationId, seismicRegion, seismicCoeff, projectNotes]);
 
   // Ensure thickness is valid relative to dimensions to prevent geometric errors
   React.useEffect(() => {
@@ -2302,7 +2356,7 @@ export function App() {
     length, material, sectionType, width, height, thickness,
     supportCondition, safetyFactor, selectedCodeId,
     loads, combinations, activeCombinationId,
-    seismicRegion, seismicCoeff
+    seismicRegion, seismicCoeff, projectNotes
   ]);
 
   // Calculations
@@ -2540,7 +2594,9 @@ export function App() {
       combinations,
       activeCombinationId,
       seismicRegion,
-      seismicCoeff
+      seismicCoeff,
+      thickness2,
+      projectNotes
     };
     localStorage.setItem('facadecalc_project', JSON.stringify(projectData));
     setNotification({ message: t.projectSaved, type: 'success' });
@@ -3050,6 +3106,16 @@ export function App() {
                         onChange={(e) => setProjectDescription(e.target.value)}
                         placeholder="Project details..."
                         className="flex min-h-[60px] w-full rounded-md border border-input bg-white px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="proj-notes" className="text-[10px] uppercase font-bold text-slate-400">Structural Notes</Label>
+                      <textarea 
+                        id="proj-notes"
+                        value={projectNotes}
+                        onChange={(e) => setProjectNotes(e.target.value)}
+                        placeholder="Add structural assumptions, member constraints, or local site conditions..."
+                        className="flex min-h-[100px] w-full rounded-md border border-blue-100 bg-blue-50/20 px-3 py-2 text-xs text-blue-900 ring-offset-background placeholder:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 transition-all"
                       />
                     </div>
                   </CardContent>
@@ -3881,6 +3947,18 @@ export function App() {
                             ))}
                           </SelectContent>
                         </Select>
+
+                        <div className="flex-1" />
+
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                          onClick={() => removeLoad(load.id)}
+                          title="Remove Load"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                       </div>
 
                   <div className="bg-slate-50/50 p-1.5 rounded-md border border-slate-100 flex-1 flex flex-col justify-center">
@@ -3987,6 +4065,12 @@ export function App() {
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}</span></div>
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{sectionType === 'hollow' ? `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 1 : 3)}${u.length}` : `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}${u.length}`}</span></div>
                         </div>
+                        {projectNotes && (
+                          <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Structural Notes</p>
+                            <p className="text-xs text-slate-600 italic whitespace-pre-wrap">{projectNotes}</p>
+                          </div>
+                        )}
                       </div>
                       <div className={cn(
                         "px-6 py-4 rounded-xl border-4 font-black text-2xl tracking-tighter",
