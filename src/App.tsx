@@ -78,6 +78,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -225,26 +226,65 @@ const SEISMIC_REGIONS = {
   usa_east: { name: 'US East (ASCE 7)', coeff: 0.10, desc: 'Low Seismicity, Sds=0.33g' },
   japan: { name: 'Japan (BCJ)', coeff: 0.40, desc: 'Z=1.0, Co=0.2' },
   philippines: { name: 'Philippines (NSCP)', coeff: 0.35, desc: 'Zone 4, Cv=0.44' },
+  india: { name: 'India (IS 1893)', coeff: 0.24, desc: 'Zone IV, ag=0.24g' },
+  korea: { name: 'South Korea (KDS)', coeff: 0.22, desc: 'Zone 1, S=0.22g' },
+  turkey: { name: 'Turkey (TBDY)', coeff: 0.45, desc: 'High Seismicity, Sds=1.5' },
 };
 
 const LOCATION_SEISMIC_MAPPING: Record<string, keyof typeof SEISMIC_REGIONS> = {
   'shanghai': 'china',
   'beijing': 'china',
+  'guangzhou': 'china',
+  'shenzhen': 'china',
   'hong kong': 'hongkong',
+  'macau': 'hongkong',
   'bangkok': 'thailand',
   'kuala lumpur': 'malaysia',
+  'johor bahru': 'malaysia',
   'singapore': 'singapore',
   'london': 'eurocode',
   'paris': 'eurocode',
   'berlin': 'eurocode',
+  'munich': 'eurocode',
+  'madrid': 'eurocode',
+  'rome': 'eurocode',
+  'athens': 'turkey', // High seismic in Eurocode region
+  'istanbul': 'turkey',
+  'ankara': 'turkey',
   'vancouver': 'philippines', // Higher seismic
+  'toronto': 'usa_east',
+  'mexico city': 'philippines', // Very high seismic
   'los angeles': 'usa_west',
   'san francisco': 'usa_west',
+  'seattle': 'usa_west',
   'new york': 'usa_east',
+  'chicago': 'usa_east',
+  'houston': 'usa_east',
   'tokyo': 'japan',
   'osaka': 'japan',
+  'nagoya': 'japan',
+  'yokohama': 'japan',
+  'taipei': 'japan', // High seismic
+  'hanoi': 'thailand', // moderate
+  'ho chi minh': 'thailand',
   'manila': 'philippines',
-  'jakarta': 'philippines', // Similar high seismic profile
+  'cebu': 'philippines',
+  'davao': 'philippines',
+  'jakarta': 'philippines',
+  'mumbai': 'india',
+  'delhi': 'india',
+  'bangalore': 'india',
+  'chennai': 'india',
+  'seoul': 'korea',
+  'busan': 'korea',
+  'dubai': 'singapore', // Relatively low
+  'abu dhabi': 'singapore',
+  'riyadh': 'singapore',
+  'doha': 'singapore',
+  'muscat': 'singapore',
+  'cairo': 'thailand', // moderate
+  'johannesburg': 'singapore',
+  'cape town': 'singapore',
 };
 
 const TRANSLATIONS = {
@@ -528,9 +568,17 @@ const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[]
     codes: ['Thailand'],
     matches: ['thailand', 'bangkok', 'phuket', 'chiang mai', 'pattaya', 'samui', '泰国', '泰國', '曼谷', '普吉', '清迈', '芭提雅']
   },
-  'Vietnam': {
+  'Viet Nam': {
     codes: ['Vietnam'],
     matches: ['vietnam', 'hanoi', 'ho chi minh', 'hcmc', 'da nang', '越南', '河内', '胡志明', '岘港']
+  },
+  'Taiwan': {
+    codes: ['China (National)'],
+    matches: ['taiwan', 'taipei', 'kaohsiung', 'taichung', '台湾', '台北', '高雄', '台中']
+  },
+  'Spain': {
+    codes: ['Eurocodes (EU-General)'],
+    matches: ['spain', 'madrid', 'barcelona', 'valencia', 'seville', '西班牙', '马德里', '巴塞罗那']
   },
   'United Kingdom': {
     codes: ['United Kingdom'],
@@ -538,7 +586,7 @@ const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[]
   },
   'United States': {
     codes: ['United States'],
-    matches: ['united states', 'usa', 'us ', 'america', 'new york', 'los angeles', 'chicago', 'houston', 'miami', '美国', '美國', '纽约', '洛杉矶']
+    matches: ['united states', 'usa', 'us ', 'america', 'new york', 'los angeles', 'chicago', 'houston', 'miami', 'seattle', 'san francisco', '美国', '美國', '纽约', '洛杉矶', '迈阿密']
   },
   'Canada': {
     codes: ['Canada'],
@@ -591,6 +639,18 @@ const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[]
   'Brazil': {
     codes: ['Brazil'],
     matches: ['brazil', 'brasil', 'rio de janeiro', 'sao paulo', 'brasilia', 'curitiba', '巴西', '里约', '圣保罗']
+  },
+  'Oman': {
+    codes: ['UAE / Dubai'],
+    matches: ['oman', 'muscat', '阿曼', '马斯喀特']
+  },
+  'Egypt': {
+    codes: ['Eurocodes (EU-General)'],
+    matches: ['egypt', 'cairo', 'alexandria', '埃及', '开罗']
+  },
+  'Nigeria': {
+    codes: ['Eurocodes (EU-General)'],
+    matches: ['nigeria', 'lagos', 'abuja', '尼日利亚', '拉各斯']
   },
   'Eurocodes': {
     codes: ['Eurocodes (EU-General)'],
@@ -1645,28 +1705,40 @@ const CalculusStepsCard = ({
 
 const REGIONS = [
   { 
-    id: 'asia', 
-    name: 'Asia Pacific', 
+    id: 'asia-east', 
+    name: 'East Asia', 
     icon: <Globe className="w-4 h-4" />,
-    cities: ['Shanghai', 'Hong Kong', 'Macau', 'Beijing', 'Singapore', 'Kuala Lumpur', 'Sydney', 'Melbourne', 'Auckland'] 
+    cities: ['Shanghai', 'Beijing', 'Guangzhou', 'Shenzhen', 'Hong Kong', 'Macau', 'Taipei', 'Tokyo', 'Osaka', 'Seoul', 'Busan'] 
+  },
+  { 
+    id: 'asia-se', 
+    name: 'Southeast & South Asia', 
+    icon: <MapPin className="w-4 h-4" />,
+    cities: ['Singapore', 'Kuala Lumpur', 'Bangkok', 'Jakarta', 'Manila', 'Ho Chi Minh', 'Mumbai', 'Delhi', 'Bangalore'] 
   },
   { 
     id: 'europe', 
     name: 'Europe & UK', 
     icon: <Box className="w-4 h-4" />,
-    cities: ['London', 'Berlin', 'Paris', 'Rome', 'Madrid', 'Amsterdam', 'Brussels', 'Munich'] 
+    cities: ['London', 'Birmingham', 'Berlin', 'Munich', 'Paris', 'Lyon', 'Rome', 'Milan', 'Madrid', 'Barcelona', 'Amsterdam'] 
   },
   { 
     id: 'americas', 
     name: 'Americas', 
     icon: <PlusCircle className="w-4 h-4" />,
-    cities: ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Toronto', 'Vancouver', 'Mexico City'] 
+    cities: ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Miami', 'Toronto', 'Vancouver', 'Mexico City', 'Sao Paulo', 'Rio de Janeiro'] 
   },
   { 
-    id: 'mideast', 
+    id: 'mideast-africa', 
     name: 'Middle East & Africa', 
     icon: <Layers className="w-4 h-4" />,
-    cities: ['Dubai', 'Abu Dhabi', 'Riyadh', 'Jeddah', 'Doha', 'Cape Town', 'Johannesburg'] 
+    cities: ['Dubai', 'Abu Dhabi', 'Riyadh', 'Jeddah', 'Doha', 'Muscat', 'Cape Town', 'Johannesburg', 'Cairo', 'Lagos'] 
+  },
+  { 
+    id: 'oceania', 
+    name: 'Oceania', 
+    icon: <Activity className="w-4 h-4" />,
+    cities: ['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Auckland', 'Wellington', 'Christchurch'] 
   },
 ];
 
@@ -1738,9 +1810,9 @@ function KeyMapDialog({ onSelect }: { onSelect: (location: string) => void }) {
           Real-time Sync Active
         </div>
         <DialogFooter className="sm:justify-end">
-          <Button variant="outline" className="rounded-xl font-bold text-xs h-8 sm:h-9" onClick={() => (document.querySelector('[data-state="open"]') as any)?.click()}>
+          <DialogClose render={<Button variant="outline" className="rounded-xl font-bold text-xs h-8 sm:h-9" />}>
             Close Map
-          </Button>
+          </DialogClose>
         </DialogFooter>
       </div>
     </DialogContent>
