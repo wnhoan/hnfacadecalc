@@ -155,56 +155,56 @@ function ErrorFallback() {
 }
 
 const MATERIALS = {
-  aluminum_6063_t6: { name: 'Aluminum 6063-T6 (Extrusion)', e: 70000, yield: 160, poisson: 0.33, category: 'Aluminum' },
-  aluminum_6063_t66: { name: 'Aluminum 6063-T66 (High Strength Extrusion)', e: 70000, yield: 200, poisson: 0.33, category: 'Aluminum' },
-  aluminum_6063_t5: { name: 'Aluminum 6063-T5', e: 70000, yield: 110, poisson: 0.33, category: 'Aluminum' },
-  aluminum_6061_t6: { name: 'Aluminum 6061-T6 (Structural)', e: 70000, yield: 240, poisson: 0.33, category: 'Aluminum' },
-  aluminum_6082_t6: { name: 'Aluminum 6082-T6 (Structural)', e: 70000, yield: 250, poisson: 0.33, category: 'Aluminum' },
-  aluminum_3003_h14: { name: 'Aluminum 3003-H14 (Cladding)', e: 70000, yield: 145, poisson: 0.33, category: 'Aluminum' },
-  aluminum_5005_h34: { name: 'Aluminum 5005-H34 (Anodized)', e: 70000, yield: 135, poisson: 0.33, category: 'Aluminum' },
-  aluminum_5754_h22: { name: 'Aluminum 5754-H22 (High Strength)', e: 70000, yield: 190, poisson: 0.33, category: 'Aluminum' },
-  steel_s235: { name: 'Steel S235', e: 210000, yield: 235, poisson: 0.30, category: 'Steel' },
-  steel_s275: { name: 'Steel S275', e: 210000, yield: 275, poisson: 0.30, category: 'Steel' },
-  steel_s355: { name: 'Steel S355', e: 210000, yield: 355, poisson: 0.30, category: 'Steel' },
-  steel_s420: { name: 'Steel S420', e: 210000, yield: 420, poisson: 0.30, category: 'Steel' },
-  steel_s460: { name: 'Steel S460', e: 210000, yield: 460, poisson: 0.30, category: 'Steel' },
-  stainless_304: { name: 'Stainless Steel 304', e: 193000, yield: 205, poisson: 0.30, category: 'Stainless Steel' },
-  stainless_316: { name: 'Stainless Steel 316', e: 200000, yield: 215, poisson: 0.30, category: 'Stainless Steel' },
-  stainless_2205: { name: 'Stainless Steel 2205 (Duplex)', e: 200000, yield: 450, poisson: 0.30, category: 'Stainless Steel' },
-  concrete_c25: { name: 'Concrete C25/30', e: 31000, yield: 25, poisson: 0.20, category: 'Concrete' },
-  concrete_c30: { name: 'Concrete C30/37', e: 33000, yield: 30, poisson: 0.20, category: 'Concrete' },
-  concrete_c40: { name: 'Concrete C40/50', e: 35000, yield: 40, poisson: 0.20, category: 'Concrete' },
-  timber_softwood: { name: 'Timber (Softwood C24)', e: 11000, yield: 24, poisson: 0.30, category: 'Timber' },
-  timber_hardwood: { name: 'Timber (Hardwood D40)', e: 14000, yield: 40, poisson: 0.30, category: 'Timber' },
-  timber_glulam: { name: 'Timber (Glulam GL24h)', e: 11500, yield: 24, poisson: 0.30, category: 'Timber' },
-  timber_clt: { name: 'Timber (CLT)', e: 11000, yield: 24, poisson: 0.30, category: 'Timber' },
-  glass_annealed: { name: 'Glass (Annealed Soda-Lime)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass' },
-  glass_tempered: { name: 'Glass (Fully Tempered Soda-Lime)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass' },
-  glass_hs: { name: 'Glass (Heat Strengthened Soda-Lime)', e: 70000, yield: 70, poisson: 0.22, category: 'Glass' },
-  glass_low_iron_annealed: { name: 'Glass (Low Iron Annealed)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass' },
-  glass_low_iron_tempered: { name: 'Glass (Low Iron Tempered)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass' },
-  glass_laminated_pvb: { name: 'Glass (Laminated PVB - Effective)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass' },
-  glass_laminated_sgp: { name: 'Glass (Laminated SentryGlas - Effective)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass' },
-  glass_borosilicate_annealed: { name: 'Glass (Borosilicate Annealed)', e: 64000, yield: 50, poisson: 0.20, category: 'Glass' },
-  glass_borosilicate_tempered: { name: 'Glass (Borosilicate Tempered)', e: 64000, yield: 150, poisson: 0.20, category: 'Glass' },
-  glass_ceramic: { name: 'Glass (Ceramic / Fire Rated)', e: 92000, yield: 180, poisson: 0.24, category: 'Glass' },
-  glass_wired: { name: 'Glass (Wired / Safety)', e: 70000, yield: 30, poisson: 0.22, category: 'Glass' },
-  glass_patterned: { name: 'Glass (Patterned / Textured)', e: 70000, yield: 35, poisson: 0.22, category: 'Glass' },
-  stone_granite: { name: 'Stone (Granite)', e: 60000, yield: 10, poisson: 0.25, category: 'Stone' },
-  stone_marble: { name: 'Stone (Marble)', e: 50000, yield: 8, poisson: 0.25, category: 'Stone' },
-  stone_limestone: { name: 'Stone (Limestone)', e: 40000, yield: 5, poisson: 0.25, category: 'Stone' },
-  stone_sandstone: { name: 'Stone (Sandstone)', e: 20000, yield: 3, poisson: 0.25, category: 'Stone' },
-  plastic_polycarb: { name: 'Polycarbonate', e: 2300, yield: 60, poisson: 0.37, category: 'Plastics' },
-  plastic_acrylic: { name: 'Acrylic (PMMA)', e: 3200, yield: 70, poisson: 0.35, category: 'Plastics' },
-  plastic_pvc: { name: 'PVC (Rigid)', e: 3000, yield: 50, poisson: 0.38, category: 'Plastics' },
-  composite_acm: { name: 'ACM (Aluminum Composite)', e: 70000, yield: 100, poisson: 0.33, category: 'Composites' },
-  composite_hpl: { name: 'HPL (High Pressure Laminate)', e: 9000, yield: 80, poisson: 0.30, category: 'Composites' },
-  metal_copper: { name: 'Copper', e: 117000, yield: 70, poisson: 0.34, category: 'Other Metals' },
-  metal_zinc: { name: 'Zinc', e: 90000, yield: 100, poisson: 0.25, category: 'Other Metals' },
-  metal_brass: { name: 'Brass', e: 105000, yield: 200, poisson: 0.34, category: 'Other Metals' },
-  grc: { name: 'GRC Panel', e: 15000, yield: 8, poisson: 0.24, category: 'Other' },
-  terracotta: { name: 'Terracotta', e: 30000, yield: 15, poisson: 0.20, category: 'Other' },
-  custom: { name: 'Custom', e: 200000, yield: 200, poisson: 0.30, category: 'Other' },
+  aluminum_6063_t6: { name: 'Aluminum 6063-T6 (Extrusion)', e: 70000, yield: 160, poisson: 0.33, category: 'Aluminum', density: 2700 },
+  aluminum_6063_t66: { name: 'Aluminum 6063-T66 (High Strength Extrusion)', e: 70000, yield: 200, poisson: 0.33, category: 'Aluminum', density: 2700 },
+  aluminum_6063_t5: { name: 'Aluminum 6063-T5', e: 70000, yield: 110, poisson: 0.33, category: 'Aluminum', density: 2700 },
+  aluminum_6061_t6: { name: 'Aluminum 6061-T6 (Structural)', e: 70000, yield: 240, poisson: 0.33, category: 'Aluminum', density: 2710 },
+  aluminum_6082_t6: { name: 'Aluminum 6082-T6 (Structural)', e: 70000, yield: 250, poisson: 0.33, category: 'Aluminum', density: 2710 },
+  aluminum_3003_h14: { name: 'Aluminum 3003-H14 (Cladding)', e: 70000, yield: 145, poisson: 0.33, category: 'Aluminum', density: 2730 },
+  aluminum_5005_h34: { name: 'Aluminum 5005-H34 (Anodized)', e: 70000, yield: 135, poisson: 0.33, category: 'Aluminum', density: 2700 },
+  aluminum_5754_h22: { name: 'Aluminum 5754-H22 (High Strength)', e: 70000, yield: 190, poisson: 0.33, category: 'Aluminum', density: 2660 },
+  steel_s235: { name: 'Steel S235', e: 210000, yield: 235, poisson: 0.30, category: 'Steel', density: 7850 },
+  steel_s275: { name: 'Steel S275', e: 210000, yield: 275, poisson: 0.30, category: 'Steel', density: 7850 },
+  steel_s355: { name: 'Steel S355', e: 210000, yield: 355, poisson: 0.30, category: 'Steel', density: 7850 },
+  steel_s420: { name: 'Steel S420', e: 210000, yield: 420, poisson: 0.30, category: 'Steel', density: 7850 },
+  steel_s460: { name: 'Steel S460', e: 210000, yield: 460, poisson: 0.30, category: 'Steel', density: 7850 },
+  stainless_304: { name: 'Stainless Steel 304', e: 193000, yield: 205, poisson: 0.30, category: 'Stainless Steel', density: 8000 },
+  stainless_316: { name: 'Stainless Steel 316', e: 200000, yield: 215, poisson: 0.30, category: 'Stainless Steel', density: 8000 },
+  stainless_2205: { name: 'Stainless Steel 2205 (Duplex)', e: 200000, yield: 450, poisson: 0.30, category: 'Stainless Steel', density: 7800 },
+  concrete_c25: { name: 'Concrete C25/30', e: 31000, yield: 25, poisson: 0.20, category: 'Concrete', density: 2400 },
+  concrete_c30: { name: 'Concrete C30/37', e: 33000, yield: 30, poisson: 0.20, category: 'Concrete', density: 2400 },
+  concrete_c40: { name: 'Concrete C40/50', e: 35000, yield: 40, poisson: 0.20, category: 'Concrete', density: 2400 },
+  timber_softwood: { name: 'Timber (Softwood C24)', e: 11000, yield: 24, poisson: 0.30, category: 'Timber', density: 420 },
+  timber_hardwood: { name: 'Timber (Hardwood D40)', e: 14000, yield: 40, poisson: 0.30, category: 'Timber', density: 700 },
+  timber_glulam: { name: 'Timber (Glulam GL24h)', e: 11500, yield: 24, poisson: 0.30, category: 'Timber', density: 450 },
+  timber_clt: { name: 'Timber (CLT)', e: 11000, yield: 24, poisson: 0.30, category: 'Timber', density: 500 },
+  glass_annealed: { name: 'Glass (Annealed Soda-Lime)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass', density: 2500 },
+  glass_tempered: { name: 'Glass (Fully Tempered Soda-Lime)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass', density: 2500 },
+  glass_hs: { name: 'Glass (Heat Strengthened Soda-Lime)', e: 70000, yield: 70, poisson: 0.22, category: 'Glass', density: 2500 },
+  glass_low_iron_annealed: { name: 'Glass (Low Iron Annealed)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass', density: 2500 },
+  glass_low_iron_tempered: { name: 'Glass (Low Iron Tempered)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass', density: 2500 },
+  glass_laminated_pvb: { name: 'Glass (Laminated PVB - Effective)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass', density: 2500 },
+  glass_laminated_sgp: { name: 'Glass (Laminated SentryGlas - Effective)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass', density: 2500 },
+  glass_borosilicate_annealed: { name: 'Glass (Borosilicate Annealed)', e: 64000, yield: 50, poisson: 0.20, category: 'Glass', density: 2200 },
+  glass_borosilicate_tempered: { name: 'Glass (Borosilicate Tempered)', e: 64000, yield: 150, poisson: 0.20, category: 'Glass', density: 2200 },
+  glass_ceramic: { name: 'Glass (Ceramic / Fire Rated)', e: 92000, yield: 180, poisson: 0.24, category: 'Glass', density: 2600 },
+  glass_wired: { name: 'Glass (Wired / Safety)', e: 70000, yield: 30, poisson: 0.22, category: 'Glass', density: 2500 },
+  glass_patterned: { name: 'Glass (Patterned / Textured)', e: 70000, yield: 35, poisson: 0.22, category: 'Glass', density: 2500 },
+  stone_granite: { name: 'Stone (Granite)', e: 60000, yield: 10, poisson: 0.25, category: 'Stone', density: 2700 },
+  stone_marble: { name: 'Stone (Marble)', e: 50000, yield: 8, poisson: 0.25, category: 'Stone', density: 2600 },
+  stone_limestone: { name: 'Stone (Limestone)', e: 40000, yield: 5, poisson: 0.25, category: 'Stone', density: 2400 },
+  stone_sandstone: { name: 'Stone (Sandstone)', e: 20000, yield: 3, poisson: 0.25, category: 'Stone', density: 2300 },
+  plastic_polycarb: { name: 'Polycarbonate', e: 2300, yield: 60, poisson: 0.37, category: 'Plastics', density: 1200 },
+  plastic_acrylic: { name: 'Acrylic (PMMA)', e: 3200, yield: 70, poisson: 0.35, category: 'Plastics', density: 1180 },
+  plastic_pvc: { name: 'PVC (Rigid)', e: 3000, yield: 50, poisson: 0.38, category: 'Plastics', density: 1400 },
+  composite_acm: { name: 'ACM (Aluminum Composite)', e: 70000, yield: 100, poisson: 0.33, category: 'Composites', density: 1500 },
+  composite_hpl: { name: 'HPL (High Pressure Laminate)', e: 9000, yield: 80, poisson: 0.30, category: 'Composites', density: 1350 },
+  metal_copper: { name: 'Copper', e: 117000, yield: 70, poisson: 0.34, category: 'Other Metals', density: 8960 },
+  metal_zinc: { name: 'Zinc', e: 90000, yield: 100, poisson: 0.25, category: 'Other Metals', density: 7140 },
+  metal_brass: { name: 'Brass', e: 105000, yield: 200, poisson: 0.34, category: 'Other Metals', density: 8500 },
+  grc: { name: 'GRC Panel', e: 15000, yield: 8, poisson: 0.24, category: 'Other', density: 2100 },
+  terracotta: { name: 'Terracotta', e: 30000, yield: 15, poisson: 0.20, category: 'Other', density: 2100 },
+  custom: { name: 'Custom', e: 200000, yield: 200, poisson: 0.30, category: 'Other', density: 7850 },
 };
 
 const LOAD_CATEGORIES = {
@@ -216,19 +216,19 @@ const LOAD_CATEGORIES = {
 };
 
 const SEISMIC_REGIONS = {
-  china: { name: 'China (GB 50011)', coeff: 0.16, desc: 'Intensity 7, αmax=0.16' },
-  eurocode: { name: 'Eurocode (EN 1998)', coeff: 0.15, desc: 'ag=0.15g, S=1.2' },
-  hongkong: { name: 'Hong Kong (CoP)', coeff: 0.12, desc: 'ag=0.12g' },
-  thailand: { name: 'Thailand (DPT)', coeff: 0.10, desc: 'Zone 1' },
-  malaysia: { name: 'Malaysia (MS EN)', coeff: 0.07, desc: 'ag=0.07g' },
-  singapore: { name: 'Singapore (BC)', coeff: 0.05, desc: 'Low seismicity' },
-  usa_west: { name: 'US West (ASCE 7)', coeff: 0.30, desc: 'High Seismicity, Sds=1.0g' },
-  usa_east: { name: 'US East (ASCE 7)', coeff: 0.10, desc: 'Low Seismicity, Sds=0.33g' },
-  japan: { name: 'Japan (BCJ)', coeff: 0.40, desc: 'Z=1.0, Co=0.2' },
-  philippines: { name: 'Philippines (NSCP)', coeff: 0.35, desc: 'Zone 4, Cv=0.44' },
-  india: { name: 'India (IS 1893)', coeff: 0.24, desc: 'Zone IV, ag=0.24g' },
-  korea: { name: 'South Korea (KDS)', coeff: 0.22, desc: 'Zone 1, S=0.22g' },
-  turkey: { name: 'Turkey (TBDY)', coeff: 0.45, desc: 'High Seismicity, Sds=1.5' },
+  china: { name: 'China (GB 50011)', coeff: 0.16, desc: 'Intensity 7, αmax=0.16', accel: 0.16, importance: 1.0, respMod: 1.0 },
+  eurocode: { name: 'Eurocode (EN 1998)', coeff: 0.15, desc: 'ag=0.15g, S=1.2', accel: 0.15, importance: 1.0, respMod: 1.0 },
+  hongkong: { name: 'Hong Kong (CoP)', coeff: 0.12, desc: 'ag=0.12g', accel: 0.12, importance: 1.0, respMod: 1.0 },
+  thailand: { name: 'Thailand (DPT)', coeff: 0.10, desc: 'Zone 1', accel: 0.10, importance: 1.0, respMod: 1.0 },
+  malaysia: { name: 'Malaysia (MS EN)', coeff: 0.07, desc: 'ag=0.07g', accel: 0.07, importance: 1.0, respMod: 1.0 },
+  singapore: { name: 'Singapore (BC)', coeff: 0.05, desc: 'Low seismicity', accel: 0.05, importance: 1.0, respMod: 1.0 },
+  usa_west: { name: 'US West (ASCE 7)', coeff: 0.30, desc: 'High Seismicity, Sds=1.0g', accel: 1.0, importance: 1.0, respMod: 1.0 },
+  usa_east: { name: 'US East (ASCE 7)', coeff: 0.10, desc: 'Low Seismicity, Sds=0.33g', accel: 0.33, importance: 1.0, respMod: 1.0 },
+  japan: { name: 'Japan (BCJ)', coeff: 0.40, desc: 'Z=1.0, Co=0.2', accel: 1.0, importance: 1.0, respMod: 1.0 },
+  philippines: { name: 'Philippines (NSCP)', coeff: 0.35, desc: 'Zone 4, Cv=0.44', accel: 0.44, importance: 1.0, respMod: 1.0 },
+  india: { name: 'India (IS 1893)', coeff: 0.24, desc: 'Zone IV, ag=0.24g', accel: 0.24, importance: 1.0, respMod: 1.0 },
+  korea: { name: 'South Korea (KDS)', coeff: 0.22, desc: 'Zone 1, S=0.22g', accel: 0.22, importance: 1.0, respMod: 1.0 },
+  turkey: { name: 'Turkey (TBDY)', coeff: 0.45, desc: 'High Seismicity, Sds=1.5', accel: 1.5, importance: 1.0, respMod: 1.0 },
 };
 
 const LOCATION_SEISMIC_MAPPING: Record<string, keyof typeof SEISMIC_REGIONS> = {
@@ -1414,9 +1414,12 @@ const CalculusStepsCard = ({
   activeCombination,
   t,
   criticalPoints,
-  toDisplay
+  toDisplay,
+  seismicRegion,
+  seismicCoeff,
+  loads
 }: {
-  options: { section: boolean; loads: boolean; analysis: boolean; stress: boolean };
+  options: { section: boolean; loads: boolean; analysis: boolean; stress: boolean; seismic: boolean };
   setOptions: (v: any) => void;
   sectionProps: any;
   factoredLoads: any[];
@@ -1436,6 +1439,9 @@ const CalculusStepsCard = ({
   t: any;
   criticalPoints?: any;
   toDisplay: any;
+  seismicRegion: string;
+  seismicCoeff: number;
+  loads: Load[];
 }) => {
   const toggleOption = (key: keyof typeof options) => {
     setOptions({ ...options, [key]: !options[key] });
@@ -1465,6 +1471,10 @@ const CalculusStepsCard = ({
             <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
               <span className="text-[9px] font-bold text-slate-400 uppercase">Stress</span>
               <Switch checked={options.stress} onCheckedChange={() => toggleOption('stress')} className="scale-75" />
+            </div>
+            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
+              <span className="text-[9px] font-bold text-slate-400 uppercase">Seismic</span>
+              <Switch checked={options.seismic} onCheckedChange={() => toggleOption('seismic')} className="scale-75" />
             </div>
           </div>
         </div>
@@ -1651,6 +1661,56 @@ const CalculusStepsCard = ({
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {options.seismic && (
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center gap-2">
+              <Activity className="w-3 h-3" />
+              Seismic Parameter Verification
+            </h4>
+            <div className="bg-rose-50/30 p-3 rounded-xl border border-rose-100/50 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-rose-700/70 italic uppercase tracking-wider font-bold">Region Database ({SEISMIC_REGIONS[seismicRegion as keyof typeof SEISMIC_REGIONS].name})</p>
+                <div className="font-mono text-[11px] space-y-1.5">
+                  <div className="bg-white/80 p-2 rounded border border-rose-100 flex justify-between">
+                    <span className="text-slate-500">Peak Ground Accel (ag/g):</span>
+                    <span className="font-bold text-rose-600">{SEISMIC_REGIONS[seismicRegion as keyof typeof SEISMIC_REGIONS].accel.toFixed(3)}</span>
+                  </div>
+                  <div className="bg-white/80 p-2 rounded border border-rose-100 flex justify-between">
+                    <span className="text-slate-500">Importance Factor (Ie):</span>
+                    <span className="font-bold text-rose-600">{SEISMIC_REGIONS[seismicRegion as keyof typeof SEISMIC_REGIONS].importance.toFixed(2)}</span>
+                  </div>
+                  <div className="bg-white/80 p-2 rounded border border-rose-100 flex justify-between">
+                    <span className="text-slate-500">Resp. Mod Factor (R):</span>
+                    <span className="font-bold text-rose-600">{SEISMIC_REGIONS[seismicRegion as keyof typeof SEISMIC_REGIONS].respMod.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-rose-700/70 italic uppercase tracking-wider font-bold">Derivation (Static Equivalent)</p>
+                <div className="font-mono text-[11px] space-y-1.5">
+                  <div className="bg-white/80 p-2 rounded border border-rose-100 space-y-1">
+                    <div className="flex justify-between items-center bg-rose-50/50 p-1 px-1.5 rounded mb-1 border border-rose-100">
+                      <span className="text-[9px] font-bold text-rose-600 uppercase">Seismic Coefficient (Cs)</span>
+                      <span className="text-[12px] font-bold text-rose-700">{seismicCoeff.toFixed(4)}</span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 italic">Cs = ag/g × (Ie / R) × α (simplified local code model)</p>
+                  </div>
+                  <div className="bg-white/80 p-2 rounded border border-rose-100 space-y-1">
+                     <div className="flex justify-between items-center bg-rose-50/50 p-1 px-1.5 rounded border border-rose-100">
+                      <span className="text-[9px] font-bold text-rose-600 uppercase">Resultant Force (Fs)</span>
+                      <span className="text-rose-700 font-bold">{(loads.filter(l => l.category === 'seismic').reduce((s, l) => s + (l.value ?? 0), 0)).toFixed(4)} {u.force}/{u.length}</span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 italic">Fs = Cs × Total Weight (W_dead)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="text-[9px] text-slate-400 px-1 leading-relaxed bg-slate-50 p-2 rounded border border-slate-100">
+              <strong>Note:</strong> The seismic coefficient derived is based on the equivalent static force method as per the selected regional standard. For non-structural facade components, dynamic amplification may be required depending on the component's natural frequency and mounting height relative to the building height.
+            </p>
           </div>
         )}
 
@@ -1985,7 +2045,8 @@ export function App() {
     section: true,
     loads: true,
     analysis: true,
-    stress: true
+    stress: true,
+    seismic: true
   });
   const [visualAnalysisOptions, setVisualAnalysisOptions] = useState({
     deflection: true,
@@ -2505,8 +2566,16 @@ export function App() {
     setLoads([...loads, newLoad]);
   };
 
+  const selfWeightPerUnit = useMemo(() => {
+    const areaMm2 = sectionProps.area ?? 0;
+    const densityKgM3 = (MATERIALS[material as keyof typeof MATERIALS] as any).density ?? 2700;
+    // Area (mm2) * 1e-6 (m2) * Density (kg/m3) * 9.81 (N/kg) = N/m
+    // Divide by 1000 to get N/mm
+    return (areaMm2 * 1e-6 * densityKgM3 * 9.81) / 1000;
+  }, [sectionProps.area, material]);
+
   const totalDeadMagnitude = useMemo(() => {
-    return loads
+    const appliedDead = loads
       .filter(l => l.category === 'dead')
       .reduce((sum, l) => {
         const v1 = safeParseNumber(l.value, 0);
@@ -2520,7 +2589,10 @@ export function App() {
         }
         return sum;
       }, 0);
-  }, [loads, length]);
+    
+    const selfWeight = selfWeightPerUnit * length;
+    return appliedDead + selfWeight;
+  }, [loads, length, selfWeightPerUnit]);
 
   const applySeismicLoad = () => {
     // Seismic load as UDL: Fs = (Dead * Cs) / L
@@ -4597,6 +4669,9 @@ export function App() {
                 t={t}
                 criticalPoints={criticalPoints}
                 toDisplay={toDisplay}
+                seismicRegion={seismicRegion}
+                seismicCoeff={seismicCoeff}
+                loads={loads}
               />
             </motion.div>
           )}
