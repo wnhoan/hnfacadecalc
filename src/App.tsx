@@ -2055,7 +2055,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState('deflection');
   const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [lang, setLang] = useState<keyof typeof TRANSLATIONS>('en');
-  const [view, setView] = useState<'home' | 'calculator' | 'docs'>('home');
+  const [view, setView] = useState<'home' | 'calculator' | 'docs'>('calculator');
   const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
@@ -2834,7 +2834,7 @@ export function App() {
       <header className="border-b bg-white sticky top-0 z-50 print:hidden">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-8">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('home')}>
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('calculator')}>
               <div className="bg-blue-600 p-1.5 rounded-lg">
                 <Calculator className="w-5 h-5 text-white" />
               </div>
@@ -2858,15 +2858,6 @@ export function App() {
             </div>
 
             <nav className="hidden md:flex items-center gap-6">
-              <button 
-                onClick={() => setView('home')}
-                className={cn(
-                  "text-sm font-medium transition-colors hover:text-blue-600",
-                  view === 'home' ? "text-blue-600" : "text-slate-500"
-                )}
-              >
-                {t.navIntro}
-              </button>
               <button 
                 onClick={() => setView('calculator')}
                 className={cn(
