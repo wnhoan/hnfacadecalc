@@ -5,7 +5,6 @@
 
 import * as React from 'react';
 import { useState, useMemo } from 'react';
-import { Slider } from '@/components/ui/slider';
 import { 
   Calculator, 
   Plus, 
@@ -3775,13 +3774,6 @@ export function App() {
                           value={toDisplay(width ?? 0, 'length')} 
                           onChange={(val) => setWidth(fromDisplay(val, 'length'))}
                         />
-                        <Slider 
-                          value={[toDisplay(width ?? 0, 'length')]} 
-                          onValueChange={(vals) => setWidth(fromDisplay(vals[0], 'length'))} 
-                          min={toDisplay(1, 'length')} 
-                          max={toDisplay(1000, 'length')} 
-                          step={0.1}
-                        />
                       </div>
                       <div className="grid gap-1.5">
                         <Label htmlFor="height" className="text-[10px] uppercase font-bold text-slate-400">{t.height} ({u.length})</Label>
@@ -3793,13 +3785,6 @@ export function App() {
                           precision={unitSystem === 'metric' ? 0 : 2}
                           value={toDisplay(height ?? 0, 'length')} 
                           onChange={(val) => setHeight(fromDisplay(val, 'length'))}
-                        />
-                        <Slider 
-                          value={[toDisplay(height ?? 0, 'length')]} 
-                          onValueChange={(vals) => setHeight(fromDisplay(vals[0], 'length'))} 
-                          min={toDisplay(1, 'length')} 
-                          max={toDisplay(1000, 'length')} 
-                          step={0.1}
                         />
                       </div>
                     </div>
