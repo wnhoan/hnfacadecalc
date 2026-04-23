@@ -48,7 +48,9 @@ import {
   Zap,
   Image as ImageIcon,
   Paperclip,
-  Square
+  Square,
+  Link,
+  Droplet
 } from 'lucide-react';
 import { 
   Card, 
@@ -295,6 +297,18 @@ const PANEL_MATERIALS = {
   acm_3mm: { name: 'ACM / Composite (3mm)', e: 70000, yield: 120, density: 1500, poisson: 0.25, skinThickness: 0.5, totalThickness: 3.0 },
 };
 
+const SEALANT_MATERIALS = {
+  silicone_structural: { name: 'Structural Silicone', dynamicStress: 0.14, staticStress: 0.011, eModulus: 1.5 },
+  silicone_weather: { name: 'Weather Silicone', dynamicStress: 0.05, staticStress: 0.005, eModulus: 0.8 },
+  pu_sealant: { name: 'PU Sealant', dynamicStress: 0.08, staticStress: 0.008, eModulus: 1.2 },
+};
+
+const BRACKET_TYPES = {
+  dead_load: { name: 'Dead Load Bracket', description: 'Supports vertical gravity loads' },
+  wind_load: { name: 'Wind Load Bracket (Slotted)', description: 'Supports horizontal wind while allowing vertical movement' },
+  combined: { name: 'Fixed Connection (Dead + Wind)', description: 'Supports all directions' },
+};
+
 const TRANSLATIONS = {
   en: {
     title: 'FacadeCalc',
@@ -366,6 +380,19 @@ const TRANSLATIONS = {
     stiffenerSpacing: 'Stiffener Spacing',
     maxSkinDeflection: 'Max Skin Deflection',
     maxSkinStress: 'Max Skin Stress',
+    sealantMode: 'Structural Sealant',
+    bracketMode: 'Fixing Bracket',
+    sealantProps: 'Sealant Properties',
+    bracketProps: 'Bracket Properties',
+    glassDims: 'Glass Dimensions',
+    biteDept: 'Bite Depth',
+    contactWidth: 'Contact Width',
+    tributaryArea: 'Tributary Area',
+    boltProps: 'Bolt Specification',
+    boltDiameter: 'Bolt Diameter',
+    boltCount: 'Bolt Count',
+    deadLoad: 'Dead Load',
+    windPressure: 'Wind Pressure',
   },
   zh: {
     title: '幕墙结构计算',
@@ -437,6 +464,19 @@ const TRANSLATIONS = {
     stiffenerSpacing: '筋条间距',
     maxSkinDeflection: '最大面板挠度',
     maxSkinStress: '最大面板应力',
+    sealantMode: '结构硅酮胶',
+    bracketMode: '连接转接件',
+    sealantProps: '密封胶属性',
+    bracketProps: '支座/转接件属性',
+    glassDims: '玻璃尺寸',
+    biteDept: '打胶深度 (Bite)',
+    contactWidth: '接触宽度',
+    tributaryArea: '受荷面积',
+    boltProps: '螺栓规格',
+    boltDiameter: '螺栓直径',
+    boltCount: '螺栓数量',
+    deadLoad: '恒载 (Dead Load)',
+    windPressure: '风压 (Wind)',
   },
   th: {
     title: 'FacadeCalc',
@@ -885,10 +925,12 @@ interface HistoryState {
   projectDate: string;
   projectTime: string;
   projectAttachment?: string;
-  calculationMode: 'beam' | 'panel';
+  calculationMode: 'beam' | 'panel' | 'bracket' | 'sealant';
   length: number;
   material: keyof typeof MATERIALS;
   panelMaterialId: keyof typeof PANEL_MATERIALS;
+  sealantMaterialId: keyof typeof SEALANT_MATERIALS;
+  bracketTypeId: keyof typeof BRACKET_TYPES;
   sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate';
   beamType: 'mullion' | 'transom';
   width: number;
@@ -902,6 +944,18 @@ interface HistoryState {
   stiffenerWidth: number;
   stiffenerHeight: number;
   stiffenerThickness: number;
+  // Sealant specific
+  glassWidth: number;
+  glassHeight: number;
+  windPressureInput: number;
+  deadLoadInput: number;
+  // Bracket specific
+  tributaryArea: number;
+  bracketWidth: number;
+  bracketHeight: number;
+  bracketThickness: number;
+  boltDiameter: number;
+  boltCount: number;
   selectedCodeId: string;
   loads: Load[];
   combinations: Combination[];
@@ -928,6 +982,8 @@ const createNewProject = (id: string, title: string): Project => ({
   length: 3500,
   material: 'aluminum_6061_t6',
   panelMaterialId: 'aluminum_solid',
+  sealantMaterialId: 'silicone_structural',
+  bracketTypeId: 'combined',
   sectionType: 'hollow',
   beamType: 'mullion',
   width: 65,
@@ -941,6 +997,18 @@ const createNewProject = (id: string, title: string): Project => ({
   stiffenerWidth: 40,
   stiffenerHeight: 40,
   stiffenerThickness: 2,
+  // Sealant defaults
+  glassWidth: 1500,
+  glassHeight: 3000,
+  windPressureInput: 1.5,
+  deadLoadInput: 0.5,
+  // Bracket defaults
+  tributaryArea: 4.5,
+  bracketWidth: 100,
+  bracketHeight: 150,
+  bracketThickness: 10,
+  boltDiameter: 12,
+  boltCount: 2,
   selectedCodeId: 'Shanghai',
   loads: [{ id: '1', type: 'udl', category: 'dead', value: 0.5 }],
   combinations: DEFAULT_COMBINATIONS,
@@ -997,6 +1065,297 @@ const getProjectResults = (project: Project) => {
       }
     };
   }
+};
+
+const calculatePanelResults = (project: Project) => {
+  if (project.calculationMode !== 'panel') return null;
+
+  const mat = PANEL_MATERIALS[project.panelMaterialId];
+  const E = mat.e;
+  const nu = mat.poisson;
+  const t = (mat as any).totalThickness ?? project.thickness ?? 3.0;
+  
+  const activeCombination = project.combinations.find(c => c.id === project.activeCombinationId) || project.combinations[0];
+
+  const q_wind_factored = project.loads
+    .filter(l => l.category === 'wind')
+    .reduce((sum, l) => sum + (safeParseNumber(l.value, 0) / 1000) * (activeCombination.factors.wind || 0), 0);
+
+  const b_panel = Math.min(project.width, project.length);
+  const a_panel = Math.max(project.width, project.length);
+  
+  const stiffenerCount = project.stiffenerCount ?? 0;
+  const b_eff = stiffenerCount > 0 ? (project.length / (stiffenerCount + 1)) : b_panel;
+  const a_eff = project.width;
+  const s_min = Math.min(a_eff, b_eff);
+  const s_max = Math.max(a_eff, b_eff);
+  const ratio = s_max / s_min;
+
+  const alphaMap = [
+    { r: 1.0, a: 0.00406, b: 0.2874 },
+    { r: 1.2, a: 0.00564, b: 0.3762 },
+    { r: 1.4, a: 0.00705, b: 0.4530 },
+    { r: 1.6, a: 0.00830, b: 0.5172 },
+    { r: 1.8, a: 0.00931, b: 0.5688 },
+    { r: 2.0, a: 0.01013, b: 0.6102 },
+    { r: 3.0, a: 0.01223, b: 0.7134 },
+    { r: 5.0, a: 0.01297, b: 0.7410 },
+    { r: 10, a: 0.01302, b: 0.7500 },
+  ];
+
+  let alpha = 0.01302;
+  let beta = 0.7500;
+  for (let i = 0; i < alphaMap.length - 1; i++) {
+    if (ratio >= alphaMap[i].r && ratio <= alphaMap[i+1].r) {
+      const frac = (ratio - alphaMap[i].r) / (alphaMap[i+1].r - alphaMap[i].r);
+      alpha = alphaMap[i].a + frac * (alphaMap[i+1].a - alphaMap[i].a);
+      beta = alphaMap[i].b + frac * (alphaMap[i+1].b - alphaMap[i].b);
+      break;
+    }
+  }
+
+  const D = (E * Math.pow(t, 3)) / (12 * (1 - nu * nu));
+  const maxSkinDeflection = (alpha * q_wind_factored * Math.pow(s_min, 4)) / D;
+  const maxSkinStress = (beta * q_wind_factored * Math.pow(s_min, 2)) / (t * t);
+
+  const tribWidth = project.width / (stiffenerCount + 1);
+  const stiffenerLoads = project.loads.map(l => ({
+    ...l,
+    value: l.type === 'udl' ? l.value * tribWidth : l.value,
+    value2: l.value2 !== undefined ? l.value2 * tribWidth : undefined,
+  }));
+
+  const stiffProps = calculateLPlateProperties(project.stiffenerWidth, project.stiffenerHeight, project.stiffenerThickness, project.stiffenerThickness);
+  const stiffenerBeamProps = {
+    length: project.length,
+    elasticModulus: 70000,
+    momentOfInertia: stiffProps.momentOfInertia,
+    sectionModulus: stiffProps.sectionModulus,
+    yieldStrength: 160,
+    safetyFactor: project.safetyFactor,
+    supportCondition: 'simply_supported' as any,
+  };
+
+  const stiffenerAnalysis = calculateBeam(stiffenerBeamProps, stiffenerLoads.map(l => ({
+    ...l,
+    value: safeParseNumber(l.value, 0) * (activeCombination.factors[l.category] || 0),
+    value2: l.value2 !== undefined ? safeParseNumber(l.value2, 0) * (activeCombination.factors[l.category] || 0) : undefined,
+  })));
+
+  return {
+    skin: {
+      deflection: maxSkinDeflection,
+      stress: maxSkinStress,
+      allowableStress: mat.yield / project.safetyFactor,
+      allowableDeflection: s_min / 60,
+      utilizationStress: maxSkinStress / (mat.yield / project.safetyFactor),
+      utilizationDeflection: maxSkinDeflection / (s_min / 60)
+    },
+    dimensions: {
+      a: s_max,
+      b: s_min
+    },
+    stiffener: stiffenerCount > 0 ? {
+      ...stiffenerAnalysis.summary,
+      loadWidth: tribWidth,
+      count: stiffenerCount
+    } : null,
+    summary: {
+       utilization: Math.max(maxSkinStress / (mat.yield / project.safetyFactor), maxSkinDeflection / (s_min / 60), (stiffenerCount > 0 ? stiffenerAnalysis.summary.utilizationStress : 0)),
+       status: (maxSkinStress / (mat.yield / project.safetyFactor) <= 1 && maxSkinDeflection / (s_min / 60) <= 1 && (stiffenerCount > 0 ? stiffenerAnalysis.summary.status === 'pass' : true)) ? 'pass' as const : 'fail' as const,
+       weight: (mat.density * project.width * project.length * t * 1e-9) // Added weight field back into summary for view
+    },
+    totalWeight: (mat.density * project.width * project.length * t * 1e-9)
+  };
+};
+
+const calculateSealantResults = (project: Project) => {
+  if (project.calculationMode !== 'sealant') return null;
+
+  const mat = SEALANT_MATERIALS[project.sealantMaterialId];
+  const w = project.glassWidth;
+  const h = project.glassHeight;
+  const q_wind = project.windPressureInput;
+  const dl = project.deadLoadInput;
+  
+  const biteDynamic = (q_wind * Math.min(w, h)) / (2 * mat.dynamicStress);
+  const glassThicknessAssumed = 10;
+  const weight = (w * h * glassThicknessAssumed * 2500 * 9.81 * 1e-9);
+  const biteStatic = weight / ((2 * w + 2 * h) * mat.staticStress);
+
+  const requiredBite = Math.max(0, biteDynamic, biteStatic, 6);
+  
+  return {
+    biteDynamic,
+    biteStatic,
+    requiredBite,
+    utilization: requiredBite / Math.max(1, project.width),
+    status: requiredBite <= project.width ? 'pass' : 'fail'
+  };
+};
+
+const calculateBracketResults = (project: Project) => {
+  if (project.calculationMode !== 'bracket') return null;
+
+  const mat = MATERIALS[project.material];
+  const fy = mat.yield;
+  const q_wind = project.windPressureInput;
+  const totalForce = q_wind * project.tributaryArea * 1000;
+  
+  const boltArea = Math.PI * Math.pow(project.boltDiameter / 2, 2);
+  const boltShearStress = totalForce / (project.boltCount * boltArea);
+  const boltUtilization = boltShearStress / (420 / 2);
+  
+  const bearingStress = totalForce / (project.boltCount * project.boltDiameter * project.bracketThickness);
+  const bearingUtilization = bearingStress / (fy / project.safetyFactor);
+  
+  const eccentricity = 50; 
+  const moment = totalForce * eccentricity;
+  const Z = (project.bracketWidth * Math.pow(project.bracketThickness, 2)) / 6;
+  const bendingStress = moment / Z;
+  const bendingUtilization = bendingStress / (fy / project.safetyFactor);
+
+  const maxUtil = Math.max(boltUtilization, bearingUtilization, bendingUtilization);
+
+  return {
+    boltShearStress,
+    bearingStress,
+    bendingStress,
+    boltUtilization,
+    bearingUtilization,
+    bendingUtilization,
+    maxUtilization: maxUtil,
+    status: maxUtil <= 1.0 ? 'pass' : 'fail'
+  };
+};
+
+const SealantResultsView = ({
+  results,
+  unitSystem,
+  t,
+  u,
+  toDisplay,
+}: {
+  results: any;
+  unitSystem: string;
+  t: any;
+  u: any;
+  toDisplay: (v: number, type: string) => number;
+}) => {
+  return (
+    <div className="space-y-4">
+      <Card 
+        className={cn(
+          "shadow-sm border-slate-200 bg-gradient-to-br from-white to-slate-50/30",
+          results.status === 'pass' ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
+        )}
+      >
+        <CardContent className="p-4 sm:p-6 text-center">
+          <Droplet className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+          <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Structural Silicone Result</h3>
+          <div className="flex items-center justify-center gap-4 mt-2">
+            <div className="text-sm font-bold text-slate-500">
+               Utilization: <span className={cn("text-xl", (results.utilization ?? 0) > 1 ? "text-red-600" : "text-green-600")}>{((results.utilization ?? 0) * 100).toFixed(1)}%</span>
+            </div>
+            <Badge variant={results.status === 'pass' ? 'outline' : 'destructive'} className={cn(
+              "text-[10px] font-bold uppercase",
+              results.status === 'pass' && "border-green-200 bg-green-50 text-green-700"
+            )}>
+              {results.status === 'pass' ? "PASS" : "FAIL"}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="p-4 shadow-sm border-slate-200">
+           <p className="text-[10px] font-bold text-slate-400 uppercase">Req. Bite (Dynamic/Wind)</p>
+           <p className="text-xl font-black text-slate-900">{(results.biteDynamic ?? 0).toFixed(2)} mm</p>
+        </Card>
+        <Card className="p-4 shadow-sm border-slate-200">
+           <p className="text-[10px] font-bold text-slate-400 uppercase">Req. Bite (Static/Dead)</p>
+           <p className="text-xl font-black text-slate-900">{(results.biteStatic ?? 0).toFixed(2)} mm</p>
+        </Card>
+      </div>
+      
+      <Card className="p-4 shadow-sm border-blue-100 bg-blue-50/20">
+         <div className="flex items-center justify-between">
+           <div>
+              <p className="text-[10px] font-bold text-blue-600 uppercase">Recommended Bite Depth</p>
+              <p className="text-2xl font-black text-slate-900">{Math.ceil(results.requiredBite)} mm</p>
+           </div>
+           <div className="text-right">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Design Rule</p>
+              <p className="text-xs font-medium text-slate-600 italic">ASTM C1184 / GB 16776</p>
+           </div>
+         </div>
+      </Card>
+    </div>
+  );
+};
+
+const BracketResultsView = ({
+  results,
+  unitSystem,
+  t,
+  u,
+  toDisplay,
+}: {
+  results: any;
+  unitSystem: string;
+  t: any;
+  u: any;
+  toDisplay: (v: number, type: string) => number;
+}) => {
+  return (
+    <div className="space-y-4">
+      <Card 
+        className={cn(
+          "shadow-sm border-slate-200 bg-gradient-to-br from-white to-slate-50/30",
+          results.status === 'pass' ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
+        )}
+      >
+        <CardContent className="p-4 sm:p-6 relative overflow-hidden">
+          <div className="flex items-center justify-between relative z-10">
+            <div>
+              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Bracket Connection Status</h3>
+              <div className="flex items-center gap-2 mt-1">
+                 <Badge variant={results.status === 'pass' ? 'outline' : 'destructive'} className={cn(
+                  "text-[10px] font-bold uppercase",
+                  results.status === 'pass' && "border-green-200 bg-green-50 text-green-700"
+                )}>
+                  {results.status === 'pass' ? "PASS" : "FAIL"}
+                </Badge>
+                <span className="text-[10px] font-bold text-slate-400">Max Util: {((results.maxUtilization ?? 0) * 100).toFixed(1)}%</span>
+              </div>
+            </div>
+            <Link className="w-10 h-10 text-slate-100 absolute -right-2 -bottom-2 rotate-12" />
+          </div>
+          <div className="mt-4 h-2 bg-slate-100 rounded-full">
+             <div className={cn("h-full rounded-full transition-all", (results.maxUtilization ?? 0) > 1 ? "bg-red-500" : "bg-blue-600")} style={{ width: `${Math.min(100, (results.maxUtilization ?? 0) * 100)}%` }} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
+         <Card className="p-3 border-slate-100 shadow-sm">
+            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Bolt Shear</p>
+            <p className="text-sm font-black text-slate-800">{(results.boltShearStress ?? 0).toFixed(1)} MPa</p>
+            <div className="text-[8px] font-bold mt-1" style={{ color: (results.boltUtilization ?? 0) > 1 ? 'red' : 'green' }}>{((results.boltUtilization ?? 0) * 100).toFixed(0)}%</div>
+         </Card>
+         <Card className="p-3 border-slate-100 shadow-sm">
+            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Bearing</p>
+            <p className="text-sm font-black text-slate-800">{(results.bearingStress ?? 0).toFixed(1)} MPa</p>
+            <div className="text-[8px] font-bold mt-1" style={{ color: (results.bearingUtilization ?? 0) > 1 ? 'red' : 'green' }}>{((results.bearingUtilization ?? 0) * 100).toFixed(0)}%</div>
+         </Card>
+         <Card className="p-3 border-slate-100 shadow-sm">
+            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Bending</p>
+            <p className="text-sm font-black text-slate-800">{(results.bendingStress ?? 0).toFixed(1)} MPa</p>
+            <div className="text-[8px] font-bold mt-1" style={{ color: (results.bendingUtilization ?? 0) > 1 ? 'red' : 'green' }}>{((results.bendingUtilization ?? 0) * 100).toFixed(0)}%</div>
+         </Card>
+      </div>
+    </div>
+  );
 };
 
 const PanelResultsView = ({
@@ -1073,24 +1432,24 @@ const PanelResultsView = ({
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
-                  <p className="text-lg font-black text-slate-900">{results.skin.deflection.toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
-                  <Badge variant={results.skin.utilizationDeflection > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
-                    U: {(results.skin.utilizationDeflection * 100).toFixed(1)}%
+                  <p className="text-lg font-black text-slate-900">{(results.skin?.deflection ?? 0).toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
+                  <Badge variant={(results.skin?.utilizationDeflection ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
+                    U: {((results.skin?.utilizationDeflection ?? 0) * 100).toFixed(1)}%
                   </Badge>
                 </div>
                 <div className="space-y-1 text-right">
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Max Stress</p>
-                  <p className="text-lg font-black text-slate-900">{results.skin.stress.toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
-                  <Badge variant={results.skin.utilizationStress > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
-                    U: {(results.skin.utilizationStress * 100).toFixed(1)}%
+                  <p className="text-lg font-black text-slate-900">{(results.skin?.stress ?? 0).toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
+                  <Badge variant={(results.skin?.utilizationStress ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
+                    U: {((results.skin?.utilizationStress ?? 0) * 100).toFixed(1)}%
                   </Badge>
                 </div>
              </div>
              <Separator className="bg-slate-100" />
              <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 italic">
-               <div>a: {results.dimensions?.a.toFixed(0)}mm</div>
-               <div className="text-center">b: {results.dimensions?.b.toFixed(0)}mm</div>
-               <div className="text-right">a/b: {(results.dimensions?.a / results.dimensions?.b).toFixed(2)}</div>
+               <div>a: {(results.dimensions?.a ?? 0).toFixed(0)}mm</div>
+               <div className="text-center">b: {(results.dimensions?.b ?? 0).toFixed(0)}mm</div>
+               <div className="text-right">a/b: {((results.dimensions?.a ?? 0) / (results.dimensions?.b ?? 1)).toFixed(2)}</div>
              </div>
           </CardContent>
         </Card>
@@ -1109,21 +1468,21 @@ const PanelResultsView = ({
                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
-                      <p className="text-lg font-black text-slate-900">{results.stiffener.maxDeflection.toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
-                      <Badge variant={results.stiffener.utilizationDeflection > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
-                        U: {(results.stiffener.utilizationDeflection * 100).toFixed(1)}%
+                      <p className="text-lg font-black text-slate-900">{(results.stiffener?.maxDeflection ?? 0).toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
+                      <Badge variant={(results.stiffener?.utilizationDeflection ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
+                        U: {((results.stiffener?.utilizationDeflection ?? 0) * 100).toFixed(1)}%
                       </Badge>
                     </div>
                     <div className="space-y-1 text-right">
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress</p>
-                      <p className="text-lg font-black text-slate-900">{results.stiffener.maxStress.toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
-                      <Badge variant={results.stiffener.utilizationStress > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
-                        U: {(results.stiffener.utilizationStress * 100).toFixed(1)}%
+                      <p className="text-lg font-black text-slate-900">{(results.stiffener?.maxStress ?? 0).toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
+                      <Badge variant={(results.stiffener?.utilizationStress ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
+                        U: {((results.stiffener?.utilizationStress ?? 0) * 100).toFixed(1)}%
                       </Badge>
                     </div>
                  </div>
                  <div className="pt-2">
-                   <p className="text-[10px] text-slate-400 font-mono">Tributary: {results.stiffener.loadWidth.toFixed(0)} mm | Count: {results.stiffener.count}</p>
+                   <p className="text-[10px] text-slate-400 font-mono">Tributary: {(results.stiffener?.loadWidth ?? 0).toFixed(0)} mm | Count: {results.stiffener?.count}</p>
                  </div>
                </>
              ) : (
@@ -1145,7 +1504,7 @@ const PanelResultsView = ({
              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest leading-none">Estimated Total Weight</p>
            </div>
            <div className="text-right">
-             <p className="text-xl font-black text-slate-900">{(results.summary.weight / 9.81).toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span></p>
+             <p className="text-xl font-black text-slate-900">{((results.summary?.weight ?? 0) / 9.81).toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span></p>
              <p className="text-[10px] text-slate-400 font-mono">Includes Skin + Stiffeners</p>
            </div>
         </CardContent>
@@ -1158,6 +1517,8 @@ const ProjectResultsView = ({
   project, 
   results, 
   panelResults,
+  sealantResults,
+  bracketResults,
   calculationMode,
   unitSystem, 
   t, 
@@ -1171,7 +1532,9 @@ const ProjectResultsView = ({
 }: { 
   project: Project; 
   results: any; 
-  panelResults?: any;
+  panelResults: any;
+  sealantResults: any;
+  bracketResults: any;
   calculationMode: string;
   unitSystem: string; 
   t: any; 
@@ -1185,6 +1548,14 @@ const ProjectResultsView = ({
 }) => {
   if (calculationMode === 'panel' && panelResults) {
     return <PanelResultsView results={panelResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
+  }
+
+  if (calculationMode === 'sealant' && sealantResults) {
+    return <SealantResultsView results={sealantResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
+  }
+
+  if (calculationMode === 'bracket' && bracketResults) {
+    return <BracketResultsView results={bracketResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
   }
 
   const governingCriteria = results.summary.utilizationStress >= results.summary.utilizationDeflection ? 'Stress' : 'Deflection';
@@ -2310,7 +2681,7 @@ export function App() {
   const [isBiViewMode, setIsBiViewMode] = useState(false);
 
   // Project Info State
-  const [calculationMode, setCalculationMode] = useState<'beam' | 'panel'>(() => {
+  const [calculationMode, setCalculationMode] = useState<'beam' | 'panel' | 'sealant' | 'bracket'>(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
       try {
@@ -2337,6 +2708,19 @@ export function App() {
   const [stiffenerWidth, setStiffenerWidth] = useState(40);
   const [stiffenerHeight, setStiffenerHeight] = useState(40);
   const [stiffenerThickness, setStiffenerThickness] = useState(2.0);
+
+  const [sealantMaterialId, setSealantMaterialId] = useState<keyof typeof SEALANT_MATERIALS>('silicone_structural');
+  const [bracketTypeId, setBracketTypeId] = useState<keyof typeof BRACKET_TYPES>('combined');
+  const [glassWidth, setGlassWidth] = useState(1500);
+  const [glassHeight, setGlassHeight] = useState(3000);
+  const [windPressureInput, setWindPressureInput] = useState(1.5);
+  const [deadLoadInput, setDeadLoadInput] = useState(0.5);
+  const [tributaryArea, setTributaryArea] = useState(4.5);
+  const [bracketWidth, setBracketWidth] = useState(100);
+  const [bracketHeight, setBracketHeight] = useState(150);
+  const [bracketThickness, setBracketThickness] = useState(10);
+  const [boltDiameter, setBoltDiameter] = useState(12);
+  const [boltCount, setBoltCount] = useState(2);
 
   const [projectTitle, setProjectTitle] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -2521,6 +2905,8 @@ export function App() {
     length,
     material,
     panelMaterialId,
+    sealantMaterialId,
+    bracketTypeId,
     sectionType,
     beamType,
     width,
@@ -2534,6 +2920,16 @@ export function App() {
     stiffenerWidth,
     stiffenerHeight,
     stiffenerThickness,
+    glassWidth,
+    glassHeight,
+    windPressureInput,
+    deadLoadInput,
+    tributaryArea,
+    bracketWidth,
+    bracketHeight,
+    bracketThickness,
+    boltDiameter,
+    boltCount,
     selectedCodeId,
     loads,
     combinations,
@@ -2556,6 +2952,8 @@ export function App() {
     setLength(state.length);
     setMaterial(state.material);
     setPanelMaterialId(state.panelMaterialId ?? 'aluminum_solid');
+    setSealantMaterialId(state.sealantMaterialId ?? 'silicone_structural');
+    setBracketTypeId(state.bracketTypeId ?? 'combined');
     setSectionType(state.sectionType);
     setWidth(state.width);
     setHeight(state.height);
@@ -2568,6 +2966,16 @@ export function App() {
     setStiffenerWidth(state.stiffenerWidth ?? 40);
     setStiffenerHeight(state.stiffenerHeight ?? 40);
     setStiffenerThickness(state.stiffenerThickness ?? 2);
+    setGlassWidth(state.glassWidth ?? 1500);
+    setGlassHeight(state.glassHeight ?? 3000);
+    setWindPressureInput(state.windPressureInput ?? 1.5);
+    setDeadLoadInput(state.deadLoadInput ?? 0.5);
+    setTributaryArea(state.tributaryArea ?? 4.5);
+    setBracketWidth(state.bracketWidth ?? 100);
+    setBracketHeight(state.bracketHeight ?? 150);
+    setBracketThickness(state.bracketThickness ?? 10);
+    setBoltDiameter(state.boltDiameter ?? 12);
+    setBoltCount(state.boltCount ?? 2);
     setSelectedCodeId(state.selectedCodeId);
     setLoads(state.loads);
     setCombinations(state.combinations);
@@ -2816,94 +3224,16 @@ export function App() {
   , [results, unitSystem, u, toDisplay]);
 
   const panelResults = useMemo(() => {
-    if (calculationMode !== 'panel') return null;
+    return calculatePanelResults({ ...getCurrentState(), id: activeProjectId });
+  }, [calculationMode, panelMaterialId, width, length, loads, activeCombinationId, combinations, stiffenerCount, stiffenerWidth, stiffenerHeight, stiffenerThickness, safetyFactor]);
 
-    const mat = PANEL_MATERIALS[panelMaterialId];
-    const E = mat.e;
-    const nu = mat.poisson;
-    const t = (mat as any).totalThickness ?? 3.0;
-    
-    // Total wind pressure in MPa (N/mm2)
-    const q_wind_factored = loads
-      .filter(l => l.category === 'wind')
-      .reduce((sum, l) => sum + (safeParseNumber(l.value, 0) / 1000) * (activeCombination.factors.wind || 0), 0);
+  const sealantResults = useMemo(() => {
+    return calculateSealantResults({ ...getCurrentState(), id: activeProjectId });
+  }, [calculationMode, sealantMaterialId, glassWidth, glassHeight, windPressureInput, deadLoadInput, width, thickness]);
 
-    const b_panel = Math.min(width, length);
-    const a_panel = Math.max(width, length);
-    
-    const b_eff = stiffenerCount > 0 ? (length / (stiffenerCount + 1)) : b_panel;
-    const a_eff = width;
-    const s_min = Math.min(a_eff, b_eff);
-    const s_max = Math.max(a_eff, b_eff);
-    const ratio = s_max / s_min;
-
-    // Roark coefficients
-    const alphaMap = [
-      { r: 1.0, a: 0.00406, b: 0.2874 },
-      { r: 1.2, a: 0.00564, b: 0.3762 },
-      { r: 1.4, a: 0.00705, b: 0.4530 },
-      { r: 1.6, a: 0.00830, b: 0.5172 },
-      { r: 1.8, a: 0.00931, b: 0.5688 },
-      { r: 2.0, a: 0.01013, b: 0.6102 },
-      { r: 3.0, a: 0.01223, b: 0.7134 },
-      { r: 5.0, a: 0.01297, b: 0.7410 },
-      { r: 10, a: 0.01302, b: 0.7500 },
-    ];
-
-    let alpha = 0.01302;
-    let beta = 0.7500;
-    for (let i = 0; i < alphaMap.length - 1; i++) {
-      if (ratio >= alphaMap[i].r && ratio <= alphaMap[i+1].r) {
-        const frac = (ratio - alphaMap[i].r) / (alphaMap[i+1].r - alphaMap[i].r);
-        alpha = alphaMap[i].a + frac * (alphaMap[i+1].a - alphaMap[i].a);
-        beta = alphaMap[i].b + frac * (alphaMap[i+1].b - alphaMap[i].b);
-        break;
-      }
-    }
-
-    const D = (E * Math.pow(t, 3)) / (12 * (1 - nu * nu));
-    const maxSkinDeflection = (alpha * q_wind_factored * Math.pow(s_min, 4)) / D;
-    const maxSkinStress = (beta * q_wind_factored * Math.pow(s_min, 2)) / (t * t);
-
-    // Stiffener Analysis
-    const tribWidth = width / (stiffenerCount + 1);
-    const stiffenerLoads = loads.map(l => ({
-      ...l,
-      value: l.type === 'udl' ? l.value * tribWidth : l.value,
-      value2: l.value2 !== undefined ? l.value2 * tribWidth : undefined,
-    }));
-
-    const stiffProps = calculateLPlateProperties(stiffenerWidth, stiffenerHeight, stiffenerThickness, stiffenerThickness);
-    
-    const stiffenerBeamProps = {
-      length: length,
-      elasticModulus: 70000,
-      momentOfInertia: stiffProps.momentOfInertia,
-      sectionModulus: stiffProps.sectionModulus,
-      yieldStrength: 160,
-      safetyFactor: safetyFactor,
-      supportCondition: 'simply_supported' as any,
-    };
-
-    const stiffenerAnalysis = calculateBeam(stiffenerBeamProps, stiffenerLoads.map(l => ({
-      ...l,
-      value: safeParseNumber(l.value, 0) * (activeCombination.factors[l.category] || 0),
-      value2: l.value2 !== undefined ? safeParseNumber(l.value2, 0) * (activeCombination.factors[l.category] || 0) : undefined,
-    })));
-
-    return {
-      skin: {
-        deflection: maxSkinDeflection,
-        stress: maxSkinStress,
-        allowableStress: mat.yield / safetyFactor,
-        allowableDeflection: s_min / 60,
-        utilizationStress: maxSkinStress / (mat.yield / safetyFactor),
-        utilizationDeflection: maxSkinDeflection / (s_min / 60)
-      },
-      stiffener: stiffenerAnalysis.summary,
-      totalWeight: (mat.density * width * length * t * 1e-9)
-    };
-  }, [calculationMode, panelMaterialId, width, length, loads, activeCombination, stiffenerCount, stiffenerWidth, stiffenerHeight, stiffenerThickness, safetyFactor]);
+  const bracketResults = useMemo(() => {
+    return calculateBracketResults({ ...getCurrentState(), id: activeProjectId });
+  }, [calculationMode, material, tributaryArea, windPressureInput, boltDiameter, boltCount, bracketWidth, bracketThickness, safetyFactor]);
 
   const addLoad = (type: Load['type'] = 'point', category: Load['category'] = 'dead', value?: number) => {
     const newLoad: Load = {
@@ -3492,18 +3822,23 @@ export function App() {
                     <div className="px-1">
                       <Tabs value={calculationMode} onValueChange={(v: any) => {
                         setCalculationMode(v);
-                        if (v === 'panel') {
-                          // Default loads for panel?
-                        }
                       }} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 h-9 p-1 bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm rounded-xl">
-                          <TabsTrigger value="beam" className="text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1.5">
+                        <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm rounded-xl">
+                          <TabsTrigger value="beam" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
                             <Box className="w-3 h-3" />
                             {t.beamMode}
                           </TabsTrigger>
-                          <TabsTrigger value="panel" className="text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1.5">
+                          <TabsTrigger value="panel" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
                             <Square className="w-3 h-3" />
                             {t.panelMode}
+                          </TabsTrigger>
+                          <TabsTrigger value="sealant" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
+                            <Droplet className="w-3 h-3" />
+                            Sealant
+                          </TabsTrigger>
+                          <TabsTrigger value="bracket" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
+                            <Link className="w-3 h-3" />
+                            Bracket
                           </TabsTrigger>
                         </TabsList>
                       </Tabs>
@@ -3988,7 +4323,7 @@ export function App() {
                     </div>
 
                     <div className="grid gap-1.5">
-                      <Label htmlFor="length" className="text-[10px] uppercase font-bold text-slate-400">{calculationMode === 'beam' ? t.span : 'Panel Height'} ({u.length})</Label>
+                      <Label htmlFor="length" className="text-[10px] uppercase font-bold text-slate-400">{(calculationMode as string) === 'beam' ? t.span : 'Panel Height'} ({u.length})</Label>
                       <NumericInputWithControls 
                         id="length"
                         min={toDisplay(100, 'length')}
@@ -4000,7 +4335,7 @@ export function App() {
                       />
                     </div>
 
-                    {calculationMode === 'panel' && (
+                    {(calculationMode as string) === 'panel' && (
                       <div className="grid gap-1.5">
                         <Label htmlFor="width" className="text-[10px] uppercase font-bold text-slate-400">Panel Width ({u.length})</Label>
                         <NumericInputWithControls 
@@ -4015,8 +4350,90 @@ export function App() {
                       </div>
                     )}
                     
+                    {/* Sealant specific */}
+                    {(calculationMode as string) === 'sealant' && (
+                      <div className="space-y-3 p-3 bg-blue-50/30 rounded-xl border border-blue-100">
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] uppercase font-bold text-blue-600">Sealant Material</Label>
+                          <Select value={sealantMaterialId} onValueChange={(v: any) => setSealantMaterialId(v)}>
+                            <SelectTrigger className="bg-white h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(SEALANT_MATERIALS).map(([key, m]) => (
+                                <SelectItem key={key} value={key} className="text-xs">{m.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">Glass Width ({u.length})</Label>
+                            <NumericInputWithControls value={toDisplay(glassWidth, 'length')} onChange={(v) => setGlassWidth(fromDisplay(v, 'length'))} />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">Glass Height ({u.length})</Label>
+                            <NumericInputWithControls value={toDisplay(glassHeight, 'length')} onChange={(v) => setGlassHeight(fromDisplay(v, 'length'))} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">Wind Pressure (kPa)</Label>
+                            <NumericInputWithControls value={windPressureInput} step={0.1} onChange={setWindPressureInput} />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">Actual Bite ({u.length})</Label>
+                            <NumericInputWithControls value={toDisplay(width, 'length')} onChange={(v) => setWidth(fromDisplay(v, 'length'))} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bracket specific */}
+                    {(calculationMode as string) === 'bracket' && (
+                      <div className="space-y-3 p-3 bg-rose-50/30 rounded-xl border border-rose-100">
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] uppercase font-bold text-rose-600">Bracket Type</Label>
+                          <Select value={bracketTypeId} onValueChange={(v: any) => setBracketTypeId(v)}>
+                            <SelectTrigger className="bg-white h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(BRACKET_TYPES).map(([key, m]) => (
+                                <SelectItem key={key} value={key} className="text-xs">{m.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">Tributary Area (m²)</Label>
+                            <NumericInputWithControls value={tributaryArea} step={0.1} onChange={setTributaryArea} />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">Wind Pressure (kPa)</Label>
+                            <NumericInputWithControls value={windPressureInput} step={0.1} onChange={setWindPressureInput} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">B (mm)</Label>
+                            <NumericInputWithControls value={bracketWidth} min={10} onChange={setBracketWidth} />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">T (mm)</Label>
+                            <NumericInputWithControls value={bracketThickness} min={1} onChange={setBracketThickness} />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">Bolts</Label>
+                            <NumericInputWithControls value={boltCount} min={1} step={1} onChange={setBoltCount} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="grid gap-1.5">
-                      <Label className="text-[10px] uppercase font-bold text-slate-400">{calculationMode === 'beam' ? t.material : t.skinMaterial}</Label>
+                      <Label className="text-[10px] uppercase font-bold text-slate-400">{calculationMode === 'beam' ? t.material : (calculationMode === 'panel' ? t.skinMaterial : 'Structure Material')}</Label>
                       {calculationMode === 'beam' ? (
                         <Select value={material} onValueChange={(v: any) => setMaterial(v)}>
                           <SelectTrigger className="bg-white h-8 text-sm">
@@ -4687,6 +5104,8 @@ export function App() {
                   project={{ ...getCurrentState(), id: activeProjectId }}
                   results={results}
                   panelResults={panelResults}
+                  sealantResults={sealantResults}
+                  bracketResults={bracketResults}
                   calculationMode={calculationMode}
                   unitSystem={unitSystem}
                   t={t}
@@ -4720,6 +5139,9 @@ export function App() {
                   <ProjectResultsView 
                     project={projects.find(p => p.id === comparisonProjectId)!}
                     results={getProjectResults(projects.find(p => p.id === comparisonProjectId)!)}
+                    panelResults={calculatePanelResults(projects.find(p => p.id === comparisonProjectId)!)}
+                    sealantResults={calculateSealantResults(projects.find(p => p.id === comparisonProjectId)!)}
+                    bracketResults={calculateBracketResults(projects.find(p => p.id === comparisonProjectId)!)}
                     calculationMode={projects.find(p => p.id === comparisonProjectId)!.calculationMode || 'beam'}
                     unitSystem={unitSystem}
                     t={t}
@@ -4744,6 +5166,8 @@ export function App() {
               project={{ ...getCurrentState(), id: activeProjectId }}
               results={results}
               panelResults={panelResults}
+              sealantResults={sealantResults}
+              bracketResults={bracketResults}
               calculationMode={calculationMode}
               unitSystem={unitSystem}
               t={t}
