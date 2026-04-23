@@ -47,7 +47,8 @@ import {
   Redo2,
   Zap,
   Image as ImageIcon,
-  Paperclip
+  Paperclip,
+  Square
 } from 'lucide-react';
 import { 
   Card, 
@@ -57,6 +58,7 @@ import {
   CardTitle,
   CardFooter
 } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -286,6 +288,13 @@ const LOCATION_SEISMIC_MAPPING: Record<string, keyof typeof SEISMIC_REGIONS> = {
   'cape town': 'singapore',
 };
 
+const PANEL_MATERIALS = {
+  aluminum_solid: { name: 'Solid Aluminum (3mm)', e: 70000, yield: 160, density: 2700, poisson: 0.33 },
+  aluminum_solid_high: { name: 'Solid Aluminum (High Strength)', e: 70000, yield: 240, density: 2700, poisson: 0.33 },
+  acm_4mm: { name: 'ACM / Composite (4mm)', e: 70000, yield: 120, density: 1500, poisson: 0.25, skinThickness: 0.5, totalThickness: 4.0 },
+  acm_3mm: { name: 'ACM / Composite (3mm)', e: 70000, yield: 120, density: 1500, poisson: 0.25, skinThickness: 0.5, totalThickness: 3.0 },
+};
+
 const TRANSLATIONS = {
   en: {
     title: 'FacadeCalc',
@@ -347,6 +356,16 @@ const TRANSLATIONS = {
     unitSystem: 'Unit System',
     metric: 'Metric (mm, MPa)',
     imperial: 'Imperial (in, psi)',
+    analysisMode: 'Analysis Mode',
+    beamMode: 'Beam Member',
+    panelMode: 'Cladding Panel',
+    panelProps: 'Panel Properties',
+    stiffenerProps: 'Backing Stiffeners',
+    skinMaterial: 'Skin Material',
+    skinThickness: 'Skin Thickness',
+    stiffenerSpacing: 'Stiffener Spacing',
+    maxSkinDeflection: 'Max Skin Deflection',
+    maxSkinStress: 'Max Skin Stress',
   },
   zh: {
     title: '幕墙结构计算',
@@ -408,6 +427,16 @@ const TRANSLATIONS = {
     unitSystem: '单位制',
     metric: '公制 (mm, MPa)',
     imperial: '英制 (in, psi)',
+    analysisMode: '分析模式',
+    beamMode: '结构梁',
+    panelMode: '幕墙面板',
+    panelProps: '面板属性',
+    stiffenerProps: '加强肋/后置筋',
+    skinMaterial: '面板材料',
+    skinThickness: '面板厚度',
+    stiffenerSpacing: '筋条间距',
+    maxSkinDeflection: '最大面板挠度',
+    maxSkinStress: '最大面板应力',
   },
   th: {
     title: 'FacadeCalc',
@@ -469,6 +498,16 @@ const TRANSLATIONS = {
     unitSystem: 'ระบบหน่วย',
     metric: 'เมตริก (mm, MPa)',
     imperial: 'อิมพีเรียล (in, psi)',
+    analysisMode: 'โหมดการวิเคราะห์',
+    beamMode: 'คานโครงสร้าง',
+    panelMode: 'แผงหุ้ม',
+    panelProps: 'คุณสมบัติของแผง',
+    stiffenerProps: 'ตัวเสริมความแข็งแรง',
+    skinMaterial: 'วัสดุผิว',
+    skinThickness: 'ความหนาของผิว',
+    stiffenerSpacing: 'ระยะห่างตัวเสริม',
+    maxSkinDeflection: 'การโก่งตัวสูงสุดของผิว',
+    maxSkinStress: 'หน่วยแรงสูงสุดของผิว',
   },
   ms: {
     title: 'FacadeCalc',
@@ -530,6 +569,16 @@ const TRANSLATIONS = {
     unitSystem: 'Sistem Unit',
     metric: 'Metrik (mm, MPa)',
     imperial: 'Imperial (in, psi)',
+    analysisMode: 'Mod Analisis',
+    beamMode: 'Rasuk Struktur',
+    panelMode: 'Panel Kemasan',
+    panelProps: 'Sifat Panel',
+    stiffenerProps: 'Pengeras Belakang',
+    skinMaterial: 'Bahan Kulit',
+    skinThickness: 'Ketebalan Kulit',
+    stiffenerSpacing: 'Jarak Pengeras',
+    maxSkinDeflection: 'Pesongan Kulit Maks',
+    maxSkinStress: 'Tegangan Kulit Maks',
   }
 };
 
@@ -836,8 +885,10 @@ interface HistoryState {
   projectDate: string;
   projectTime: string;
   projectAttachment?: string;
+  calculationMode: 'beam' | 'panel';
   length: number;
   material: keyof typeof MATERIALS;
+  panelMaterialId: keyof typeof PANEL_MATERIALS;
   sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate';
   beamType: 'mullion' | 'transom';
   width: number;
@@ -847,6 +898,10 @@ interface HistoryState {
   supportCondition: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous';
   intermediateSupports: number[];
   safetyFactor: number;
+  stiffenerCount: number;
+  stiffenerWidth: number;
+  stiffenerHeight: number;
+  stiffenerThickness: number;
   selectedCodeId: string;
   loads: Load[];
   combinations: Combination[];
@@ -869,8 +924,10 @@ const createNewProject = (id: string, title: string): Project => ({
   projectDate: new Date().toISOString().split('T')[0],
   projectTime: new Date().toTimeString().split(' ')[0].slice(0, 5),
   projectAttachment: '',
+  calculationMode: 'beam',
   length: 3500,
   material: 'aluminum_6061_t6',
+  panelMaterialId: 'aluminum_solid',
   sectionType: 'hollow',
   beamType: 'mullion',
   width: 65,
@@ -880,6 +937,10 @@ const createNewProject = (id: string, title: string): Project => ({
   supportCondition: 'simply_supported',
   intermediateSupports: [],
   safetyFactor: 1.5,
+  stiffenerCount: 0,
+  stiffenerWidth: 40,
+  stiffenerHeight: 40,
+  stiffenerThickness: 2,
   selectedCodeId: 'Shanghai',
   loads: [{ id: '1', type: 'udl', category: 'dead', value: 0.5 }],
   combinations: DEFAULT_COMBINATIONS,
@@ -938,9 +999,166 @@ const getProjectResults = (project: Project) => {
   }
 };
 
+const PanelResultsView = ({
+  results,
+  unitSystem,
+  t,
+  u,
+  toDisplay,
+}: {
+  results: any;
+  unitSystem: string;
+  t: any;
+  u: any;
+  toDisplay: (v: number, type: string) => number;
+}) => {
+  const maxUtilization = results.summary.utilization;
+
+  return (
+    <div className="space-y-4">
+      <Card 
+        className={cn(
+          "shadow-sm border-slate-200 bg-gradient-to-br from-white to-slate-50/30",
+          results.summary.status === 'pass' ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
+        )}
+      >
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-black tracking-tighter text-slate-900">
+                  {(maxUtilization * 100).toFixed(1)}%
+                </span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Governing Utilization</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={results.summary.status === 'pass' ? 'outline' : 'destructive'} className={cn(
+                  "text-[10px] font-bold uppercase py-0 px-2 h-5",
+                  results.summary.status === 'pass' && "border-green-200 bg-green-50 text-green-700"
+                )}>
+                  {results.summary.status === 'pass' ? "PASS" : "FAIL"}
+                </Badge>
+                <span className="text-[10px] font-medium text-slate-500">
+                  Method: <span className="font-bold text-slate-700">Roark's Formulas</span>
+                </span>
+              </div>
+            </div>
+            <div className="h-12 w-12 rounded-full border-4 border-slate-100 flex items-center justify-center relative">
+               <Activity className="w-5 h-5 text-slate-300" />
+            </div>
+          </div>
+          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(100, maxUtilization * 100)}%` }}
+              className={cn(
+                "h-full rounded-full transition-all duration-500",
+                maxUtilization > 1 ? "bg-red-500" : maxUtilization > 0.8 ? "bg-amber-500" : "bg-blue-500"
+              )}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Skin Analysis Card */}
+        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-blue-200 transition-colors">
+          <CardHeader className="p-3 sm:p-4 border-b bg-blue-50/30">
+            <div className="flex items-center gap-2 text-blue-600">
+              <Square className="w-4 h-4" />
+              <CardTitle className="text-sm font-bold uppercase tracking-wide">Skin Analysis (Panel)</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 space-y-4">
+             <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
+                  <p className="text-lg font-black text-slate-900">{results.skin.deflection.toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
+                  <Badge variant={results.skin.utilizationDeflection > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
+                    U: {(results.skin.utilizationDeflection * 100).toFixed(1)}%
+                  </Badge>
+                </div>
+                <div className="space-y-1 text-right">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Max Stress</p>
+                  <p className="text-lg font-black text-slate-900">{results.skin.stress.toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
+                  <Badge variant={results.skin.utilizationStress > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
+                    U: {(results.skin.utilizationStress * 100).toFixed(1)}%
+                  </Badge>
+                </div>
+             </div>
+             <Separator className="bg-slate-100" />
+             <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 italic">
+               <div>a: {results.dimensions?.a.toFixed(0)}mm</div>
+               <div className="text-center">b: {results.dimensions?.b.toFixed(0)}mm</div>
+               <div className="text-right">a/b: {(results.dimensions?.a / results.dimensions?.b).toFixed(2)}</div>
+             </div>
+          </CardContent>
+        </Card>
+
+        {/* Stiffener Analysis Card */}
+        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-rose-200 transition-colors">
+          <CardHeader className="p-3 sm:p-4 border-b bg-rose-50/30">
+            <div className="flex items-center gap-2 text-rose-600">
+              <Layout className="w-4 h-4" />
+              <CardTitle className="text-sm font-bold uppercase tracking-wide">Stiffener Analysis</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 space-y-4">
+             {results.stiffener ? (
+               <>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
+                      <p className="text-lg font-black text-slate-900">{results.stiffener.maxDeflection.toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
+                      <Badge variant={results.stiffener.utilizationDeflection > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
+                        U: {(results.stiffener.utilizationDeflection * 100).toFixed(1)}%
+                      </Badge>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress</p>
+                      <p className="text-lg font-black text-slate-900">{results.stiffener.maxStress.toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
+                      <Badge variant={results.stiffener.utilizationStress > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
+                        U: {(results.stiffener.utilizationStress * 100).toFixed(1)}%
+                      </Badge>
+                    </div>
+                 </div>
+                 <div className="pt-2">
+                   <p className="text-[10px] text-slate-400 font-mono">Tributary: {results.stiffener.loadWidth.toFixed(0)} mm | Count: {results.stiffener.count}</p>
+                 </div>
+               </>
+             ) : (
+               <div className="h-full flex items-center justify-center py-6 text-slate-400 italic text-xs">
+                 No stiffeners added
+               </div>
+             )}
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Weight Summary */}
+      <Card className="shadow-sm border-slate-200 bg-slate-50/50">
+        <CardContent className="p-4 flex items-center justify-between">
+           <div className="flex items-center gap-3">
+             <div className="p-2 bg-white rounded-full shadow-sm border">
+               <Scale className="w-4 h-4 text-slate-500" />
+             </div>
+             <p className="text-xs font-bold text-slate-600 uppercase tracking-widest leading-none">Estimated Total Weight</p>
+           </div>
+           <div className="text-right">
+             <p className="text-xl font-black text-slate-900">{(results.summary.weight / 9.81).toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span></p>
+             <p className="text-[10px] text-slate-400 font-mono">Includes Skin + Stiffeners</p>
+           </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 const ProjectResultsView = ({ 
   project, 
   results, 
+  panelResults,
+  calculationMode,
   unitSystem, 
   t, 
   u, 
@@ -953,6 +1171,8 @@ const ProjectResultsView = ({
 }: { 
   project: Project; 
   results: any; 
+  panelResults?: any;
+  calculationMode: string;
   unitSystem: string; 
   t: any; 
   u: any; 
@@ -963,6 +1183,10 @@ const ProjectResultsView = ({
   setIsChartExpanded: (v: boolean) => void;
   criticalPoints: any;
 }) => {
+  if (calculationMode === 'panel' && panelResults) {
+    return <PanelResultsView results={panelResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
+  }
+
   const governingCriteria = results.summary.utilizationStress >= results.summary.utilizationDeflection ? 'Stress' : 'Deflection';
   const maxUtilization = Math.max(0, results.summary.utilizationStress || 0, results.summary.utilizationDeflection || 0);
 
@@ -2086,6 +2310,34 @@ export function App() {
   const [isBiViewMode, setIsBiViewMode] = useState(false);
 
   // Project Info State
+  const [calculationMode, setCalculationMode] = useState<'beam' | 'panel'>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.calculationMode ?? 'beam';
+      } catch (e) { return 'beam'; }
+    }
+    return 'beam';
+  });
+
+  const [panelMaterialId, setPanelMaterialId] = useState<keyof typeof PANEL_MATERIALS>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.panelMaterialId ?? 'aluminum_solid';
+      } catch (e) { return 'aluminum_solid'; }
+    }
+    return 'aluminum_solid';
+  });
+
+  const [stiffenerSpacing, setStiffenerSpacing] = useState(600);
+  const [stiffenerCount, setStiffenerCount] = useState(1);
+  const [stiffenerWidth, setStiffenerWidth] = useState(40);
+  const [stiffenerHeight, setStiffenerHeight] = useState(40);
+  const [stiffenerThickness, setStiffenerThickness] = useState(2.0);
+
   const [projectTitle, setProjectTitle] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
@@ -2265,8 +2517,10 @@ export function App() {
     projectDate,
     projectTime,
     projectAttachment,
+    calculationMode,
     length,
     material,
+    panelMaterialId,
     sectionType,
     beamType,
     width,
@@ -2276,6 +2530,10 @@ export function App() {
     supportCondition,
     intermediateSupports,
     safetyFactor,
+    stiffenerCount,
+    stiffenerWidth,
+    stiffenerHeight,
+    stiffenerThickness,
     selectedCodeId,
     loads,
     combinations,
@@ -2294,8 +2552,10 @@ export function App() {
     setProjectDate(state.projectDate);
     setProjectTime(state.projectTime ?? new Date().toTimeString().split(' ')[0].slice(0, 5));
     setProjectAttachment(state.projectAttachment ?? '');
+    setCalculationMode(state.calculationMode ?? 'beam');
     setLength(state.length);
     setMaterial(state.material);
+    setPanelMaterialId(state.panelMaterialId ?? 'aluminum_solid');
     setSectionType(state.sectionType);
     setWidth(state.width);
     setHeight(state.height);
@@ -2304,6 +2564,10 @@ export function App() {
     setSupportCondition(state.supportCondition);
     setIntermediateSupports(state.intermediateSupports ?? []);
     setSafetyFactor(state.safetyFactor);
+    setStiffenerCount(state.stiffenerCount ?? 0);
+    setStiffenerWidth(state.stiffenerWidth ?? 40);
+    setStiffenerHeight(state.stiffenerHeight ?? 40);
+    setStiffenerThickness(state.stiffenerThickness ?? 2);
     setSelectedCodeId(state.selectedCodeId);
     setLoads(state.loads);
     setCombinations(state.combinations);
@@ -2550,6 +2814,96 @@ export function App() {
   const criticalPoints = useMemo(() => 
     getCriticalPoints(results, unitSystem, u, toDisplay)
   , [results, unitSystem, u, toDisplay]);
+
+  const panelResults = useMemo(() => {
+    if (calculationMode !== 'panel') return null;
+
+    const mat = PANEL_MATERIALS[panelMaterialId];
+    const E = mat.e;
+    const nu = mat.poisson;
+    const t = (mat as any).totalThickness ?? 3.0;
+    
+    // Total wind pressure in MPa (N/mm2)
+    const q_wind_factored = loads
+      .filter(l => l.category === 'wind')
+      .reduce((sum, l) => sum + (safeParseNumber(l.value, 0) / 1000) * (activeCombination.factors.wind || 0), 0);
+
+    const b_panel = Math.min(width, length);
+    const a_panel = Math.max(width, length);
+    
+    const b_eff = stiffenerCount > 0 ? (length / (stiffenerCount + 1)) : b_panel;
+    const a_eff = width;
+    const s_min = Math.min(a_eff, b_eff);
+    const s_max = Math.max(a_eff, b_eff);
+    const ratio = s_max / s_min;
+
+    // Roark coefficients
+    const alphaMap = [
+      { r: 1.0, a: 0.00406, b: 0.2874 },
+      { r: 1.2, a: 0.00564, b: 0.3762 },
+      { r: 1.4, a: 0.00705, b: 0.4530 },
+      { r: 1.6, a: 0.00830, b: 0.5172 },
+      { r: 1.8, a: 0.00931, b: 0.5688 },
+      { r: 2.0, a: 0.01013, b: 0.6102 },
+      { r: 3.0, a: 0.01223, b: 0.7134 },
+      { r: 5.0, a: 0.01297, b: 0.7410 },
+      { r: 10, a: 0.01302, b: 0.7500 },
+    ];
+
+    let alpha = 0.01302;
+    let beta = 0.7500;
+    for (let i = 0; i < alphaMap.length - 1; i++) {
+      if (ratio >= alphaMap[i].r && ratio <= alphaMap[i+1].r) {
+        const frac = (ratio - alphaMap[i].r) / (alphaMap[i+1].r - alphaMap[i].r);
+        alpha = alphaMap[i].a + frac * (alphaMap[i+1].a - alphaMap[i].a);
+        beta = alphaMap[i].b + frac * (alphaMap[i+1].b - alphaMap[i].b);
+        break;
+      }
+    }
+
+    const D = (E * Math.pow(t, 3)) / (12 * (1 - nu * nu));
+    const maxSkinDeflection = (alpha * q_wind_factored * Math.pow(s_min, 4)) / D;
+    const maxSkinStress = (beta * q_wind_factored * Math.pow(s_min, 2)) / (t * t);
+
+    // Stiffener Analysis
+    const tribWidth = width / (stiffenerCount + 1);
+    const stiffenerLoads = loads.map(l => ({
+      ...l,
+      value: l.type === 'udl' ? l.value * tribWidth : l.value,
+      value2: l.value2 !== undefined ? l.value2 * tribWidth : undefined,
+    }));
+
+    const stiffProps = calculateLPlateProperties(stiffenerWidth, stiffenerHeight, stiffenerThickness, stiffenerThickness);
+    
+    const stiffenerBeamProps = {
+      length: length,
+      elasticModulus: 70000,
+      momentOfInertia: stiffProps.momentOfInertia,
+      sectionModulus: stiffProps.sectionModulus,
+      yieldStrength: 160,
+      safetyFactor: safetyFactor,
+      supportCondition: 'simply_supported' as any,
+    };
+
+    const stiffenerAnalysis = calculateBeam(stiffenerBeamProps, stiffenerLoads.map(l => ({
+      ...l,
+      value: safeParseNumber(l.value, 0) * (activeCombination.factors[l.category] || 0),
+      value2: l.value2 !== undefined ? safeParseNumber(l.value2, 0) * (activeCombination.factors[l.category] || 0) : undefined,
+    })));
+
+    return {
+      skin: {
+        deflection: maxSkinDeflection,
+        stress: maxSkinStress,
+        allowableStress: mat.yield / safetyFactor,
+        allowableDeflection: s_min / 60,
+        utilizationStress: maxSkinStress / (mat.yield / safetyFactor),
+        utilizationDeflection: maxSkinDeflection / (s_min / 60)
+      },
+      stiffener: stiffenerAnalysis.summary,
+      totalWeight: (mat.density * width * length * t * 1e-9)
+    };
+  }, [calculationMode, panelMaterialId, width, length, loads, activeCombination, stiffenerCount, stiffenerWidth, stiffenerHeight, stiffenerThickness, safetyFactor]);
 
   const addLoad = (type: Load['type'] = 'point', category: Load['category'] = 'dead', value?: number) => {
     const newLoad: Load = {
@@ -3134,6 +3488,26 @@ export function App() {
                 {/* Left Column: Inputs */}
                 <div className="lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/30 no-scrollbar print:hidden">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
+                    {/* Analysis Mode Switch */}
+                    <div className="px-1">
+                      <Tabs value={calculationMode} onValueChange={(v: any) => {
+                        setCalculationMode(v);
+                        if (v === 'panel') {
+                          // Default loads for panel?
+                        }
+                      }} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 h-9 p-1 bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm rounded-xl">
+                          <TabsTrigger value="beam" className="text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1.5">
+                            <Box className="w-3 h-3" />
+                            {t.beamMode}
+                          </TabsTrigger>
+                          <TabsTrigger value="panel" className="text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1.5">
+                            <Square className="w-3 h-3" />
+                            {t.panelMode}
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
                     {/* Project Information */}
                     <Card className="shadow-sm border-slate-200 overflow-hidden">
                   <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
@@ -3598,9 +3972,9 @@ export function App() {
                   <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
                     <div className="flex items-center gap-2 text-blue-600 mb-0.5">
                       <Settings2 className="w-3.5 h-3.5" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest">{t.properties}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest">{calculationMode === 'beam' ? t.properties : t.panelProps}</span>
                     </div>
-                    <CardTitle className="text-sm sm:text-base">{t.properties}</CardTitle>
+                    <CardTitle className="text-sm sm:text-base">{calculationMode === 'beam' ? t.properties : t.panelProps}</CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4 space-y-3">
                     <div className="grid gap-1.5">
@@ -3614,7 +3988,7 @@ export function App() {
                     </div>
 
                     <div className="grid gap-1.5">
-                      <Label htmlFor="length" className="text-[10px] uppercase font-bold text-slate-400">{t.span} ({u.length})</Label>
+                      <Label htmlFor="length" className="text-[10px] uppercase font-bold text-slate-400">{calculationMode === 'beam' ? t.span : 'Panel Height'} ({u.length})</Label>
                       <NumericInputWithControls 
                         id="length"
                         min={toDisplay(100, 'length')}
@@ -3625,26 +3999,54 @@ export function App() {
                         onChange={(val) => setLength(fromDisplay(val, 'length'))}
                       />
                     </div>
+
+                    {calculationMode === 'panel' && (
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="width" className="text-[10px] uppercase font-bold text-slate-400">Panel Width ({u.length})</Label>
+                        <NumericInputWithControls 
+                          id="width" 
+                          min={toDisplay(100, 'length')}
+                          max={toDisplay(50000, 'length')}
+                          step={unitSystem === 'metric' ? 100 : 1}
+                          precision={unitSystem === 'metric' ? 0 : 2}
+                          value={toDisplay(width ?? 0, 'length')} 
+                          onChange={(val) => setWidth(fromDisplay(val, 'length'))}
+                        />
+                      </div>
+                    )}
                     
                     <div className="grid gap-1.5">
-                      <Label className="text-[10px] uppercase font-bold text-slate-400">{t.material}</Label>
-                      <Select value={material} onValueChange={(v: any) => setMaterial(v)}>
-                        <SelectTrigger className="bg-white h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from(new Set(Object.values(MATERIALS).map(m => m.category))).map(category => (
-                            <SelectGroup key={category}>
-                              <SelectLabel className="text-blue-600 font-bold px-2 py-1.5 text-[10px] uppercase tracking-wider bg-blue-50/50">{category}</SelectLabel>
-                              {Object.entries(MATERIALS)
-                                .filter(([_, m]) => m.category === category)
-                                .map(([key, m]) => (
-                                  <SelectItem key={key} value={key} className="text-xs">{m.name}</SelectItem>
-                                ))}
-                            </SelectGroup>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-[10px] uppercase font-bold text-slate-400">{calculationMode === 'beam' ? t.material : t.skinMaterial}</Label>
+                      {calculationMode === 'beam' ? (
+                        <Select value={material} onValueChange={(v: any) => setMaterial(v)}>
+                          <SelectTrigger className="bg-white h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from(new Set(Object.values(MATERIALS).map(m => m.category))).map(category => (
+                              <SelectGroup key={category}>
+                                <SelectLabel className="text-blue-600 font-bold px-2 py-1.5 text-[10px] uppercase tracking-wider bg-blue-50/50">{category}</SelectLabel>
+                                {Object.entries(MATERIALS)
+                                  .filter(([_, m]) => m.category === category)
+                                  .map(([key, m]) => (
+                                    <SelectItem key={key} value={key} className="text-xs">{m.name}</SelectItem>
+                                  ))}
+                              </SelectGroup>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Select value={panelMaterialId} onValueChange={(v: any) => setPanelMaterialId(v)}>
+                          <SelectTrigger className="bg-white h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(PANEL_MATERIALS).map(([key, m]) => (
+                              <SelectItem key={key} value={key} className="text-xs">{m.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -3661,183 +4063,257 @@ export function App() {
                         />
                       </div>
 
-                      <div className="grid gap-1.5">
-                        <Label className="text-[10px] uppercase font-bold text-slate-400">{t.supportCondition}</Label>
-                        <Select value={supportCondition} onValueChange={(v: any) => setSupportCondition(v)}>
-                          <SelectTrigger className="bg-white h-8 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="simply_supported" className="text-xs">{t.simplySupported}</SelectItem>
-                            <SelectItem value="cantilever" className="text-xs">{t.cantilever}</SelectItem>
-                            <SelectItem value="propped_cantilever" className="text-xs">{t.proppedCantilever}</SelectItem>
-                            <SelectItem value="fixed_fixed" className="text-xs">{t.fixedFixed}</SelectItem>
-                            <SelectItem value="fixed_pinned" className="text-xs">{t.fixedPinned}</SelectItem>
-                            <SelectItem value="continuous" className="text-xs">{t.continuous}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {supportCondition === 'continuous' && (
-                        <div className="grid gap-1.5 p-2 bg-blue-50/50 rounded-md border border-blue-100">
-                          <Label className="text-[10px] uppercase font-bold text-blue-600 flex items-center justify-between">
-                            Intermediate Supports (mm)
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-4 w-4 text-blue-600 hover:bg-blue-100"
-                              onClick={() => {
-                                const newPos = Math.round(length / 2);
-                                if (!intermediateSupports.includes(newPos)) {
-                                  setIntermediateSupports([...intermediateSupports, newPos].sort((a, b) => a - b));
-                                }
-                              }}
-                            >
-                              <PlusCircle className="h-3 w-3" />
-                            </Button>
-                          </Label>
-                          <div className="space-y-1.5">
-                            {intermediateSupports.map((pos, idx) => (
-                              <div key={idx} className="flex items-center gap-2">
-                                <NumericInputWithControls
-                                  id={`support-${idx}`}
-                                  value={toDisplay(pos, 'length')}
-                                  min={0.1}
-                                  max={toDisplay(length, 'length') - 0.1}
-                                  onChange={(val) => {
-                                    const newSupports = [...intermediateSupports];
-                                    newSupports[idx] = fromDisplay(val, 'length');
-                                    setIntermediateSupports(newSupports.sort((a, b) => a - b));
-                                  }}
-                                  className="h-7 text-xs"
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-slate-400 hover:text-rose-500"
-                                  onClick={() => setIntermediateSupports(intermediateSupports.filter((_, i) => i !== idx))}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            ))}
-                            {intermediateSupports.length === 0 && (
-                              <div className="text-[10px] text-slate-400 italic text-center py-1">No mid-supports added</div>
-                            )}
-                          </div>
+                      {calculationMode === 'beam' && (
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] uppercase font-bold text-slate-400">{t.supportCondition}</Label>
+                          <Select value={supportCondition} onValueChange={(v: any) => setSupportCondition(v)}>
+                            <SelectTrigger className="bg-white h-8 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="simply_supported" className="text-xs">{t.simplySupported}</SelectItem>
+                              <SelectItem value="cantilever" className="text-xs">{t.cantilever}</SelectItem>
+                              <SelectItem value="propped_cantilever" className="text-xs">{t.proppedCantilever}</SelectItem>
+                              <SelectItem value="fixed_fixed" className="text-xs">{t.fixedFixed}</SelectItem>
+                              <SelectItem value="fixed_pinned" className="text-xs">{t.fixedPinned}</SelectItem>
+                              <SelectItem value="continuous" className="text-xs">{t.continuous}</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       )}
                     </div>
 
-                    <div className="grid gap-1.5">
-                      <Label className="text-[10px] uppercase font-bold text-slate-400">Beam Type</Label>
-                      <Tabs value={beamType} onValueChange={(v: any) => setBeamType(v)} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 h-8">
-                          <TabsTrigger value="mullion" className="text-[10px]">Mullion (Vertical)</TabsTrigger>
-                          <TabsTrigger value="transom" className="text-[10px]">Transom (Horizontal)</TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                    </div>
-
-                    <Separator className="my-1" />
-
-                    <div className="grid gap-1.5">
-                      <Label className="text-[10px] uppercase font-bold text-slate-400">{t.sectionType}</Label>
-                      <Tabs value={sectionType} onValueChange={(v: any) => setSectionType(v)} className="w-full">
-                        <TabsList className="grid w-full grid-cols-4 h-8">
-                          <TabsTrigger value="solid" className="text-[10px]">{t.solid}</TabsTrigger>
-                          <TabsTrigger value="hollow" className="text-[10px]">{t.hollow}</TabsTrigger>
-                          <TabsTrigger value="channel" className="text-[10px]">Channel</TabsTrigger>
-                          <TabsTrigger value="l-plate" className="text-[10px]">L-Plate</TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="width" className="text-[10px] uppercase font-bold text-slate-400">{t.width} ({u.length})</Label>
-                        <NumericInputWithControls 
-                          id="width" 
-                          min={toDisplay(1, 'length')}
-                          max={toDisplay(1000, 'length')}
-                          step={unitSystem === 'metric' ? 1 : 0.1}
-                          precision={unitSystem === 'metric' ? 0 : 2}
-                          value={toDisplay(width ?? 0, 'length')} 
-                          onChange={(val) => setWidth(fromDisplay(val, 'length'))}
-                        />
-                      </div>
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="height" className="text-[10px] uppercase font-bold text-slate-400">{t.height} ({u.length})</Label>
-                        <NumericInputWithControls 
-                          id="height" 
-                          min={toDisplay(1, 'length')}
-                          max={toDisplay(1000, 'length')}
-                          step={unitSystem === 'metric' ? 1 : 0.1}
-                          precision={unitSystem === 'metric' ? 0 : 2}
-                          value={toDisplay(height ?? 0, 'length')} 
-                          onChange={(val) => setHeight(fromDisplay(val, 'length'))}
-                        />
-                      </div>
-                    </div>
-
-                    {sectionType !== 'solid' && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="grid gap-1.5">
-                          <Label htmlFor="thickness" className="text-[10px] uppercase font-bold text-slate-400">
-                            {sectionType === 'hollow' ? 'Width Thickness (tx)' : 
-                             sectionType === 'channel' ? 'Web Thickness (tw)' : 
-                             'Horiz. Thickness (th)'} ({u.length})
-                          </Label>
-                          <NumericInputWithControls 
-                            id="thickness" 
-                            min={toDisplay(0.1, 'length')}
-                            max={toDisplay(Math.max(width, height) / 2.1, 'length')}
-                            step={unitSystem === 'metric' ? 0.1 : 0.01}
-                            precision={unitSystem === 'metric' ? 1 : 3}
-                            value={toDisplay(thickness ?? 0, 'length')} 
-                            onChange={(val) => setThickness(fromDisplay(val, 'length'))}
-                          />
-                        </div>
-                        <div className="grid gap-1.5">
-                          <Label htmlFor="thickness2" className="text-[10px] uppercase font-bold text-slate-400">
-                            {sectionType === 'hollow' ? 'Height Thickness (ty)' : 
-                             sectionType === 'channel' ? 'Flange Thickness (tf)' : 
-                             'Vert. Thickness (tv)'} ({u.length})
-                          </Label>
-                          <NumericInputWithControls 
-                            id="thickness2" 
-                            min={toDisplay(0.1, 'length')}
-                            max={toDisplay(Math.min(width, height) / 2.1, 'length')}
-                            step={unitSystem === 'metric' ? 0.1 : 0.01}
-                            precision={unitSystem === 'metric' ? 1 : 3}
-                            value={toDisplay(thickness2 ?? 0, 'length')} 
-                            onChange={(val) => setThickness2(fromDisplay(val, 'length'))}
-                          />
+                    {calculationMode === 'beam' && supportCondition === 'continuous' && (
+                      <div className="grid gap-1.5 p-2 bg-blue-50/50 rounded-md border border-blue-100">
+                        <Label className="text-[10px] uppercase font-bold text-blue-600 flex items-center justify-between">
+                          Intermediate Supports (mm)
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-4 w-4 text-blue-600 hover:bg-blue-100"
+                            onClick={() => {
+                              const newPos = Math.round(length / 2);
+                              if (!intermediateSupports.includes(newPos)) {
+                                setIntermediateSupports([...intermediateSupports, newPos].sort((a, b) => a - b));
+                              }
+                            }}
+                          >
+                            <PlusCircle className="h-3 w-3" />
+                          </Button>
+                        </Label>
+                        <div className="space-y-1.5">
+                          {intermediateSupports.map((pos, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <NumericInputWithControls
+                                id={`support-${idx}`}
+                                value={toDisplay(pos, 'length')}
+                                min={0.1}
+                                max={toDisplay(length, 'length') - 0.1}
+                                onChange={(val) => {
+                                  const newSupports = [...intermediateSupports];
+                                  newSupports[idx] = fromDisplay(val, 'length');
+                                  setIntermediateSupports(newSupports.sort((a, b) => a - b));
+                                }}
+                                className="h-7 text-xs"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-slate-400 hover:text-rose-500"
+                                onClick={() => setIntermediateSupports(intermediateSupports.filter((_, i) => i !== idx))}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                          {intermediateSupports.length === 0 && (
+                            <div className="text-[10px] text-slate-400 italic text-center py-1">No mid-supports added</div>
+                          )}
                         </div>
                       </div>
                     )}
+
+                    {calculationMode === 'beam' && (
+                      <div className="grid gap-1.5">
+                        <Label className="text-[10px] uppercase font-bold text-slate-400">Beam Type</Label>
+                        <Tabs value={beamType} onValueChange={(v: any) => setBeamType(v)} className="w-full">
+                          <TabsList className="grid w-full grid-cols-2 h-8">
+                            <TabsTrigger value="mullion" className="text-[10px]">Mullion (Vertical)</TabsTrigger>
+                            <TabsTrigger value="transom" className="text-[10px]">Transom (Horizontal)</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                      </div>
+                    )}
+
+                    <Separator className="my-1" />
+
+                    {calculationMode === 'beam' ? (
+                      <>
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] uppercase font-bold text-slate-400">{t.sectionType}</Label>
+                          <Tabs value={sectionType} onValueChange={(v: any) => setSectionType(v)} className="w-full">
+                            <TabsList className="grid w-full grid-cols-4 h-8">
+                              <TabsTrigger value="solid" className="text-[10px]">{t.solid}</TabsTrigger>
+                              <TabsTrigger value="hollow" className="text-[10px]">{t.hollow}</TabsTrigger>
+                              <TabsTrigger value="channel" className="text-[10px]">Channel</TabsTrigger>
+                              <TabsTrigger value="l-plate" className="text-[10px]">L-Plate</TabsTrigger>
+                            </TabsList>
+                          </Tabs>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-1.5">
+                            <Label htmlFor="width" className="text-[10px] uppercase font-bold text-slate-400">{t.width} ({u.length})</Label>
+                            <NumericInputWithControls 
+                              id="width" 
+                              min={toDisplay(1, 'length')}
+                              max={toDisplay(1000, 'length')}
+                              step={unitSystem === 'metric' ? 1 : 0.1}
+                              precision={unitSystem === 'metric' ? 0 : 2}
+                              value={toDisplay(width ?? 0, 'length')} 
+                              onChange={(val) => setWidth(fromDisplay(val, 'length'))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label htmlFor="height" className="text-[10px] uppercase font-bold text-slate-400">{t.height} ({u.length})</Label>
+                            <NumericInputWithControls 
+                              id="height" 
+                              min={toDisplay(1, 'length')}
+                              max={toDisplay(1000, 'length')}
+                              step={unitSystem === 'metric' ? 1 : 0.1}
+                              precision={unitSystem === 'metric' ? 0 : 2}
+                              value={toDisplay(height ?? 0, 'length')} 
+                              onChange={(val) => setHeight(fromDisplay(val, 'length'))}
+                            />
+                          </div>
+                        </div>
+
+                        {sectionType !== 'solid' && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="thickness" className="text-[10px] uppercase font-bold text-slate-400">
+                                {sectionType === 'hollow' ? 'Width Thickness (tx)' : 
+                                 sectionType === 'channel' ? 'Web Thickness (tw)' : 
+                                 'Horiz. Thickness (th)'} ({u.length})
+                              </Label>
+                              <NumericInputWithControls 
+                                id="thickness" 
+                                min={toDisplay(0.1, 'length')}
+                                max={toDisplay(Math.max(width, height) / 2.1, 'length')}
+                                step={unitSystem === 'metric' ? 0.1 : 0.01}
+                                precision={unitSystem === 'metric' ? 1 : 3}
+                                value={toDisplay(thickness ?? 0, 'length')} 
+                                onChange={(val) => setThickness(fromDisplay(val, 'length'))}
+                              />
+                            </div>
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="thickness2" className="text-[10px] uppercase font-bold text-slate-400">
+                                {sectionType === 'hollow' ? 'Height Thickness (ty)' : 
+                                 sectionType === 'channel' ? 'Flange Thickness (tf)' : 
+                                 'Vert. Thickness (tv)'} ({u.length})
+                              </Label>
+                              <NumericInputWithControls 
+                                id="thickness2" 
+                                min={toDisplay(0.1, 'length')}
+                                max={toDisplay(Math.min(width, height) / 2.1, 'length')}
+                                step={unitSystem === 'metric' ? 0.1 : 0.01}
+                                precision={unitSystem === 'metric' ? 1 : 3}
+                                value={toDisplay(thickness2 ?? 0, 'length')} 
+                                onChange={(val) => setThickness2(fromDisplay(val, 'length'))}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="grid gap-1.5">
+                          <Label htmlFor="skin-thickness" className="text-[10px] uppercase font-bold text-slate-400">Skin/Panel Thickness ({u.length})</Label>
+                          <NumericInputWithControls 
+                            id="skin-thickness"
+                            min={0.1}
+                            max={50}
+                            step={0.1}
+                            value={panelMaterialId.includes('acm') ? (PANEL_MATERIALS[panelMaterialId] as any).totalThickness : (thickness || 3)}
+                            onChange={(val) => setThickness(val)}
+                            disabled={panelMaterialId.includes('acm')}
+                          />
+                          {panelMaterialId.includes('acm') && <p className="text-[9px] text-slate-400 italic">ACM thickness is fixed per specification.</p>}
+                        </div>
+                      </>
+                    )}
                   </CardContent>
-                  <CardFooter className="bg-slate-50/50 border-t px-4 py-2">
-                    <div className="w-full grid grid-cols-2 gap-4 text-[9px] font-mono text-slate-500 uppercase font-bold">
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <div className="cursor-help hover:text-blue-600 transition-colors">I: {sectionProps.momentOfInertia.toExponential(2)} mm⁴</div>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[200px] text-[10px]">
-                          <p><strong>Moment of Inertia (I)</strong>: A geometric property that measures a shape's resistance to bending. Higher values mean less deflection.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <div className="cursor-help hover:text-blue-600 transition-colors">W: {sectionProps.sectionModulus.toExponential(2)} mm³</div>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[200px] text-[10px]">
-                          <p><strong>Section Modulus (W)</strong>: Ratio of Moment of Inertia to distance from neutral axis. Used to calculate maximum bending stress.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </CardFooter>
+                  {calculationMode === 'beam' && (
+                    <CardFooter className="bg-slate-50/50 border-t px-4 py-2">
+                      <div className="w-full grid grid-cols-2 gap-4 text-[9px] font-mono text-slate-500 uppercase font-bold">
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div className="cursor-help hover:text-blue-600 transition-colors">I: {sectionProps.momentOfInertia.toExponential(2)} mm⁴</div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[200px] text-[10px]">
+                            <p><strong>Moment of Inertia (I)</strong>: A geometric property that measures a shape's resistance to bending. Higher values mean less deflection.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div className="cursor-help hover:text-blue-600 transition-colors">W: {sectionProps.sectionModulus.toExponential(2)} mm³</div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[200px] text-[10px]">
+                            <p><strong>Section Modulus (W)</strong>: Ratio of Moment of Inertia to distance from neutral axis. Used to calculate maximum bending stress.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </CardFooter>
+                  )}
                 </Card>
+
+                {calculationMode === 'panel' && (
+                  <Card className="shadow-sm border-slate-200 overflow-hidden">
+                    <CardHeader className="p-3 sm:p-4 border-b bg-rose-50/50">
+                      <div className="flex items-center gap-2 text-rose-600 mb-0.5">
+                        <Layout className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{t.stiffenerProps}</span>
+                      </div>
+                      <CardTitle className="text-sm sm:text-base">Panel Reinforcement</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4 space-y-3">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="stiffener-count" className="text-[10px] uppercase font-bold text-slate-400">Total Stiffeners</Label>
+                        <NumericInputWithControls 
+                          id="stiffener-count"
+                          min={0}
+                          max={10}
+                          value={stiffenerCount}
+                          onChange={(val) => setStiffenerCount(val)}
+                        />
+                      </div>
+                      
+                      {stiffenerCount > 0 && (
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="s-width" className="text-[10px] uppercase font-bold text-slate-400">Stiffener Width</Label>
+                              <NumericInputWithControls id="s-width" min={1} value={stiffenerWidth} onChange={setStiffenerWidth} />
+                            </div>
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="s-height" className="text-[10px] uppercase font-bold text-slate-400">Stiffener Height</Label>
+                              <NumericInputWithControls id="s-height" min={1} value={stiffenerHeight} onChange={setStiffenerHeight} />
+                            </div>
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label htmlFor="s-thick" className="text-[10px] uppercase font-bold text-slate-400">Stiffener Thickness</Label>
+                            <NumericInputWithControls id="s-thick" min={0.5} max={10} step={0.1} value={stiffenerThickness} onChange={setStiffenerThickness} />
+                          </div>
+                          <div className="p-2 bg-rose-50 border border-rose-100 rounded-md">
+                            <p className="text-[9px] text-rose-700 leading-tight">
+                              <strong>Note:</strong> Stiffeners are assumed to span vertically (parallel to panel height). Tributary width is calculated as Panel Width / (N+1).
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
           
           {/* Material Properties */}
           <Card className="shadow-sm border-slate-200 overflow-hidden">
@@ -4210,6 +4686,8 @@ export function App() {
                 <ProjectResultsView 
                   project={{ ...getCurrentState(), id: activeProjectId }}
                   results={results}
+                  panelResults={panelResults}
+                  calculationMode={calculationMode}
                   unitSystem={unitSystem}
                   t={t}
                   u={u}
@@ -4242,6 +4720,7 @@ export function App() {
                   <ProjectResultsView 
                     project={projects.find(p => p.id === comparisonProjectId)!}
                     results={getProjectResults(projects.find(p => p.id === comparisonProjectId)!)}
+                    calculationMode={projects.find(p => p.id === comparisonProjectId)!.calculationMode || 'beam'}
                     unitSystem={unitSystem}
                     t={t}
                     u={u}
@@ -4264,6 +4743,8 @@ export function App() {
             <ProjectResultsView 
               project={{ ...getCurrentState(), id: activeProjectId }}
               results={results}
+              panelResults={panelResults}
+              calculationMode={calculationMode}
               unitSystem={unitSystem}
               t={t}
               u={u}
@@ -4276,8 +4757,9 @@ export function App() {
             />
           )}
           
-          {/* Beam Visualization */}
-          <Card className="shadow-sm border-slate-200 overflow-hidden">
+          {/* Structural Visualization */}
+          {calculationMode === 'beam' ? (
+            <Card className="shadow-sm border-slate-200 overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between py-3">
               <div>
                 <CardTitle className="text-sm font-bold uppercase tracking-tight text-slate-900">{t.structuralModel}</CardTitle>
@@ -4542,6 +5024,44 @@ export function App() {
               </div>
             </CardFooter>
           </Card>
+          ) : (
+            <Card className="shadow-sm border-slate-200 overflow-hidden">
+               <CardHeader className="py-3">
+                 <CardTitle className="text-sm font-bold uppercase tracking-tight text-slate-900">Panel Geometry Visualization</CardTitle>
+                 <CardDescription className="text-[10px]">Plan view of selected panel and stiffeners</CardDescription>
+               </CardHeader>
+               <CardContent className="h-72 relative flex items-center justify-center bg-slate-50 px-8 overflow-hidden">
+                 <div className="relative border-4 border-slate-300 bg-blue-100/20 shadow-xl" style={{ 
+                    width: '200px', 
+                    height: `${Math.min(240, (length/width)*200)}px`,
+                    maxHeight: '240px' 
+                 }}>
+                   {/* Stiffeners */}
+                   {[...Array(stiffenerCount)].map((_, i) => (
+                     <div 
+                       key={i} 
+                       className="absolute bg-rose-500/40 border-x border-rose-600/50" 
+                       style={{ 
+                         width: '8px', 
+                         height: '100%', 
+                         left: `${(i + 1) * (100 / (stiffenerCount + 1))}%`,
+                         transform: 'translateX(-50%)'
+                       }} 
+                     />
+                   ))}
+                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="text-[10px] font-bold text-slate-400 bg-white/80 px-2 py-1 rounded">
+                        {toDisplay(width, 'length').toFixed(0)}x{toDisplay(length, 'length').toFixed(0)}
+                      </div>
+                   </div>
+                 </div>
+                 <div className="absolute bottom-4 right-4 flex flex-col gap-1 text-[9px] text-slate-500 font-mono">
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-200 border border-slate-400" /> Skin</div>
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-rose-400" /> Stiffeners</div>
+                 </div>
+               </CardContent>
+            </Card>
+          )}
           {/* Calculation Notes */}
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50 flex flex-row items-center justify-between">
@@ -5229,7 +5749,8 @@ function NumericInputWithControls({
   step = 1, 
   precision = 2,
   className,
-  id
+  id,
+  disabled = false
 }: { 
   value: number; 
   onChange: (val: number) => void; 
@@ -5239,6 +5760,7 @@ function NumericInputWithControls({
   precision?: number;
   className?: string;
   id?: string;
+  disabled?: boolean;
 }) {
   const [localValue, setLocalValue] = useState((value ?? 0).toFixed(precision));
 
@@ -5247,6 +5769,7 @@ function NumericInputWithControls({
   }, [value, precision]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const val = e.target.value;
     setLocalValue(val);
     if (val === '') return;
@@ -5257,11 +5780,13 @@ function NumericInputWithControls({
   };
 
   const increment = () => {
+    if (disabled) return;
     const newValue = Math.min(max, value + step);
     onChange(newValue);
   };
 
   const decrement = () => {
+    if (disabled) return;
     const newValue = Math.max(min, value - step);
     onChange(newValue);
   };
@@ -5273,7 +5798,7 @@ function NumericInputWithControls({
         size="icon" 
         className="h-7 w-7 shrink-0" 
         onClick={decrement}
-        disabled={value <= min}
+        disabled={disabled || value <= min}
       >
         <Minus className="h-3 w-3" />
       </Button>
@@ -5282,6 +5807,7 @@ function NumericInputWithControls({
         type="number" 
         value={localValue} 
         onChange={handleInputChange}
+        disabled={disabled}
         className="h-7 flex-1 text-center bg-white text-xs px-1"
         step="any"
       />
@@ -5290,7 +5816,7 @@ function NumericInputWithControls({
         size="icon" 
         className="h-7 w-7 shrink-0" 
         onClick={increment}
-        disabled={value >= max}
+        disabled={disabled || value >= max}
       >
         <Plus className="h-3 w-3" />
       </Button>
