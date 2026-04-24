@@ -45,6 +45,8 @@ export interface SummaryResults {
   maxStress: number;
   deflectionRatio: string; // e.g. L/200
   status: 'pass' | 'fail';
+  utilizationStress: number;
+  utilizationDeflection: number;
 }
 
 export function calculateBeam(
@@ -72,7 +74,9 @@ export function calculateBeam(
         maxShear: 0,
         maxStress: 0,
         deflectionRatio: 'N/A',
-        status: 'fail'
+        status: 'fail',
+        utilizationStress: 0,
+        utilizationDeflection: 0
       }
     };
   }
@@ -441,6 +445,9 @@ export function calculateBeam(
 
   const status = maxStress <= allowableStress && deflectionRatioValue >= deflectionLimitRatio ? 'pass' : 'fail';
 
+  const maxUtilizationStress = Math.max(...points.map((p) => p.utilizationStress));
+  const maxUtilizationDeflection = Math.max(...points.map((p) => p.utilizationDeflection));
+
   return {
     points,
     summary: {
@@ -450,6 +457,8 @@ export function calculateBeam(
       maxStress,
       deflectionRatio,
       status,
+      utilizationStress: maxUtilizationStress,
+      utilizationDeflection: maxUtilizationDeflection,
     },
   };
 }

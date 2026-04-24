@@ -4327,8 +4327,8 @@ export function App() {
                       <NumericInputWithControls 
                         id="length"
                         min={toDisplay(100, 'length')}
-                        max={toDisplay(50000, 'length')}
-                        step={unitSystem === 'metric' ? 100 : 1}
+                        max={toDisplay(12000, 'length')}
+                        step={unitSystem === 'metric' ? 10 : 0.5}
                         precision={unitSystem === 'metric' ? 0 : 2}
                         value={toDisplay(length ?? 0, 'length')} 
                         onChange={(val) => setLength(fromDisplay(val, 'length'))}
@@ -4341,8 +4341,8 @@ export function App() {
                         <NumericInputWithControls 
                           id="width" 
                           min={toDisplay(100, 'length')}
-                          max={toDisplay(50000, 'length')}
-                          step={unitSystem === 'metric' ? 100 : 1}
+                          max={toDisplay(12000, 'length')}
+                          step={unitSystem === 'metric' ? 10 : 0.5}
                           precision={unitSystem === 'metric' ? 0 : 2}
                           value={toDisplay(width ?? 0, 'length')} 
                           onChange={(val) => setWidth(fromDisplay(val, 'length'))}
@@ -4369,21 +4369,49 @@ export function App() {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="grid gap-1.5">
                             <Label className="text-[10px] uppercase font-bold text-slate-400">Glass Width ({u.length})</Label>
-                            <NumericInputWithControls value={toDisplay(glassWidth, 'length')} onChange={(v) => setGlassWidth(fromDisplay(v, 'length'))} />
+                            <NumericInputWithControls 
+                              min={toDisplay(100, 'length')}
+                              max={toDisplay(6000, 'length')}
+                              step={unitSystem === 'metric' ? 10 : 0.5}
+                              precision={unitSystem === 'metric' ? 0 : 2}
+                              value={toDisplay(glassWidth, 'length')} 
+                              onChange={(v) => setGlassWidth(fromDisplay(v, 'length'))} 
+                            />
                           </div>
                           <div className="grid gap-1.5">
                             <Label className="text-[10px] uppercase font-bold text-slate-400">Glass Height ({u.length})</Label>
-                            <NumericInputWithControls value={toDisplay(glassHeight, 'length')} onChange={(v) => setGlassHeight(fromDisplay(v, 'length'))} />
+                            <NumericInputWithControls 
+                              min={toDisplay(100, 'length')}
+                              max={toDisplay(6000, 'length')}
+                              step={unitSystem === 'metric' ? 10 : 0.5}
+                              precision={unitSystem === 'metric' ? 0 : 2}
+                              value={toDisplay(glassHeight, 'length')} 
+                              onChange={(v) => setGlassHeight(fromDisplay(v, 'length'))} 
+                            />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="grid gap-1.5">
                             <Label className="text-[10px] uppercase font-bold text-slate-400">Wind Pressure (kPa)</Label>
-                            <NumericInputWithControls value={windPressureInput} step={0.1} onChange={setWindPressureInput} />
+                            <NumericInputWithControls 
+                              value={windPressureInput} 
+                              min={0.1}
+                              max={15}
+                              step={0.05} 
+                              precision={2}
+                              onChange={setWindPressureInput} 
+                            />
                           </div>
                           <div className="grid gap-1.5">
                             <Label className="text-[10px] uppercase font-bold text-slate-400">Actual Bite ({u.length})</Label>
-                            <NumericInputWithControls value={toDisplay(width, 'length')} onChange={(v) => setWidth(fromDisplay(v, 'length'))} />
+                            <NumericInputWithControls 
+                              min={toDisplay(4, 'length')}
+                              max={toDisplay(100, 'length')}
+                              step={unitSystem === 'metric' ? 1 : 0.01}
+                              precision={unitSystem === 'metric' ? 0 : 3}
+                              value={toDisplay(width, 'length')} 
+                              onChange={(v) => setWidth(fromDisplay(v, 'length'))} 
+                            />
                           </div>
                         </div>
                       </div>
@@ -4408,26 +4436,72 @@ export function App() {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="grid gap-1.5">
                             <Label className="text-[10px] uppercase font-bold text-slate-400">Tributary Area (m²)</Label>
-                            <NumericInputWithControls value={tributaryArea} step={0.1} onChange={setTributaryArea} />
+                            <NumericInputWithControls 
+                              value={tributaryArea} 
+                              min={0.1}
+                              max={100}
+                              step={0.1} 
+                              precision={1}
+                              onChange={setTributaryArea} 
+                            />
                           </div>
                           <div className="grid gap-1.5">
                             <Label className="text-[10px] uppercase font-bold text-slate-400">Wind Pressure (kPa)</Label>
-                            <NumericInputWithControls value={windPressureInput} step={0.1} onChange={setWindPressureInput} />
+                            <NumericInputWithControls 
+                              value={windPressureInput} 
+                              min={0.1}
+                              max={15}
+                              step={0.05} 
+                              precision={2}
+                              onChange={setWindPressureInput} 
+                            />
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                           <div className="grid gap-1.5">
                             <Label className="text-[10px] uppercase font-bold text-slate-400">B (mm)</Label>
-                            <NumericInputWithControls value={bracketWidth} min={10} onChange={setBracketWidth} />
+                            <NumericInputWithControls 
+                              value={bracketWidth} 
+                              min={20} 
+                              max={1000}
+                              step={5}
+                              precision={0}
+                              onChange={setBracketWidth} 
+                            />
                           </div>
                           <div className="grid gap-1.5">
                             <Label className="text-[10px] uppercase font-bold text-slate-400">T (mm)</Label>
-                            <NumericInputWithControls value={bracketThickness} min={1} onChange={setBracketThickness} />
+                            <NumericInputWithControls 
+                              value={bracketThickness} 
+                              min={1} 
+                              max={60}
+                              step={1}
+                              precision={0}
+                              onChange={setBracketThickness} 
+                            />
                           </div>
                           <div className="grid gap-1.5">
-                            <Label className="text-[10px] uppercase font-bold text-slate-400">Bolts</Label>
-                            <NumericInputWithControls value={boltCount} min={1} step={1} onChange={setBoltCount} />
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">Bolt Count</Label>
+                            <NumericInputWithControls 
+                              value={boltCount} 
+                              min={1} 
+                              max={20}
+                              step={1} 
+                              precision={0}
+                              onChange={setBoltCount} 
+                            />
                           </div>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] uppercase font-bold text-slate-400">Bolt Diameter (mm)</Label>
+                          <NumericInputWithControls 
+                            value={boltDiameter} 
+                            min={6} 
+                            max={48}
+                            step={2} 
+                            precision={0}
+                            onChange={setBoltDiameter} 
+                          />
                         </div>
                       </div>
                     )}
@@ -4648,9 +4722,10 @@ export function App() {
                           <Label htmlFor="skin-thickness" className="text-[10px] uppercase font-bold text-slate-400">Skin/Panel Thickness ({u.length})</Label>
                           <NumericInputWithControls 
                             id="skin-thickness"
-                            min={0.1}
-                            max={50}
-                            step={0.1}
+                            min={1}
+                            max={60}
+                            step={0.5}
+                            precision={1}
                             value={panelMaterialId.includes('acm') ? (PANEL_MATERIALS[panelMaterialId] as any).totalThickness : (thickness || 3)}
                             onChange={(val) => setThickness(val)}
                             disabled={panelMaterialId.includes('acm')}
@@ -4699,7 +4774,9 @@ export function App() {
                         <NumericInputWithControls 
                           id="stiffener-count"
                           min={0}
-                          max={10}
+                          max={20}
+                          step={1}
+                          precision={0}
                           value={stiffenerCount}
                           onChange={(val) => setStiffenerCount(val)}
                         />
@@ -4710,16 +4787,40 @@ export function App() {
                           <div className="grid grid-cols-2 gap-3">
                             <div className="grid gap-1.5">
                               <Label htmlFor="s-width" className="text-[10px] uppercase font-bold text-slate-400">Stiffener Width</Label>
-                              <NumericInputWithControls id="s-width" min={1} value={stiffenerWidth} onChange={setStiffenerWidth} />
+                              <NumericInputWithControls 
+                                id="s-width" 
+                                min={10} 
+                                max={400}
+                                step={2}
+                                precision={0}
+                                value={stiffenerWidth} 
+                                onChange={setStiffenerWidth} 
+                              />
                             </div>
                             <div className="grid gap-1.5">
                               <Label htmlFor="s-height" className="text-[10px] uppercase font-bold text-slate-400">Stiffener Height</Label>
-                              <NumericInputWithControls id="s-height" min={1} value={stiffenerHeight} onChange={setStiffenerHeight} />
+                              <NumericInputWithControls 
+                                id="s-height" 
+                                min={10} 
+                                max={400}
+                                step={2}
+                                precision={0}
+                                value={stiffenerHeight} 
+                                onChange={setStiffenerHeight} 
+                              />
                             </div>
                           </div>
                           <div className="grid gap-1.5">
                             <Label htmlFor="s-thick" className="text-[10px] uppercase font-bold text-slate-400">Stiffener Thickness</Label>
-                            <NumericInputWithControls id="s-thick" min={0.5} max={10} step={0.1} value={stiffenerThickness} onChange={setStiffenerThickness} />
+                            <NumericInputWithControls 
+                              id="s-thick" 
+                              min={0.5} 
+                              max={30} 
+                              step={0.1} 
+                              precision={1}
+                              value={stiffenerThickness} 
+                              onChange={setStiffenerThickness} 
+                            />
                           </div>
                           <div className="p-2 bg-rose-50 border border-rose-100 rounded-md">
                             <p className="text-[9px] text-rose-700 leading-tight">
