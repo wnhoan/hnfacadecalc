@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity validation helpers
+    function isValidProject(data) {
+      return data.keys().hasAll(['id', 'title', 'calculationMode', 'userId']) 
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.calculationMode in ['beam', 'panel', 'sealant', 'bracket', 'cast-in-embed']
+        && data.userId == request.auth.uid
+        && (data.get('material', '') is string)
+        && (data.get('length', 0) is number)
+        && (data.get('width', 0) is number)
+        && (data.get('height', 0) is number)
+        && (data.get('safetyFactor', 1.0) is number)
+        && (data.get('embedDepth', 0) is number)
+        && (data.get('edgeDistance', 0) is number)
+        && (data.get('concreteGrade', 0) is number);
+    }
+
+    match /projects/{projectId} {
+      allow get: if isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() 
+        && isValidId(projectId)
+        && isValidProject(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+        
+      allow update: if isOwner(existing().userId)
+        && isValidProject(incoming())
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Standard Update
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'location', 'description', 'notes', 'calculationMode', 
+            'material', 'length', 'width', 'height', 'thickness', 'thickness2',
+            'safetyFactor', 'supportCondition', 'beamType', 'tributaryArea',
+            'windPressureInput', 'deadLoadInput', 'boltDiameter', 'boltCount',
+            'embedDepth', 'edgeDistance', 'concreteGrade', 'updatedAt'
+          ])
+        );
+        
+      allow delete: if isOwner(existing().userId);
+    }
+  }
+}

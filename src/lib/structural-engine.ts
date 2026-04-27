@@ -550,3 +550,70 @@ export function calculateLPlateProperties(width: number, height: number, thickne
 
   return { area, momentOfInertia, sectionModulus };
 }
+
+/**
+ * Cast-in Embed Analysis (Simplified ACI 318 / EOTA TR 029)
+ */
+export function calculateCastInEmbed(props: {
+  embedDepth: number; // hef (mm)
+  edgeDistance: number; // c1 (mm)
+  concreteGrade: number; // fc' (MPa)
+  boltDiameter: number; // d (mm)
+  boltCount: number; // n
+  tensionLoad: number; // N (Factored)
+  shearLoad: number; // N (Factored)
+  safetyFactor: number;
+}) {
+  const { embedDepth, edgeDistance, concreteGrade, boltDiameter, boltCount, tensionLoad, shearLoad, safetyFactor } = props;
+
+  // 1. Steel Tension Capacity (Simplified)
+  // Area of bolt (threaded area approx 75% of gross)
+  const boltArea = (Math.PI * Math.pow(boltDiameter, 2)) / 4 * 0.75;
+  const steelStrength = 400; // Typical M12 grade 8.8 or similar reduced yield
+  const steelTensionCapacity = boltArea * steelStrength * boltCount;
+
+  // 2. Concrete Breakout Capacity (Tension) - Ncb
+  // N_b = 10 * sqrt(fc') * hef^1.5 (metric units approx)
+  const Nb = 10 * Math.sqrt(concreteGrade) * Math.pow(embedDepth, 1.5);
+  
+  // Area influence: for a single anchor, ANco = 9 * hef^2
+  const ANco = 9 * Math.pow(embedDepth, 2);
+  
+  // Projected area ANc considering edge distance c1
+  // If c1 < 1.5 * hef, it restricts the area
+  const sideLimit = Math.min(edgeDistance, 1.5 * embedDepth);
+  const ANc = (1.5 * embedDepth + sideLimit) * (3 * embedDepth); // Simplified 1-edge anchor
+  
+  const Ncb = (ANc / ANco) * Nb;
+
+  // 3. Concrete Pullout Capacity - Np
+  // Np = 8 * Abrg * fc' (simplified)
+  const headSize = boltDiameter * 1.8;
+  const Abrg = (Math.PI * (Math.pow(headSize, 2) - Math.pow(boltDiameter, 2))) / 4;
+  const Npn = 8 * Abrg * concreteGrade;
+
+  // 4. Concrete Breakout (Shear) - Vcb
+  // Vb = 0.6 * (le/d)^0.2 * sqrt(d) * sqrt(fc') * c1^1.5
+  const le = Math.min(embedDepth, 8 * boltDiameter);
+  const Vb = 0.6 * Math.pow(le / boltDiameter, 0.2) * Math.sqrt(boltDiameter) * Math.sqrt(concreteGrade) * Math.pow(edgeDistance, 1.5);
+  const Vcb = (ANc / ANco) * Vb; // Simplified area ratio reuse
+
+  // 5. Utilization
+  const tensionCapacity = Math.min(steelTensionCapacity, Ncb, Npn) / safetyFactor;
+  const shearCapacity = Vcb / safetyFactor; // Simplified shear (focus on concrete edge)
+
+  const utilizationTension = tensionLoad / (tensionCapacity || 1);
+  const utilizationShear = shearLoad / (shearCapacity || 1);
+  
+  // Interaction Equation: (N/Nn)^1.5 + (V/Vn)^1.5 <= 1
+  const utilizationInteraction = Math.pow(utilizationTension, 1.5) + Math.pow(utilizationShear, 1.5);
+
+  return {
+    tensionCapacity,
+    shearCapacity,
+    utilizationTension,
+    utilizationShear,
+    utilizationInteraction,
+    status: utilizationInteraction <= 1 && utilizationTension <= 1 && utilizationShear <= 1 ? 'pass' : 'fail'
+  };
+}

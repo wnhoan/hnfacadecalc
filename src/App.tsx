@@ -14,6 +14,7 @@ import {
   CheckCircle2, 
   AlertCircle,
   ChevronRight,
+  ArrowLeft,
   Maximize2,
   Settings2,
   BarChart3,
@@ -50,7 +51,8 @@ import {
   Paperclip,
   Square,
   Link,
-  Droplet
+  Droplet,
+  Anchor
 } from 'lucide-react';
 import { 
   Card, 
@@ -130,10 +132,29 @@ import {
   calculateHollowRectangularProperties,
   calculateChannelProperties,
   calculateLPlateProperties,
+  calculateCastInEmbed,
   BeamProperties,
   Load
 } from '@/lib/structural-engine';
 import { cn } from '@/lib/utils';
+import { auth, db, OperationType, handleFirestoreError } from '@/lib/firebase';
+import { 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut, 
+  onAuthStateChanged,
+  User
+} from 'firebase/auth';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  collection, 
+  query, 
+  where, 
+  getDocs,
+  serverTimestamp 
+} from 'firebase/firestore';
 
 // Error fallback for robustness
 function ErrorFallback() {
@@ -354,6 +375,7 @@ const TRANSLATIONS = {
     seismicCoeff: 'Seismic Coeff (Cs)',
     applySeismic: 'Apply Seismic Load',
     saveProject: 'Save Project',
+    saveToCloud: 'Save to Cloud',
     loadProject: 'Load Project',
     projectSaved: 'Project saved to local storage',
     projectLoaded: 'Project loaded successfully',
@@ -382,8 +404,10 @@ const TRANSLATIONS = {
     maxSkinStress: 'Max Skin Stress',
     sealantMode: 'Structural Sealant',
     bracketMode: 'Fixing Bracket',
+    castInMode: 'Cast-in Embed',
     sealantProps: 'Sealant Properties',
     bracketProps: 'Bracket Properties',
+    embedProps: 'Embedment Properties',
     glassDims: 'Glass Dimensions',
     biteDept: 'Bite Depth',
     contactWidth: 'Contact Width',
@@ -391,6 +415,9 @@ const TRANSLATIONS = {
     boltProps: 'Bolt Specification',
     boltDiameter: 'Bolt Diameter',
     boltCount: 'Bolt Count',
+    embedDepth: 'Embedment Depth',
+    edgeDistance: 'Edge Distance',
+    concreteGrade: 'Concrete Grade',
     deadLoad: 'Dead Load',
     windPressure: 'Wind Pressure',
   },
@@ -438,6 +465,7 @@ const TRANSLATIONS = {
     seismicCoeff: '地震系数 (Cs)',
     applySeismic: '应用地震荷载',
     saveProject: '保存项目',
+    saveToCloud: '保存到云端',
     loadProject: '加载项目',
     projectSaved: '项目已保存到本地存储',
     projectLoaded: '项目加载成功',
@@ -466,8 +494,10 @@ const TRANSLATIONS = {
     maxSkinStress: '最大面板应力',
     sealantMode: '结构硅酮胶',
     bracketMode: '连接转接件',
+    castInMode: '预埋件分析',
     sealantProps: '密封胶属性',
     bracketProps: '支座/转接件属性',
+    embedProps: '埋件属性',
     glassDims: '玻璃尺寸',
     biteDept: '打胶深度 (Bite)',
     contactWidth: '接触宽度',
@@ -475,6 +505,9 @@ const TRANSLATIONS = {
     boltProps: '螺栓规格',
     boltDiameter: '螺栓直径',
     boltCount: '螺栓数量',
+    embedDepth: '埋设深度',
+    edgeDistance: '边缘距离',
+    concreteGrade: '混凝土等级',
     deadLoad: '恒载 (Dead Load)',
     windPressure: '风压 (Wind)',
   },
@@ -548,6 +581,25 @@ const TRANSLATIONS = {
     stiffenerSpacing: 'ระยะห่างตัวเสริม',
     maxSkinDeflection: 'การโก่งตัวสูงสุดของผิว',
     maxSkinStress: 'หน่วยแรงสูงสุดของผิว',
+    castInMode: 'ฝังพุกในคอนกรีต',
+    sealantMode: 'ยาแนวรอยต่อ',
+    bracketMode: 'ขาจึด',
+    sealantProps: 'คุณสมบัติน้ำยาแนว',
+    bracketProps: 'คุณสมบัติขาจึด',
+    embedProps: 'คุณสมบัติการฝัง',
+    glassDims: 'ขนาดกระจก',
+    biteDept: 'ระยะฝัง',
+    contactWidth: 'ความกว้างหน้าสัมผัส',
+    tributaryArea: 'พื้นที่รับแรง',
+    boltProps: 'ข้อกำหนดสลักเกลียว',
+    boltDiameter: 'เส้นผ่านศูนย์กลางสลักเกลียว',
+    boltCount: 'จำนวนสลักเกลียว',
+    embedDepth: 'ความลึกการฝัง',
+    edgeDistance: 'ระยะขอบ',
+    concreteGrade: 'เกรดคอนกรีต',
+    deadLoad: 'น้ำหนักบรรทุกคงที่',
+    windPressure: 'แรงลม',
+    saveToCloud: 'บันทึกในคลาวด์',
   },
   ms: {
     title: 'FacadeCalc',
@@ -593,6 +645,7 @@ const TRANSLATIONS = {
     seismicCoeff: 'Pekali Seismik (Cs)',
     applySeismic: 'Gunakan Beban Seismik',
     saveProject: 'Simpan Projek',
+    saveToCloud: 'Simpan ke Awan',
     loadProject: 'Muat Projek',
     projectSaved: 'Projek disimpan ke storan tempatan',
     projectLoaded: 'Projek berjaya dimuatkan',
@@ -619,6 +672,24 @@ const TRANSLATIONS = {
     stiffenerSpacing: 'Jarak Pengeras',
     maxSkinDeflection: 'Pesongan Kulit Maks',
     maxSkinStress: 'Tegangan Kulit Maks',
+    castInMode: 'Benam Tuang',
+    sealantMode: 'Kedap Struktur',
+    bracketMode: 'Pendakap Pembetulan',
+    sealantProps: 'Sifat Kedap',
+    bracketProps: 'Sifat Pendakap',
+    embedProps: 'Sifat Benaman',
+    glassDims: 'Dimensi Kaca',
+    biteDept: 'Kedalaman Gigitan',
+    contactWidth: 'Lebar Hubungan',
+    tributaryArea: 'Kawasan Tributari',
+    boltProps: 'Spesifikasi Bolt',
+    boltDiameter: 'Diameter Bolt',
+    boltCount: 'Bilangan Bolt',
+    embedDepth: 'Kedalaman Benaman',
+    edgeDistance: 'Jarak Tepi',
+    concreteGrade: 'Gred Konkrit',
+    deadLoad: 'Beban Mati',
+    windPressure: 'Tekanan Angin',
   }
 };
 
@@ -925,7 +996,7 @@ interface HistoryState {
   projectDate: string;
   projectTime: string;
   projectAttachment?: string;
-  calculationMode: 'beam' | 'panel' | 'bracket' | 'sealant';
+  calculationMode: 'beam' | 'panel' | 'bracket' | 'sealant' | 'cast-in-embed';
   length: number;
   material: keyof typeof MATERIALS;
   panelMaterialId: keyof typeof PANEL_MATERIALS;
@@ -956,6 +1027,9 @@ interface HistoryState {
   bracketThickness: number;
   boltDiameter: number;
   boltCount: number;
+  embedDepth: number;
+  edgeDistance: number;
+  concreteGrade: number;
   selectedCodeId: string;
   loads: Load[];
   combinations: Combination[];
@@ -1009,6 +1083,9 @@ const createNewProject = (id: string, title: string): Project => ({
   bracketThickness: 10,
   boltDiameter: 12,
   boltCount: 2,
+  embedDepth: 120,
+  edgeDistance: 150,
+  concreteGrade: 30,
   selectedCodeId: 'Shanghai',
   loads: [{ id: '1', type: 'udl', category: 'dead', value: 0.5 }],
   combinations: DEFAULT_COMBINATIONS,
@@ -1229,6 +1306,29 @@ const calculateBracketResults = (project: Project) => {
   };
 };
 
+const calculateCastInEmbedResults = (project: Project) => {
+  if (project.calculationMode !== 'cast-in-embed') return null;
+
+  const q_wind = project.windPressureInput ?? 1.5; 
+  const q_dead = project.deadLoadInput ?? 0.5;
+  const tribArea = project.tributaryArea ?? 4.5;
+
+  const tensionLoad = q_wind * tribArea * 1000; 
+  const shearLoad = q_dead * tribArea * 1000;
+
+  return calculateCastInEmbed({
+    embedDepth: project.embedDepth ?? 120,
+    edgeDistance: project.edgeDistance ?? 150,
+    concreteGrade: project.concreteGrade ?? 30,
+    boltDiameter: project.boltDiameter ?? 12,
+    boltCount: project.boltCount ?? 2,
+    tensionLoad,
+    shearLoad,
+    safetyFactor: project.safetyFactor
+  });
+};
+
+
 const SealantResultsView = ({
   results,
   unitSystem,
@@ -1352,6 +1452,124 @@ const BracketResultsView = ({
             <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Bending</p>
             <p className="text-sm font-black text-slate-800">{(results.bendingStress ?? 0).toFixed(1)} MPa</p>
             <div className="text-[8px] font-bold mt-1" style={{ color: (results.bendingUtilization ?? 0) > 1 ? 'red' : 'green' }}>{((results.bendingUtilization ?? 0) * 100).toFixed(0)}%</div>
+         </Card>
+      </div>
+    </div>
+  );
+};
+
+const CastInResultsView = ({
+  results,
+  unitSystem,
+  t,
+  u,
+  toDisplay,
+}: {
+  results: any;
+  unitSystem: string;
+  t: any;
+  u: any;
+  toDisplay: (v: number, type: string) => number;
+}) => {
+  if (!results) return null;
+
+  return (
+    <div className="space-y-4">
+      <Card 
+        className={cn(
+          "shadow-sm border-slate-200 bg-gradient-to-br from-white to-slate-50/30",
+          results.status === 'pass' ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
+        )}
+      >
+        <CardContent className="p-4 sm:p-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center p-2.5",
+              results.status === 'pass' ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+            )}>
+              <Anchor className="w-full h-full" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Cast-in Embed Result</h3>
+              <div className="flex items-center gap-2 mt-0.5">
+                <Badge variant={results.status === 'pass' ? 'outline' : 'destructive'} className={cn(
+                  "text-[10px] font-bold uppercase",
+                  results.status === 'pass' && "border-green-200 bg-green-50 text-green-700"
+                )}>
+                  {results.status === 'pass' ? "PASS" : "FAIL"}
+                </Badge>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                   {(results.utilizationInteraction * 100).toFixed(1)}% Interaction
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="hidden sm:block text-right">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Status</p>
+            <p className={cn(
+              "text-sm font-black uppercase italic",
+              results.status === 'pass' ? "text-green-600" : "text-red-600"
+            )}>
+              {results.status === 'pass' ? "Structurally Sound" : "Reinforcement Required"}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+         <Card className="p-3 border-slate-200 shadow-sm relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-16 h-16 -mr-8 -mt-8 bg-blue-50/50 rounded-full group-hover:scale-110 transition-transform" />
+            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 relative z-10">Tension Capacity</p>
+            <p className="text-sm font-black text-slate-800 relative z-10">{(results.tensionCapacity / 1000).toFixed(1)} kN</p>
+            <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden relative z-10">
+               <div 
+                 className={cn("h-full rounded-full transition-all duration-700", (results.utilizationTension ?? 0) > 1 ? "bg-red-500" : "bg-blue-600")} 
+                 style={{ width: `${Math.min(100, (results.utilizationTension ?? 0) * 100)}%` }} 
+               />
+            </div>
+            <div className="flex justify-between items-center mt-1">
+               <span className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">Utilization</span>
+               <span className={cn("text-[9px] font-black", (results.utilizationTension ?? 0) > 1 ? "text-red-600" : "text-blue-600")}>
+                  {((results.utilizationTension ?? 0) * 100).toFixed(0)}%
+               </span>
+            </div>
+         </Card>
+
+         <Card className="p-3 border-slate-200 shadow-sm relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-16 h-16 -mr-8 -mt-8 bg-blue-50/50 rounded-full group-hover:scale-110 transition-transform" />
+            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 relative z-10">Shear Capacity</p>
+            <p className="text-sm font-black text-slate-800 relative z-10">{(results.shearCapacity / 1000).toFixed(1)} kN</p>
+            <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden relative z-10">
+               <div 
+                 className={cn("h-full rounded-full transition-all duration-700", (results.utilizationShear ?? 0) > 1 ? "bg-red-500" : "bg-blue-600")} 
+                 style={{ width: `${Math.min(100, (results.utilizationShear ?? 0) * 100)}%` }} 
+               />
+            </div>
+            <div className="flex justify-between items-center mt-1">
+               <span className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">Utilization</span>
+               <span className={cn("text-[9px] font-black", (results.utilizationShear ?? 0) > 1 ? "text-red-600" : "text-blue-600")}>
+                  {((results.utilizationShear ?? 0) * 100).toFixed(0)}%
+               </span>
+            </div>
+         </Card>
+
+         <Card className="p-3 border-blue-100 shadow-sm bg-blue-50/30 md:col-span-2">
+            <p className="text-[9px] font-bold text-blue-600 uppercase mb-2">Interaction Check (Combined N+V)</p>
+            <div className="flex items-center gap-3">
+               <div className="text-2xl font-black text-slate-900 leading-none">{(results.utilizationInteraction * 100).toFixed(1)}%</div>
+               <div className="flex-1 h-3 bg-white/50 border border-blue-100/50 rounded-full overflow-hidden p-0.5 shadow-inner">
+                  <div 
+                    className={cn(
+                      "h-full rounded-full transition-all duration-1000 shadow-sm",
+                      results.utilizationInteraction > 1 ? "bg-gradient-to-r from-red-400 to-red-600" : "bg-gradient-to-r from-blue-400 to-blue-600"
+                    )} 
+                    style={{ width: `${Math.min(100, results.utilizationInteraction * 100)}%` }} 
+                  />
+               </div>
+            </div>
+            <p className="text-[8px] text-slate-400 italic mt-2 uppercase font-medium tracking-wide">
+              * Based on Simplified ACI 318 - CCD Method
+            </p>
          </Card>
       </div>
     </div>
@@ -1519,6 +1737,7 @@ const ProjectResultsView = ({
   panelResults,
   sealantResults,
   bracketResults,
+  castInResults,
   calculationMode,
   unitSystem, 
   t, 
@@ -1528,13 +1747,15 @@ const ProjectResultsView = ({
   setActiveTab,
   isChartExpanded,
   setIsChartExpanded,
-  criticalPoints
+  criticalPoints,
+  setMobileTab
 }: { 
   project: Project; 
   results: any; 
   panelResults: any;
   sealantResults: any;
   bracketResults: any;
+  castInResults: any;
   calculationMode: string;
   unitSystem: string; 
   t: any; 
@@ -1545,6 +1766,7 @@ const ProjectResultsView = ({
   isChartExpanded: boolean;
   setIsChartExpanded: (v: boolean) => void;
   criticalPoints: any;
+  setMobileTab: (v: 'inputs' | 'results') => void;
 }) => {
   if (calculationMode === 'panel' && panelResults) {
     return <PanelResultsView results={panelResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
@@ -1558,11 +1780,27 @@ const ProjectResultsView = ({
     return <BracketResultsView results={bracketResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
   }
 
+  if (calculationMode === 'cast-in-embed' && castInResults) {
+    return <CastInResultsView results={castInResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
+  }
+
   const governingCriteria = results.summary.utilizationStress >= results.summary.utilizationDeflection ? 'Stress' : 'Deflection';
   const maxUtilization = Math.max(0, results.summary.utilizationStress || 0, results.summary.utilizationDeflection || 0);
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between mb-1 sm:mb-2 lg:hidden">
+        <Button variant="ghost" size="sm" onClick={() => setMobileTab('inputs')} className="h-7 text-[10px] gap-1 px-2">
+          <ArrowLeft className="w-3 h-3" />
+          Back to Config
+        </Button>
+        <div className="flex items-center gap-2">
+          <div className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
+            Live Analysis
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between mb-1 sm:mb-2">
         <h3 className="text-[10px] sm:text-sm font-bold text-slate-500 uppercase tracking-wider truncate max-w-[60%]">{project.projectTitle}</h3>
         <div className={cn(
@@ -2011,7 +2249,13 @@ const CalculusStepsCard = ({
   toDisplay,
   seismicRegion,
   seismicCoeff,
-  loads
+  loads,
+  calculationMode,
+  embedDepth,
+  edgeDistance,
+  concreteGrade,
+  boltCount,
+  boltDiameter,
 }: {
   options: { section: boolean; loads: boolean; analysis: boolean; stress: boolean; seismic: boolean };
   setOptions: (v: any) => void;
@@ -2036,10 +2280,27 @@ const CalculusStepsCard = ({
   seismicRegion: string;
   seismicCoeff: number;
   loads: Load[];
+  calculationMode: 'beam' | 'panel' | 'sealant' | 'bracket' | 'cast-in-embed';
+  embedDepth: number;
+  edgeDistance: number;
+  concreteGrade: number;
+  boltCount: number;
+  boltDiameter: number;
 }) => {
   const toggleOption = (key: keyof typeof options) => {
     setOptions({ ...options, [key]: !options[key] });
   };
+
+  const castInResults = calculationMode === 'cast-in-embed' ? calculateCastInEmbed({
+    embedDepth: embedDepth ?? 120,
+    edgeDistance: edgeDistance ?? 150,
+    concreteGrade: concreteGrade ?? 30,
+    boltDiameter: boltDiameter ?? 12,
+    boltCount: boltCount ?? 2,
+    tensionLoad: 0, // Just for summary display in steps if needed, or pass real loads
+    shearLoad: 0,
+    safetyFactor
+  }) : null;
 
   return (
     <Card className="shadow-sm border-slate-200 overflow-hidden">
@@ -2075,7 +2336,46 @@ const CalculusStepsCard = ({
         <CardTitle className="text-sm sm:text-base mt-1">Detailed Calculation Steps</CardTitle>
       </CardHeader>
       <CardContent className="p-4 space-y-6">
-        {options.section && (
+        {calculationMode === 'cast-in-embed' && options.section && (
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+              <Anchor className="w-3 h-3" />
+              Step 1: Anchor Geometry & Concrete Properties
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/20 p-3 rounded-xl border border-blue-100">
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-slate-500 italic">Parameters:</p>
+                <div className="font-mono text-[11px] space-y-1.5">
+                   <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                     <span>Embed Depth (h_ef)</span>
+                     <span className="font-bold">{embedDepth} mm</span>
+                   </div>
+                   <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                     <span>Edge Distance (c_1)</span>
+                     <span className="font-bold">{edgeDistance} mm</span>
+                   </div>
+                   <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
+                     <span>Concrete Grade (f'_c)</span>
+                     <span className="font-bold">{concreteGrade} MPa</span>
+                   </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium text-slate-500 italic">Design Criteria (ACI 318):</p>
+                <div className="font-mono text-[11px] space-y-1.5">
+                   <div className="bg-white p-2 rounded border border-slate-200">
+                     N_b = 10 · √(f'c) · h_ef^1.5
+                   </div>
+                   <div className="bg-white p-2 rounded border border-slate-200">
+                     A_Nc = (1.5h_ef + c_1) · 3h_ef
+                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {calculationMode === 'beam' && options.section && (
           <div className="space-y-3">
             <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
               <Layers className="w-3 h-3" />
@@ -2597,6 +2897,89 @@ export function App() {
   });
   const [hoveredLoad, setHoveredLoad] = useState<Load | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [mobileTab, setMobileTab] = useState<'inputs' | 'results'>('inputs');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Firebase Auth State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Auth Listener
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setIsAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const login = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  const saveToFirebase = async () => {
+    if (!currentUser) {
+      login();
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const state = getCurrentState();
+      const projectRef = doc(db, 'projects', activeProjectId);
+      
+      const payload = {
+        ...state,
+        userId: currentUser.uid,
+        updatedAt: serverTimestamp(),
+        // Add createdAt if first time, but we use setDoc with merge or just setDoc
+      };
+
+      // Check if document exists to preserve createdAt or handle correctly
+      const docSnap = await getDoc(projectRef);
+      if (!docSnap.exists()) {
+        (payload as any).createdAt = serverTimestamp();
+      }
+
+      await setDoc(projectRef, payload, { merge: true });
+      console.log("Project saved to cloud successfully.");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `projects/${activeProjectId}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadFromFirebase = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const q = query(collection(db, 'projects'), where('userId', '==', currentUser.uid));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // For simplicity, just load the first one or prompt user if multiple
+        const docData = querySnapshot.docs[0].data() as HistoryState;
+        applyState(docData);
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'projects');
+    }
+  };
 
   // Loads State
   const [loads, setLoads] = useState<Load[]>(() => {
@@ -2681,7 +3064,7 @@ export function App() {
   const [isBiViewMode, setIsBiViewMode] = useState(false);
 
   // Project Info State
-  const [calculationMode, setCalculationMode] = useState<'beam' | 'panel' | 'sealant' | 'bracket'>(() => {
+  const [calculationMode, setCalculationMode] = useState<'beam' | 'panel' | 'sealant' | 'bracket' | 'cast-in-embed'>(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
       try {
@@ -2721,6 +3104,9 @@ export function App() {
   const [bracketThickness, setBracketThickness] = useState(10);
   const [boltDiameter, setBoltDiameter] = useState(12);
   const [boltCount, setBoltCount] = useState(2);
+  const [embedDepth, setEmbedDepth] = useState(120);
+  const [edgeDistance, setEdgeDistance] = useState(150);
+  const [concreteGrade, setConcreteGrade] = useState(30);
 
   const [projectTitle, setProjectTitle] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -2930,6 +3316,9 @@ export function App() {
     bracketThickness,
     boltDiameter,
     boltCount,
+    embedDepth,
+    edgeDistance,
+    concreteGrade,
     selectedCodeId,
     loads,
     combinations,
@@ -2976,6 +3365,9 @@ export function App() {
     setBracketThickness(state.bracketThickness ?? 10);
     setBoltDiameter(state.boltDiameter ?? 12);
     setBoltCount(state.boltCount ?? 2);
+    setEmbedDepth(state.embedDepth ?? 120);
+    setEdgeDistance(state.edgeDistance ?? 150);
+    setConcreteGrade(state.concreteGrade ?? 30);
     setSelectedCodeId(state.selectedCodeId);
     setLoads(state.loads);
     setCombinations(state.combinations);
@@ -3234,6 +3626,10 @@ export function App() {
   const bracketResults = useMemo(() => {
     return calculateBracketResults({ ...getCurrentState(), id: activeProjectId });
   }, [calculationMode, material, tributaryArea, windPressureInput, boltDiameter, boltCount, bracketWidth, bracketThickness, safetyFactor]);
+
+  const castInResults = useMemo(() => {
+    return calculateCastInEmbedResults({ ...getCurrentState(), id: activeProjectId });
+  }, [calculationMode, embedDepth, edgeDistance, concreteGrade, boltDiameter, boltCount, windPressureInput, deadLoadInput, tributaryArea, safetyFactor]);
 
   const addLoad = (type: Load['type'] = 'point', category: Load['category'] = 'dead', value?: number) => {
     const newLoad: Load = {
@@ -3516,28 +3912,22 @@ export function App() {
       <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100 flex flex-col">
       {/* Header */}
       <header className="border-b bg-white sticky top-0 z-50 print:hidden">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('calculator')}>
-              <div className="bg-blue-600 p-1.5 rounded-lg">
-                <Calculator className="w-5 h-5 text-white" />
+        <div className="max-w-7xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-8 overflow-hidden">
+            <div className="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0" onClick={() => setView('calculator')}>
+              <div className="bg-blue-600 p-1 sm:p-1.5 rounded-lg">
+                <Calculator className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <h1 className="font-bold text-xl tracking-tight">{t.title}</h1>
+              <h1 className="font-bold text-sm sm:text-lg md:text-xl tracking-tight truncate max-w-[100px] sm:max-w-none">{t.title}</h1>
               {view === 'calculator' && (
-                <motion.div 
-                  animate={results.summary.status === 'fail' ? { 
-                    scale: [1, 1.05, 1],
-                    transition: { repeat: Infinity, duration: 2 }
-                  } : {}}
-                  className={cn(
-                    "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm transition-all duration-500",
-                    results.summary.status === 'pass' 
-                      ? "bg-green-500 text-white" 
-                      : "bg-red-500 text-white"
-                  )}
-                >
+                <div className={cn(
+                  "hidden xs:flex px-1.5 sm:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] font-black uppercase tracking-widest shadow-sm transition-all duration-500",
+                  results.summary.status === 'pass' 
+                    ? "bg-green-500 text-white" 
+                    : "bg-red-500 text-white"
+                )}>
                   {results.summary.status === 'pass' ? 'PASS' : 'FAIL'}
-                </motion.div>
+                </div>
               )}
             </div>
 
@@ -3563,8 +3953,8 @@ export function App() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 bg-slate-100 p-1 rounded-lg border">
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            <div className="hidden lg:flex items-center gap-2 bg-slate-100 p-1 rounded-lg border">
               <Settings2 className="w-3.5 h-3.5 text-slate-500 ml-1" />
               <Select value={unitSystem} onValueChange={(v: any) => setUnitSystem(v)}>
                 <SelectTrigger className="h-7 border-none bg-white shadow-none focus:ring-0 w-[90px] text-[10px] font-bold">
@@ -3577,7 +3967,7 @@ export function App() {
               </Select>
             </div>
 
-            <div className="hidden sm:flex items-center gap-2 bg-slate-100 p-1 rounded-lg border">
+            <div className="hidden lg:flex items-center gap-2 bg-slate-100 p-1 rounded-lg border">
               <Globe className="w-3.5 h-3.5 text-slate-500 ml-1" />
               <Select value={lang} onValueChange={(v: any) => setLang(v)}>
                 <SelectTrigger className="h-7 border-none bg-white shadow-none focus:ring-0 w-[80px] text-[10px] font-bold">
@@ -3593,12 +3983,12 @@ export function App() {
             </div>
             
             {view !== 'calculator' ? (
-              <Button size="sm" onClick={() => setView('calculator')} className="bg-blue-600 hover:bg-blue-700">
+              <Button size="sm" onClick={() => setView('calculator')} className="bg-blue-600 hover:bg-blue-700 h-8 sm:h-9 text-xs sm:text-sm">
                 {t.getStarted}
               </Button>
             ) : (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center bg-slate-100 rounded-md p-0.5 mr-2">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <div className="hidden sm:flex items-center bg-slate-100 rounded-md p-0.5 mr-1 sm:mr-2">
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -3621,36 +4011,134 @@ export function App() {
                   </Button>
                 </div>
 
-                <Button 
-                  variant={isBiViewMode ? "default" : "outline"} 
-                  size="sm" 
-                  onClick={() => setIsBiViewMode(!isBiViewMode)}
-                  className={cn("h-8 text-xs gap-2", isBiViewMode && "bg-blue-600")}
-                >
-                  <Layout className="w-3.5 h-3.5" />
-                  <span className="hidden lg:inline">Bi-View</span>
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    variant={isBiViewMode ? "default" : "outline"} 
+                    size="sm" 
+                    onClick={() => setIsBiViewMode(!isBiViewMode)}
+                    className={cn("h-8 text-[10px] sm:text-xs gap-1.5 px-2 sm:px-3", isBiViewMode && "bg-blue-600")}
+                  >
+                    <Layout className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span className="hidden lg:inline">Bi-View</span>
+                  </Button>
 
-                <Button variant="outline" size="sm" onClick={saveProject} className="h-8 text-xs gap-2">
-                  <Save className="w-3.5 h-3.5" />
-                  <span className="hidden lg:inline">{t.saveProject}</span>
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 text-xs gap-2 px-3 py-1 bg-transparent border border-input hover:bg-accent hover:text-accent-foreground cursor-pointer">
-                    <Download className="w-3.5 h-3.5" />
-                    <span className="hidden lg:inline">{t.print}</span>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem onClick={() => window.print()} className="gap-2">
-                      <Printer className="w-4 h-4 text-slate-500" />
-                      <span>Print / PDF</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportToCSV} className="gap-2">
-                      <FileSpreadsheet className="w-4 h-4 text-green-500" />
-                      <span>CSV</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={saveToFirebase} 
+                    className={cn(
+                      "h-8 text-[10px] sm:text-xs gap-1.5 px-2 sm:px-3 rounded-xl",
+                      isSaving && "opacity-70 animate-pulse bg-blue-50"
+                    )}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? <RotateCcw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5 text-slate-400" />}
+                    <span className="hidden lg:inline">{isSaving ? 'Saving...' : (t.saveToCloud || 'Cloud Save')}</span>
+                  </Button>
+
+                  <div className="h-4 w-[1px] bg-slate-200 hidden sm:block mx-1" />
+
+                  {currentUser ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="h-8 w-8 rounded-full p-0 border border-slate-200 overflow-hidden ring-2 ring-blue-100 ring-offset-1 inline-flex items-center justify-center cursor-pointer">
+                        {currentUser.photoURL ? (
+                          <img src={currentUser.photoURL} alt={currentUser.displayName || 'User'} referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">
+                            {currentUser.displayName?.charAt(0) || currentUser.email?.charAt(0) || 'U'}
+                          </div>
+                        )}
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56 rounded-xl border-slate-200 p-1.5 shadow-xl">
+                        <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 p-2">My Account</DropdownMenuLabel>
+                        <div className="px-2 pb-2">
+                           <p className="text-[11px] font-bold text-slate-700 truncate">{currentUser.displayName || currentUser.email}</p>
+                           <p className="text-[9px] text-slate-400 truncate">{currentUser.email}</p>
+                        </div>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="rounded-lg text-xs font-bold focus:bg-blue-50 focus:text-blue-700 gap-2 cursor-pointer" onClick={saveToFirebase}>
+                          <Save className="w-3.5 h-3.5" />
+                          Cloud Backup
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="rounded-lg text-xs font-bold focus:bg-blue-50 focus:text-blue-700 gap-2 cursor-pointer" onClick={loadFromFirebase}>
+                          <FolderOpen className="w-3.5 h-3.5" />
+                          Open from Cloud
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="rounded-lg text-xs font-bold text-red-600 focus:bg-red-50 focus:text-red-700 gap-2 cursor-pointer" onClick={logout}>
+                          <X className="w-3.5 h-3.5" />
+                          Logout
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="rounded-xl h-8 text-[10px] sm:text-xs font-black uppercase tracking-widest gap-2 bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 transition-all shadow-md shadow-blue-200 px-3"
+                      onClick={login}
+                    >
+                      <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                      Login
+                    </Button>
+                  )}
+                  
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 text-[10px] sm:text-xs gap-1.5 px-2 sm:px-3 py-1 bg-transparent border border-input hover:bg-accent hover:text-accent-foreground cursor-pointer">
+                      <Download className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                      <span className="hidden lg:inline">{t.print}</span>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => window.print()} className="gap-2">
+                        <Printer className="w-4 h-4 text-slate-500" />
+                        <span>Print / PDF</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={exportToCSV} className="gap-2">
+                        <FileSpreadsheet className="w-4 h-4 text-green-500" />
+                        <span>CSV</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="lg:hidden inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring h-8 w-8 bg-transparent border border-input hover:bg-accent cursor-pointer">
+                      <Menu className="w-4 h-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                       <DropdownMenuLabel>Settings & View</DropdownMenuLabel>
+                       <DropdownMenuSeparator />
+                       <DropdownMenuItem onClick={() => setView('calculator')}>Calculator</DropdownMenuItem>
+                       <DropdownMenuItem onClick={() => setView('docs')}>Documentation</DropdownMenuItem>
+                       <DropdownMenuSeparator />
+                       <div className="p-2 space-y-2">
+                         <div className="flex items-center justify-between">
+                            <span className="text-xs">Language</span>
+                            <Select value={lang} onValueChange={(v: any) => setLang(v)}>
+                              <SelectTrigger className="h-7 w-[60px] text-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="en">EN</SelectItem>
+                                <SelectItem value="zh">ZH</SelectItem>
+                              </SelectContent>
+                            </Select>
+                         </div>
+                         <div className="flex items-center justify-between">
+                            <span className="text-xs">Units</span>
+                            <Select value={unitSystem} onValueChange={(v: any) => setUnitSystem(v)}>
+                              <SelectTrigger className="h-7 w-[80px] text-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="metric">Metric</SelectItem>
+                                <SelectItem value="imperial">Imperial</SelectItem>
+                              </SelectContent>
+                            </Select>
+                         </div>
+                       </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             )}
           </div>
@@ -3814,9 +4302,28 @@ export function App() {
               exit={{ opacity: 0 }}
               className="flex-1 flex flex-col min-h-0 print:block overflow-hidden"
             >
+              {/* Mobile View Toggle */}
+              <div className="lg:hidden border-b bg-white px-4 py-2 flex items-center justify-center print:hidden">
+                <Tabs value={mobileTab} onValueChange={(v: any) => setMobileTab(v)} className="w-[200px]">
+                  <TabsList className="grid w-full grid-cols-2 h-8">
+                    <TabsTrigger value="inputs" className="text-[10px] font-bold">CONFIG</TabsTrigger>
+                    <TabsTrigger value="results" className="text-[10px] font-bold text-center flex items-center gap-1.5 justify-center">
+                      RESULT
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        results.summary.status === 'pass' ? "bg-green-500" : "bg-red-500 animate-pulse"
+                      )} />
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
               <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-0 print:block overflow-hidden">
                 {/* Left Column: Inputs */}
-                <div className="lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/30 no-scrollbar print:hidden">
+                <div className={cn(
+                  "lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/30 no-scrollbar print:hidden",
+                  mobileTab !== 'inputs' && "hidden lg:block"
+                )}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
                     {/* Analysis Mode Switch */}
                     <div className="px-1">
@@ -3826,19 +4333,28 @@ export function App() {
                         <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm rounded-xl">
                           <TabsTrigger value="beam" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
                             <Box className="w-3 h-3" />
-                            {t.beamMode}
+                            <span className="hidden xs:inline">{t.beamMode}</span>
+                            <span className="xs:hidden">B</span>
                           </TabsTrigger>
                           <TabsTrigger value="panel" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
                             <Square className="w-3 h-3" />
-                            {t.panelMode}
+                            <span className="hidden xs:inline">{t.panelMode}</span>
+                            <span className="xs:hidden">P</span>
                           </TabsTrigger>
                           <TabsTrigger value="sealant" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
                             <Droplet className="w-3 h-3" />
-                            Sealant
+                            <span className="hidden xs:inline">Seal</span>
+                            <span className="xs:hidden">S</span>
                           </TabsTrigger>
                           <TabsTrigger value="bracket" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
                             <Link className="w-3 h-3" />
-                            Bracket
+                            <span className="hidden xs:inline">Brkt</span>
+                            <span className="xs:hidden">BR</span>
+                          </TabsTrigger>
+                          <TabsTrigger value="cast-in-embed" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
+                            <Layers className="w-3 h-3" />
+                            <span className="hidden xs:inline">Embed</span>
+                            <span className="xs:hidden">EM</span>
                           </TabsTrigger>
                         </TabsList>
                       </Tabs>
@@ -4505,6 +5021,46 @@ export function App() {
                         </div>
                       </div>
                     )}
+
+                    {/* Cast-in Embed specific */}
+                    {calculationMode === 'cast-in-embed' && (
+                      <div className="space-y-3 p-3 bg-blue-50/30 rounded-xl border border-blue-100">
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] uppercase font-bold text-blue-600">{t.boltProps}</Label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="grid gap-1.5">
+                              <Label className="text-[10px] uppercase font-bold text-slate-400">{t.boltDiameter} (mm)</Label>
+                              <NumericInputWithControls value={boltDiameter} min={6} max={30} step={2} precision={0} onChange={setBoltDiameter} />
+                            </div>
+                            <div className="grid gap-1.5">
+                              <Label className="text-[10px] uppercase font-bold text-slate-400">{t.boltCount}</Label>
+                              <NumericInputWithControls value={boltCount} min={1} max={10} step={1} precision={0} onChange={setBoltCount} />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">{t.embedDepth} (mm)</Label>
+                            <NumericInputWithControls value={embedDepth} min={40} max={300} step={5} precision={0} onChange={setEmbedDepth} />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] uppercase font-bold text-slate-400">{t.edgeDistance} (mm)</Label>
+                            <NumericInputWithControls value={edgeDistance} min={25} max={1000} step={5} precision={0} onChange={setEdgeDistance} />
+                          </div>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] uppercase font-bold text-slate-400">{t.concreteGrade} (MPa)</Label>
+                          <Select value={concreteGrade.toString()} onValueChange={(v) => setConcreteGrade(Number(v))}>
+                            <SelectTrigger className="bg-white h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {[20, 25, 30, 35, 40, 50].map(c => (
+                                <SelectItem key={c} value={c.toString()} className="text-xs">C{c}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="grid gap-1.5">
                       <Label className="text-[10px] uppercase font-bold text-slate-400">{calculationMode === 'beam' ? t.material : (calculationMode === 'panel' ? t.skinMaterial : 'Structure Material')}</Label>
@@ -5006,24 +5562,33 @@ export function App() {
                       dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
                       className="p-2 bg-white space-y-2 relative z-10"
                     >
-                      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute top-1 right-1 flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-5 w-5 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                          className="h-6 w-6 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
                           onClick={() => {
                             const newLoad = { ...load, id: Math.random().toString(36).substr(2, 9) };
                             setLoads([...loads, newLoad]);
                           }}
                           title="Duplicate Load"
                         >
-                          <Copy className="h-3 w-3" />
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors lg:hidden"
+                          onClick={() => removeLoad(load.id)}
+                          title="Remove Load"
+                        >
+                          <X className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1.5 flex-1">
-                          <span className="text-[9px] font-bold bg-slate-100 px-1 py-0.5 rounded text-slate-500">#{idx + 1}</span>
+                          <span className="text-[9px] sm:text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">#{idx + 1}</span>
                           <Select 
                             value={load.type} 
                             onValueChange={(v: any) => updateLoad(load.id, { 
@@ -5033,7 +5598,7 @@ export function App() {
                               end: v === 'trapezoidal' ? length : undefined
                             })}
                           >
-                            <SelectTrigger className="h-6 text-[10px] border-slate-200 bg-slate-50/50 px-1.5 w-[90px] focus:ring-1 focus:ring-blue-500">
+                            <SelectTrigger className="h-7 sm:h-6 text-[10px] sm:text-[10px] border-slate-200 bg-slate-50/50 px-2 w-[100px] sm:w-[90px] focus:ring-1 focus:ring-blue-500">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -5049,7 +5614,7 @@ export function App() {
                           onValueChange={(v: any) => updateLoad(load.id, { category: v })}
                         >
                           <SelectTrigger className={cn(
-                            "h-6 text-[9px] font-bold px-2 rounded-full border-none focus:ring-0 w-fit shadow-sm",
+                            "h-7 sm:h-6 text-[10px] font-bold px-3 sm:px-2 rounded-full border-none focus:ring-0 w-fit shadow-xs",
                             LOAD_CATEGORIES[load.category].bg,
                             LOAD_CATEGORIES[load.category].color
                           )}>
@@ -5062,89 +5627,89 @@ export function App() {
                           </SelectContent>
                         </Select>
 
-                        <div className="flex-1" />
-
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                          onClick={() => removeLoad(load.id)}
-                          title="Remove Load"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-
-                  <div className="bg-slate-50/50 p-1.5 rounded-md border border-slate-100 flex-1 flex flex-col justify-center">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-0.5">
-                        <Label className="text-[8px] uppercase font-bold text-slate-400">
-                          {load.type === 'trapezoidal' ? `w1 (${u.udl})` : `Value (${load.type === 'point' ? u.force : u.udl})`}
-                        </Label>
-                        <NumericInputWithControls 
-                          min={-1000000}
-                          max={1000000}
-                          step={load.type === 'point' ? (unitSystem === 'metric' ? 100 : 10) : (unitSystem === 'metric' ? 0.5 : 0.05)}
-                          precision={unitSystem === 'metric' ? 2 : 4}
-                          value={toDisplay(load.value ?? 0, load.type === 'point' ? 'force' : 'udl')} 
-                          onChange={(val) => updateLoad(load.id, { value: fromDisplay(val, load.type === 'point' ? 'force' : 'udl') })}
-                        />
-                      </div>
-                      {load.type === 'point' && (
-                        <div className="space-y-0.5">
-                          <Label className="text-[8px] uppercase font-bold text-slate-400">Pos ({u.length})</Label>
-                          <NumericInputWithControls 
-                            min={0}
-                            max={toDisplay(length, 'length')}
-                            step={unitSystem === 'metric' ? 100 : 1}
-                            precision={unitSystem === 'metric' ? 0 : 2}
-                            value={toDisplay(load.position ?? 0, 'length')} 
-                            onChange={(val) => updateLoad(load.id, { position: fromDisplay(val, 'length') })}
-                          />
-                        </div>
-                      )}
-                      {load.type === 'trapezoidal' && (
-                        <div className="space-y-0.5">
-                          <Label className="text-[8px] uppercase font-bold text-slate-400">w2 ({u.udl})</Label>
-                          <NumericInputWithControls 
-                            min={-1000000}
-                            max={1000000}
-                            step={unitSystem === 'metric' ? 0.5 : 0.05}
-                            precision={unitSystem === 'metric' ? 2 : 4}
-                            value={toDisplay(load.value2 ?? load.value, 'udl')} 
-                            onChange={(val) => updateLoad(load.id, { value2: fromDisplay(val, 'udl') })}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {load.type === 'trapezoidal' && (
-                      <div className="grid grid-cols-2 gap-2 mt-1.5">
-                        <div className="space-y-0.5">
-                          <Label className="text-[8px] uppercase font-bold text-slate-400">Start ({u.length})</Label>
-                          <NumericInputWithControls 
-                            min={0}
-                            max={toDisplay(length, 'length')}
-                            step={unitSystem === 'metric' ? 100 : 1}
-                            precision={unitSystem === 'metric' ? 0 : 2}
-                            value={toDisplay(load.start ?? 0, 'length')} 
-                            onChange={(val) => updateLoad(load.id, { start: fromDisplay(val, 'length') })}
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[8px] uppercase font-bold text-slate-400">End ({u.length})</Label>
-                          <NumericInputWithControls 
-                            min={0}
-                            max={toDisplay(length, 'length')}
-                            step={unitSystem === 'metric' ? 100 : 1}
-                            precision={unitSystem === 'metric' ? 0 : 2}
-                            value={toDisplay(load.end ?? length, 'length')} 
-                            onChange={(val) => updateLoad(load.id, { end: fromDisplay(val, 'length') })}
-                          />
+                        <div className="hidden lg:block">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                            onClick={() => removeLoad(load.id)}
+                            title="Remove Load"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
-                    )}
-                  </div>
+
+                      <div className="bg-slate-50/50 p-2 sm:p-1.5 rounded-md border border-slate-100 flex-1 flex flex-col justify-center">
+                        <div className="grid grid-cols-2 gap-3 sm:gap-2">
+                          <div className="space-y-1 sm:space-y-0.5">
+                            <Label className="text-[10px] sm:text-[8px] uppercase font-bold text-slate-400">
+                              {load.type === 'trapezoidal' ? `w1 (${u.udl})` : `Value (${load.type === 'point' ? u.force : u.udl})`}
+                            </Label>
+                            <NumericInputWithControls 
+                              min={-1000000}
+                              max={1000000}
+                              step={load.type === 'point' ? (unitSystem === 'metric' ? 100 : 10) : (unitSystem === 'metric' ? 0.5 : 0.05)}
+                              precision={unitSystem === 'metric' ? 2 : 4}
+                              value={toDisplay(load.value ?? 0, load.type === 'point' ? 'force' : 'udl')} 
+                              onChange={(val) => updateLoad(load.id, { value: fromDisplay(val, load.type === 'point' ? 'force' : 'udl') })}
+                            />
+                          </div>
+                          {load.type === 'point' && (
+                            <div className="space-y-1 sm:space-y-0.5">
+                              <Label className="text-[10px] sm:text-[8px] uppercase font-bold text-slate-400">Pos ({u.length})</Label>
+                              <NumericInputWithControls 
+                                min={0}
+                                max={toDisplay(length, 'length')}
+                                step={unitSystem === 'metric' ? 100 : 1}
+                                precision={unitSystem === 'metric' ? 0 : 2}
+                                value={toDisplay(load.position ?? 0, 'length')} 
+                                onChange={(val) => updateLoad(load.id, { position: fromDisplay(val, 'length') })}
+                              />
+                            </div>
+                          )}
+                          {load.type === 'trapezoidal' && (
+                            <div className="space-y-1 sm:space-y-0.5">
+                              <Label className="text-[10px] sm:text-[8px] uppercase font-bold text-slate-400">w2 ({u.udl})</Label>
+                              <NumericInputWithControls 
+                                min={-1000000}
+                                max={1000000}
+                                step={unitSystem === 'metric' ? 0.5 : 0.05}
+                                precision={unitSystem === 'metric' ? 2 : 4}
+                                value={toDisplay(load.value2 ?? load.value, 'udl')} 
+                                onChange={(val) => updateLoad(load.id, { value2: fromDisplay(val, 'udl') })}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {load.type === 'trapezoidal' && (
+                          <div className="grid grid-cols-2 gap-3 sm:gap-2 mt-2 sm:mt-1.5">
+                            <div className="space-y-1 sm:space-y-0.5">
+                              <Label className="text-[10px] sm:text-[8px] uppercase font-bold text-slate-400">Start ({u.length})</Label>
+                              <NumericInputWithControls 
+                                min={0}
+                                max={toDisplay(length, 'length')}
+                                step={unitSystem === 'metric' ? 100 : 1}
+                                precision={unitSystem === 'metric' ? 0 : 2}
+                                value={toDisplay(load.start ?? 0, 'length')} 
+                                onChange={(val) => updateLoad(load.id, { start: fromDisplay(val, 'length') })}
+                              />
+                            </div>
+                            <div className="space-y-1 sm:space-y-0.5">
+                              <Label className="text-[10px] sm:text-[8px] uppercase font-bold text-slate-400">End ({u.length})</Label>
+                              <NumericInputWithControls 
+                                min={0}
+                                max={toDisplay(length, 'length')}
+                                step={unitSystem === 'metric' ? 100 : 1}
+                                precision={unitSystem === 'metric' ? 0 : 2}
+                                value={toDisplay(load.end ?? length, 'length')} 
+                                onChange={(val) => updateLoad(load.id, { end: fromDisplay(val, 'length') })}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
                 </motion.div>
               </div>
             ))}
@@ -5162,7 +5727,8 @@ export function App() {
                 {/* Right Column: Results & Visuals */}
                 <div className={cn(
                   "h-full overflow-y-auto p-3 sm:p-4 space-y-4 no-scrollbar print:block",
-                  isBiViewMode ? "lg:col-span-12" : "lg:col-span-8 xl:col-span-9"
+                  isBiViewMode ? "lg:col-span-12" : "lg:col-span-8 xl:col-span-9",
+                  mobileTab !== 'results' && "hidden lg:block"
                 )}>
                   {/* Print Only Header */}
                   <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-6">
@@ -5207,6 +5773,7 @@ export function App() {
                   panelResults={panelResults}
                   sealantResults={sealantResults}
                   bracketResults={bracketResults}
+                  castInResults={castInResults}
                   calculationMode={calculationMode}
                   unitSystem={unitSystem}
                   t={t}
@@ -5217,6 +5784,7 @@ export function App() {
                   isChartExpanded={isChartExpanded}
                   setIsChartExpanded={setIsChartExpanded}
                   criticalPoints={criticalPoints}
+                  setMobileTab={setMobileTab}
                 />
               </div>
               <div className="space-y-4">
@@ -5243,6 +5811,7 @@ export function App() {
                     panelResults={calculatePanelResults(projects.find(p => p.id === comparisonProjectId)!)}
                     sealantResults={calculateSealantResults(projects.find(p => p.id === comparisonProjectId)!)}
                     bracketResults={calculateBracketResults(projects.find(p => p.id === comparisonProjectId)!)}
+                    castInResults={calculateCastInEmbedResults(projects.find(p => p.id === comparisonProjectId)!)}
                     calculationMode={projects.find(p => p.id === comparisonProjectId)!.calculationMode || 'beam'}
                     unitSystem={unitSystem}
                     t={t}
@@ -5253,6 +5822,7 @@ export function App() {
                     isChartExpanded={isChartExpanded}
                     setIsChartExpanded={setIsChartExpanded}
                     criticalPoints={getCriticalPoints(getProjectResults(projects.find(p => p.id === comparisonProjectId)!), unitSystem, u, toDisplay)}
+                    setMobileTab={setMobileTab}
                   />
                 ) : (
                   <div className="h-[400px] flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-slate-50 text-slate-400">
@@ -5269,6 +5839,7 @@ export function App() {
               panelResults={panelResults}
               sealantResults={sealantResults}
               bracketResults={bracketResults}
+              castInResults={castInResults}
               calculationMode={calculationMode}
               unitSystem={unitSystem}
               t={t}
@@ -5279,6 +5850,7 @@ export function App() {
               isChartExpanded={isChartExpanded}
               setIsChartExpanded={setIsChartExpanded}
               criticalPoints={criticalPoints}
+              setMobileTab={setMobileTab}
             />
           )}
           
@@ -5609,6 +6181,9 @@ export function App() {
                     <li>Linear elastic material behavior.</li>
                     <li>Small deflection theory (y &lt;&lt; L).</li>
                     <li>Shear deformation is neglected.</li>
+                    {calculationMode === 'cast-in-embed' && (
+                      <li className="text-blue-600 font-bold">CCD Method (ACI 318 Annex D)</li>
+                    )}
                   </ul>
                 </div>
                 <div className="space-y-2">
@@ -5619,9 +6194,19 @@ export function App() {
                   <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
                     <li>Deflection limit: L/175 (Facade).</li>
                     <li>Stress limit: fy / Safety Factor (γ).</li>
-                    <li>Supported Loads: D, L, W, S, E.</li>
-                    <li>Seismic: Cs × Total Dead Load.</li>
-                    <li>Self-weight: Add manually as UDL.</li>
+                    {calculationMode === 'cast-in-embed' ? (
+                      <>
+                        <li>Concrete Breakout: f(hef, c1, fc').</li>
+                        <li>Steel Cap: n * As * fy.</li>
+                        <li>Interaction: (N/Nn)^1.5 + (V/Vn)^1.5 ≤ 1.0.</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>Supported Loads: D, L, W, S, E.</li>
+                        <li>Seismic: Cs × Total Dead Load.</li>
+                        <li>Self-weight: Add manually as UDL.</li>
+                      </>
+                    )}
                   </ul>
                 </div>
                 <div className="space-y-2">
@@ -5693,6 +6278,12 @@ export function App() {
                 seismicRegion={seismicRegion}
                 seismicCoeff={seismicCoeff}
                 loads={loads}
+                calculationMode={calculationMode}
+                embedDepth={embedDepth}
+                edgeDistance={edgeDistance}
+                concreteGrade={concreteGrade}
+                boltCount={boltCount}
+                boltDiameter={boltDiameter}
               />
             </motion.div>
           )}
@@ -5723,7 +6314,7 @@ export function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-2 space-y-8">
                     {/* Methodology */}
-                    <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-6">
+                    <section className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-6">
                       <h3 className="text-xl font-bold flex items-center gap-3 text-slate-900">
                         <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
                           <Activity className="w-5 h-5" />
@@ -5748,7 +6339,7 @@ export function App() {
                     </section>
 
                     {/* Design Criteria */}
-                    <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-6">
+                    <section className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-6">
                       <h3 className="text-xl font-bold flex items-center gap-3 text-slate-900">
                         <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
                           <Scale className="w-5 h-5" />
@@ -5788,7 +6379,7 @@ export function App() {
                     </section>
 
                     {/* Calculus Criteria */}
-                    <section className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-6">
+                    <section className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-6">
                       <h3 className="text-xl font-bold flex items-center gap-3 text-slate-900">
                         <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
                           <Calculator className="w-5 h-5" />
@@ -5823,13 +6414,25 @@ export function App() {
                             </p>
                           </div>
                           <div className="space-y-2">
-                            <h4 className="text-xs font-bold text-slate-900">Shear Force (V)</h4>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                              The internal force acting perpendicular to the beam axis. Calculated by integrating the load:
-                              <code className="block mt-1 p-2 bg-slate-50 rounded border border-slate-100 font-mono text-[10px]">V(x) = ∫ q(x) dx</code>
-                            </p>
-                          </div>
-                        </div>
+                             <h4 className="text-xs font-bold text-slate-900">Shear Force (V)</h4>
+                             <p className="text-xs text-slate-500 leading-relaxed">
+                               The internal force acting perpendicular to the beam axis. Calculated by integrating the load:
+                               <code className="block mt-1 p-2 bg-slate-50 rounded border border-slate-100 font-mono text-[10px]">V(x) = ∫ q(x) dx</code>
+                             </p>
+                           </div>
+                           <div className="space-y-2 sm:col-span-2 p-4 rounded-2xl bg-blue-50/50 border border-blue-100">
+                             <h4 className="text-xs font-bold text-blue-900 flex items-center gap-2">
+                               <Anchor className="w-4 h-4" />
+                               Cast-in Embed Design (ACI 318 Annex D)
+                             </h4>
+                             <p className="text-xs text-slate-600 leading-relaxed mt-2">
+                               Embeded anchors are analyzed for <strong>Concrete Breakout</strong> and <strong>Steel Pullout</strong>. 
+                               The capacity is governed by the effective embedment depth (h_ef) and edge distance (c_1). 
+                               Interaction between simultaneous tension and shear follows the power law: 
+                               <code className="inline-block px-2 py-0.5 mt-1 bg-white rounded border border-blue-200 font-mono text-[10px]">(N/Nn)^1.5 + (V/Vn)^1.5 ≤ 1.0</code>.
+                             </p>
+                           </div>
+                         </div>
                         <Separator />
                         <div className="space-y-4">
                           <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Load Integration Logic</h4>
@@ -6076,7 +6679,7 @@ function SummaryCard({ label, value, subValue, icon, status, onClick, active, pr
             active ? "scale-90 sm:scale-110" : "group-hover:scale-90 sm:group-hover:scale-110"
           )}>{icon}</div>
         </div>
-        <div className="text-[10px] sm:text-base font-bold tracking-tight truncate">{value}</div>
+        <div className="text-xs sm:text-base font-bold tracking-tight truncate">{value}</div>
         {subValue && (
           <div className={cn(
             "text-[7px] sm:text-[9px] font-medium mt-0.5 truncate",
@@ -6321,11 +6924,11 @@ function NumericInputWithControls({
       <Button 
         variant="outline" 
         size="icon" 
-        className="h-7 w-7 shrink-0" 
+        className="h-8 w-8 sm:h-7 sm:w-7 shrink-0" 
         onClick={decrement}
         disabled={disabled || value <= min}
       >
-        <Minus className="h-3 w-3" />
+        <Minus className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
       </Button>
       <Input 
         id={id}
@@ -6333,17 +6936,17 @@ function NumericInputWithControls({
         value={localValue} 
         onChange={handleInputChange}
         disabled={disabled}
-        className="h-7 flex-1 text-center bg-white text-xs px-1"
+        className="h-8 sm:h-7 flex-1 text-center bg-white text-xs px-1"
         step="any"
       />
       <Button 
         variant="outline" 
         size="icon" 
-        className="h-7 w-7 shrink-0" 
+        className="h-8 w-8 sm:h-7 sm:w-7 shrink-0" 
         onClick={increment}
         disabled={disabled || value >= max}
       >
-        <Plus className="h-3 w-3" />
+        <Plus className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
       </Button>
     </div>
   );

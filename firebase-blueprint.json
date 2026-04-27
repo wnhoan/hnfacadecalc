@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "Structural calculation project data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "notes": { "type": "string" },
+        "calculationMode": { "type": "string", "enum": ["beam", "panel", "sealant", "bracket", "cast-in-embed"] },
+        "material": { "type": "string" },
+        "length": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "thickness": { "type": "number" },
+        "thickness2": { "type": "number" },
+        "safetyFactor": { "type": "number" },
+        "supportCondition": { "type": "string" },
+        "beamType": { "type": "string" },
+        "tributaryArea": { "type": "number" },
+        "windPressureInput": { "type": "number" },
+        "deadLoadInput": { "type": "number" },
+        "boltDiameter": { "type": "number" },
+        "boltCount": { "type": "number" },
+        "embedDepth": { "type": "number" },
+        "edgeDistance": { "type": "number" },
+        "concreteGrade": { "type": "number" },
+        "userId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "calculationMode", "userId"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Stores structural calculation projects"
+    }
+  }
+}
