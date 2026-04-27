@@ -47,12 +47,16 @@ import {
   Undo2,
   Redo2,
   Zap,
+  TrendingUp,
   Image as ImageIcon,
   Paperclip,
   Square,
   Link,
   Droplet,
-  Anchor
+  Anchor,
+  Columns,
+  Wrench,
+  Grid
 } from 'lucide-react';
 import { 
   Card, 
@@ -1429,7 +1433,7 @@ const BracketResultsView = ({
                 <span className="text-[10px] font-bold text-slate-400">Max Util: {((results.maxUtilization ?? 0) * 100).toFixed(1)}%</span>
               </div>
             </div>
-            <Link className="w-10 h-10 text-slate-100 absolute -right-2 -bottom-2 rotate-12" />
+            <Wrench className="w-10 h-10 text-slate-100 absolute -right-2 -bottom-2 rotate-12" />
           </div>
           <div className="mt-4 h-2 bg-slate-100 rounded-full">
              <div className={cn("h-full rounded-full transition-all", (results.maxUtilization ?? 0) > 1 ? "bg-red-500" : "bg-blue-600")} style={{ width: `${Math.min(100, (results.maxUtilization ?? 0) * 100)}%` }} />
@@ -1642,7 +1646,7 @@ const PanelResultsView = ({
         <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-blue-200 transition-colors">
           <CardHeader className="p-3 sm:p-4 border-b bg-blue-50/30">
             <div className="flex items-center gap-2 text-blue-600">
-              <Square className="w-4 h-4" />
+              <Grid className="w-4 h-4" />
               <CardTitle className="text-sm font-bold uppercase tracking-wide">Skin Analysis (Panel)</CardTitle>
             </div>
           </CardHeader>
@@ -1676,7 +1680,7 @@ const PanelResultsView = ({
         <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-rose-200 transition-colors">
           <CardHeader className="p-3 sm:p-4 border-b bg-rose-50/30">
             <div className="flex items-center gap-2 text-rose-600">
-              <Layout className="w-4 h-4" />
+              <Columns className="w-4 h-4" />
               <CardTitle className="text-sm font-bold uppercase tracking-wide">Stiffener Analysis</CardTitle>
             </div>
           </CardHeader>
@@ -1920,7 +1924,7 @@ const ProjectResultsView = ({
         value={unitSystem === 'metric' 
           ? `${((results.summary.maxMoment ?? 0) / 1000000).toFixed(2)} kNm` 
           : `${(toDisplay(results.summary.maxMoment ?? 0, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1)} lb-ft`} 
-        icon={<Layout className="w-4 h-4 text-purple-500" />}
+        icon={<Columns className="w-4 h-4 text-purple-500" />}
         tooltip="Maximum bending moment occurring along the beam span."
       />
       <SummaryCard 
@@ -1928,7 +1932,7 @@ const ProjectResultsView = ({
         value={unitSystem === 'metric'
           ? `${((results.summary.maxShear ?? 0) / 1000).toFixed(2)} kN`
           : `${(toDisplay(results.summary.maxShear ?? 0, 'force') / 1000).toFixed(2)} kip`} 
-        icon={<ChevronRight className="w-4 h-4 text-green-500" />}
+        icon={<TrendingUp className="w-4 h-4 text-green-500" />}
         tooltip="Maximum internal shear force acting perpendicular to the beam axis."
       />
       </div>
@@ -2378,7 +2382,7 @@ const CalculusStepsCard = ({
         {calculationMode === 'beam' && options.section && (
           <div className="space-y-3">
             <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-              <Layers className="w-3 h-3" />
+              <Columns className="w-3 h-3" />
               Step 1: Section Properties
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
@@ -3909,7 +3913,7 @@ export function App() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100 flex flex-col">
+      <div className="h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100 flex flex-col overflow-hidden">
       {/* Header */}
       <header className="border-b bg-white sticky top-0 z-50 print:hidden">
         <div className="max-w-7xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
@@ -4265,7 +4269,7 @@ export function App() {
               <div className="mt-32 grid md:grid-cols-3 gap-8">
                 <div className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                   <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
-                    <Box className="w-6 h-6" />
+                    <Maximize2 className="w-6 h-6" />
                   </div>
                   <h3 className="text-xl font-bold mb-3">3D Visualization</h3>
                   <p className="text-slate-600 text-sm leading-relaxed">
@@ -4322,7 +4326,8 @@ export function App() {
                 {/* Left Column: Inputs */}
                 <div className={cn(
                   "lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/30 no-scrollbar print:hidden",
-                  mobileTab !== 'inputs' && "hidden lg:block"
+                  mobileTab !== 'inputs' && "hidden lg:block",
+                  isBiViewMode && "lg:hidden"
                 )}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
                     {/* Analysis Mode Switch */}
@@ -4330,14 +4335,14 @@ export function App() {
                       <Tabs value={calculationMode} onValueChange={(v: any) => {
                         setCalculationMode(v);
                       }} className="w-full">
-                        <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm rounded-xl">
+                        <TabsList className="grid w-full grid-cols-5 h-9 p-1 bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm rounded-xl">
                           <TabsTrigger value="beam" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
-                            <Box className="w-3 h-3" />
+                            <Columns className="w-3 h-3" />
                             <span className="hidden xs:inline">{t.beamMode}</span>
                             <span className="xs:hidden">B</span>
                           </TabsTrigger>
                           <TabsTrigger value="panel" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
-                            <Square className="w-3 h-3" />
+                            <Grid className="w-3 h-3" />
                             <span className="hidden xs:inline">{t.panelMode}</span>
                             <span className="xs:hidden">P</span>
                           </TabsTrigger>
@@ -4347,12 +4352,12 @@ export function App() {
                             <span className="xs:hidden">S</span>
                           </TabsTrigger>
                           <TabsTrigger value="bracket" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
-                            <Link className="w-3 h-3" />
+                            <Wrench className="w-3 h-3" />
                             <span className="hidden xs:inline">Brkt</span>
                             <span className="xs:hidden">BR</span>
                           </TabsTrigger>
                           <TabsTrigger value="cast-in-embed" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
-                            <Layers className="w-3 h-3" />
+                            <Anchor className="w-3 h-3" />
                             <span className="hidden xs:inline">Embed</span>
                             <span className="xs:hidden">EM</span>
                           </TabsTrigger>
@@ -5319,7 +5324,7 @@ export function App() {
                   <Card className="shadow-sm border-slate-200 overflow-hidden">
                     <CardHeader className="p-3 sm:p-4 border-b bg-rose-50/50">
                       <div className="flex items-center gap-2 text-rose-600 mb-0.5">
-                        <Layout className="w-3.5 h-3.5" />
+                        <Grid className="w-3.5 h-3.5" />
                         <span className="text-[10px] font-bold uppercase tracking-widest">{t.stiffenerProps}</span>
                       </div>
                       <CardTitle className="text-sm sm:text-base">Panel Reinforcement</CardTitle>
@@ -5535,7 +5540,7 @@ export function App() {
                         <Plus className="h-3.5 w-3.5" />
                       </Button>
                       <Button size="icon" variant="outline" onClick={() => addLoad('trapezoidal')} className="h-7 w-7" title="Add Trapezoidal Load">
-                        <Layout className="h-3.5 w-3.5" />
+                        <Activity className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </CardHeader>
