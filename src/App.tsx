@@ -47,16 +47,12 @@ import {
   Undo2,
   Redo2,
   Zap,
-  TrendingUp,
   Image as ImageIcon,
   Paperclip,
   Square,
   Link,
   Droplet,
-  Anchor,
-  Columns,
-  Wrench,
-  Grid
+  Anchor
 } from 'lucide-react';
 import { 
   Card, 
@@ -141,24 +137,6 @@ import {
   Load
 } from '@/lib/structural-engine';
 import { cn } from '@/lib/utils';
-import { auth, db, OperationType, handleFirestoreError } from '@/lib/firebase';
-import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signOut, 
-  onAuthStateChanged,
-  User
-} from 'firebase/auth';
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  collection, 
-  query, 
-  where, 
-  getDocs,
-  serverTimestamp 
-} from 'firebase/firestore';
 
 // Error fallback for robustness
 function ErrorFallback() {
@@ -379,7 +357,6 @@ const TRANSLATIONS = {
     seismicCoeff: 'Seismic Coeff (Cs)',
     applySeismic: 'Apply Seismic Load',
     saveProject: 'Save Project',
-    saveToCloud: 'Save to Cloud',
     loadProject: 'Load Project',
     projectSaved: 'Project saved to local storage',
     projectLoaded: 'Project loaded successfully',
@@ -469,7 +446,6 @@ const TRANSLATIONS = {
     seismicCoeff: '地震系数 (Cs)',
     applySeismic: '应用地震荷载',
     saveProject: '保存项目',
-    saveToCloud: '保存到云端',
     loadProject: '加载项目',
     projectSaved: '项目已保存到本地存储',
     projectLoaded: '项目加载成功',
@@ -585,25 +561,24 @@ const TRANSLATIONS = {
     stiffenerSpacing: 'ระยะห่างตัวเสริม',
     maxSkinDeflection: 'การโก่งตัวสูงสุดของผิว',
     maxSkinStress: 'หน่วยแรงสูงสุดของผิว',
-    castInMode: 'ฝังพุกในคอนกรีต',
-    sealantMode: 'ยาแนวรอยต่อ',
-    bracketMode: 'ขาจึด',
-    sealantProps: 'คุณสมบัติน้ำยาแนว',
-    bracketProps: 'คุณสมบัติขาจึด',
-    embedProps: 'คุณสมบัติการฝัง',
-    glassDims: 'ขนาดกระจก',
-    biteDept: 'ระยะฝัง',
-    contactWidth: 'ความกว้างหน้าสัมผัส',
-    tributaryArea: 'พื้นที่รับแรง',
-    boltProps: 'ข้อกำหนดสลักเกลียว',
-    boltDiameter: 'เส้นผ่านศูนย์กลางสลักเกลียว',
-    boltCount: 'จำนวนสลักเกลียว',
-    embedDepth: 'ความลึกการฝัง',
-    edgeDistance: 'ระยะขอบ',
-    concreteGrade: 'เกรดคอนกรีต',
-    deadLoad: 'น้ำหนักบรรทุกคงที่',
-    windPressure: 'แรงลม',
-    saveToCloud: 'บันทึกในคลาวด์',
+    sealantMode: 'Structural Sealant',
+    bracketMode: 'Fixing Bracket',
+    castInMode: 'Cast-in Embed',
+    sealantProps: 'Sealant Properties',
+    bracketProps: 'Bracket Properties',
+    embedProps: 'Embedment Properties',
+    glassDims: 'Glass Dimensions',
+    biteDept: 'Bite Depth',
+    contactWidth: 'Contact Width',
+    tributaryArea: 'Tributary Area',
+    boltProps: 'Bolt Specification',
+    boltDiameter: 'Bolt Diameter',
+    boltCount: 'Bolt Count',
+    embedDepth: 'Embedment Depth',
+    edgeDistance: 'Edge Distance',
+    concreteGrade: 'Concrete Grade',
+    deadLoad: 'Dead Load',
+    windPressure: 'Wind Pressure',
   },
   ms: {
     title: 'FacadeCalc',
@@ -649,7 +624,6 @@ const TRANSLATIONS = {
     seismicCoeff: 'Pekali Seismik (Cs)',
     applySeismic: 'Gunakan Beban Seismik',
     saveProject: 'Simpan Projek',
-    saveToCloud: 'Simpan ke Awan',
     loadProject: 'Muat Projek',
     projectSaved: 'Projek disimpan ke storan tempatan',
     projectLoaded: 'Projek berjaya dimuatkan',
@@ -676,24 +650,24 @@ const TRANSLATIONS = {
     stiffenerSpacing: 'Jarak Pengeras',
     maxSkinDeflection: 'Pesongan Kulit Maks',
     maxSkinStress: 'Tegangan Kulit Maks',
-    castInMode: 'Benam Tuang',
-    sealantMode: 'Kedap Struktur',
-    bracketMode: 'Pendakap Pembetulan',
-    sealantProps: 'Sifat Kedap',
-    bracketProps: 'Sifat Pendakap',
-    embedProps: 'Sifat Benaman',
-    glassDims: 'Dimensi Kaca',
-    biteDept: 'Kedalaman Gigitan',
-    contactWidth: 'Lebar Hubungan',
-    tributaryArea: 'Kawasan Tributari',
-    boltProps: 'Spesifikasi Bolt',
-    boltDiameter: 'Diameter Bolt',
-    boltCount: 'Bilangan Bolt',
-    embedDepth: 'Kedalaman Benaman',
-    edgeDistance: 'Jarak Tepi',
-    concreteGrade: 'Gred Konkrit',
-    deadLoad: 'Beban Mati',
-    windPressure: 'Tekanan Angin',
+    sealantMode: 'Structural Sealant',
+    bracketMode: 'Fixing Bracket',
+    castInMode: 'Cast-in Embed',
+    sealantProps: 'Sealant Properties',
+    bracketProps: 'Bracket Properties',
+    embedProps: 'Embedment Properties',
+    glassDims: 'Glass Dimensions',
+    biteDept: 'Bite Depth',
+    contactWidth: 'Contact Width',
+    tributaryArea: 'Tributary Area',
+    boltProps: 'Bolt Specification',
+    boltDiameter: 'Bolt Diameter',
+    boltCount: 'Bolt Count',
+    embedDepth: 'Embedment Depth',
+    edgeDistance: 'Edge Distance',
+    concreteGrade: 'Concrete Grade',
+    deadLoad: 'Dead Load',
+    windPressure: 'Wind Pressure',
   }
 };
 
@@ -1433,7 +1407,7 @@ const BracketResultsView = ({
                 <span className="text-[10px] font-bold text-slate-400">Max Util: {((results.maxUtilization ?? 0) * 100).toFixed(1)}%</span>
               </div>
             </div>
-            <Wrench className="w-10 h-10 text-slate-100 absolute -right-2 -bottom-2 rotate-12" />
+            <Link className="w-10 h-10 text-slate-100 absolute -right-2 -bottom-2 rotate-12" />
           </div>
           <div className="mt-4 h-2 bg-slate-100 rounded-full">
              <div className={cn("h-full rounded-full transition-all", (results.maxUtilization ?? 0) > 1 ? "bg-red-500" : "bg-blue-600")} style={{ width: `${Math.min(100, (results.maxUtilization ?? 0) * 100)}%` }} />
@@ -1646,7 +1620,7 @@ const PanelResultsView = ({
         <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-blue-200 transition-colors">
           <CardHeader className="p-3 sm:p-4 border-b bg-blue-50/30">
             <div className="flex items-center gap-2 text-blue-600">
-              <Grid className="w-4 h-4" />
+              <Square className="w-4 h-4" />
               <CardTitle className="text-sm font-bold uppercase tracking-wide">Skin Analysis (Panel)</CardTitle>
             </div>
           </CardHeader>
@@ -1680,7 +1654,7 @@ const PanelResultsView = ({
         <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-rose-200 transition-colors">
           <CardHeader className="p-3 sm:p-4 border-b bg-rose-50/30">
             <div className="flex items-center gap-2 text-rose-600">
-              <Columns className="w-4 h-4" />
+              <Layout className="w-4 h-4" />
               <CardTitle className="text-sm font-bold uppercase tracking-wide">Stiffener Analysis</CardTitle>
             </div>
           </CardHeader>
@@ -1924,7 +1898,7 @@ const ProjectResultsView = ({
         value={unitSystem === 'metric' 
           ? `${((results.summary.maxMoment ?? 0) / 1000000).toFixed(2)} kNm` 
           : `${(toDisplay(results.summary.maxMoment ?? 0, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1)} lb-ft`} 
-        icon={<Columns className="w-4 h-4 text-purple-500" />}
+        icon={<Layout className="w-4 h-4 text-purple-500" />}
         tooltip="Maximum bending moment occurring along the beam span."
       />
       <SummaryCard 
@@ -1932,7 +1906,7 @@ const ProjectResultsView = ({
         value={unitSystem === 'metric'
           ? `${((results.summary.maxShear ?? 0) / 1000).toFixed(2)} kN`
           : `${(toDisplay(results.summary.maxShear ?? 0, 'force') / 1000).toFixed(2)} kip`} 
-        icon={<TrendingUp className="w-4 h-4 text-green-500" />}
+        icon={<ChevronRight className="w-4 h-4 text-green-500" />}
         tooltip="Maximum internal shear force acting perpendicular to the beam axis."
       />
       </div>
@@ -2259,7 +2233,7 @@ const CalculusStepsCard = ({
   edgeDistance,
   concreteGrade,
   boltCount,
-  boltDiameter,
+  boltDiameter
 }: {
   options: { section: boolean; loads: boolean; analysis: boolean; stress: boolean; seismic: boolean };
   setOptions: (v: any) => void;
@@ -2284,12 +2258,12 @@ const CalculusStepsCard = ({
   seismicRegion: string;
   seismicCoeff: number;
   loads: Load[];
-  calculationMode: 'beam' | 'panel' | 'sealant' | 'bracket' | 'cast-in-embed';
-  embedDepth: number;
-  edgeDistance: number;
-  concreteGrade: number;
-  boltCount: number;
-  boltDiameter: number;
+  calculationMode?: string;
+  embedDepth?: number;
+  edgeDistance?: number;
+  concreteGrade?: number;
+  boltCount?: number;
+  boltDiameter?: number;
 }) => {
   const toggleOption = (key: keyof typeof options) => {
     setOptions({ ...options, [key]: !options[key] });
@@ -2382,7 +2356,7 @@ const CalculusStepsCard = ({
         {calculationMode === 'beam' && options.section && (
           <div className="space-y-3">
             <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-              <Columns className="w-3 h-3" />
+              <Layers className="w-3 h-3" />
               Step 1: Section Properties
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
@@ -2904,87 +2878,6 @@ export function App() {
   const [mobileTab, setMobileTab] = useState<'inputs' | 'results'>('inputs');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  // Firebase Auth State
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Auth Listener
-  React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setIsAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const login = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Login failed:", error);
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
-
-  const saveToFirebase = async () => {
-    if (!currentUser) {
-      login();
-      return;
-    }
-    
-    setIsSaving(true);
-    try {
-      const state = getCurrentState();
-      const projectRef = doc(db, 'projects', activeProjectId);
-      
-      const payload = {
-        ...state,
-        userId: currentUser.uid,
-        updatedAt: serverTimestamp(),
-        // Add createdAt if first time, but we use setDoc with merge or just setDoc
-      };
-
-      // Check if document exists to preserve createdAt or handle correctly
-      const docSnap = await getDoc(projectRef);
-      if (!docSnap.exists()) {
-        (payload as any).createdAt = serverTimestamp();
-      }
-
-      await setDoc(projectRef, payload, { merge: true });
-      console.log("Project saved to cloud successfully.");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `projects/${activeProjectId}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const loadFromFirebase = async () => {
-    if (!currentUser) return;
-    
-    try {
-      const q = query(collection(db, 'projects'), where('userId', '==', currentUser.uid));
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        // For simplicity, just load the first one or prompt user if multiple
-        const docData = querySnapshot.docs[0].data() as HistoryState;
-        applyState(docData);
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.GET, 'projects');
-    }
-  };
-
   // Loads State
   const [loads, setLoads] = useState<Load[]>(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -3372,6 +3265,7 @@ export function App() {
     setEmbedDepth(state.embedDepth ?? 120);
     setEdgeDistance(state.edgeDistance ?? 150);
     setConcreteGrade(state.concreteGrade ?? 30);
+    setBeamType(state.beamType ?? 'mullion');
     setSelectedCodeId(state.selectedCodeId);
     setLoads(state.loads);
     setCombinations(state.combinations);
@@ -3913,7 +3807,7 @@ export function App() {
 
   return (
     <TooltipProvider>
-      <div className="h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100 flex flex-col overflow-hidden">
+      <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-blue-100 flex flex-col">
       {/* Header */}
       <header className="border-b bg-white sticky top-0 z-50 print:hidden">
         <div className="max-w-7xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
@@ -4026,66 +3920,10 @@ export function App() {
                     <span className="hidden lg:inline">Bi-View</span>
                   </Button>
 
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={saveToFirebase} 
-                    className={cn(
-                      "h-8 text-[10px] sm:text-xs gap-1.5 px-2 sm:px-3 rounded-xl",
-                      isSaving && "opacity-70 animate-pulse bg-blue-50"
-                    )}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? <RotateCcw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5 text-slate-400" />}
-                    <span className="hidden lg:inline">{isSaving ? 'Saving...' : (t.saveToCloud || 'Cloud Save')}</span>
+                  <Button variant="outline" size="sm" onClick={saveProject} className="h-8 text-[10px] sm:text-xs gap-1.5 px-2 sm:px-3">
+                    <Save className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <span className="hidden lg:inline">{t.saveProject}</span>
                   </Button>
-
-                  <div className="h-4 w-[1px] bg-slate-200 hidden sm:block mx-1" />
-
-                  {currentUser ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="h-8 w-8 rounded-full p-0 border border-slate-200 overflow-hidden ring-2 ring-blue-100 ring-offset-1 inline-flex items-center justify-center cursor-pointer">
-                        {currentUser.photoURL ? (
-                          <img src={currentUser.photoURL} alt={currentUser.displayName || 'User'} referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">
-                            {currentUser.displayName?.charAt(0) || currentUser.email?.charAt(0) || 'U'}
-                          </div>
-                        )}
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 rounded-xl border-slate-200 p-1.5 shadow-xl">
-                        <DropdownMenuLabel className="text-[10px] font-black uppercase text-slate-400 p-2">My Account</DropdownMenuLabel>
-                        <div className="px-2 pb-2">
-                           <p className="text-[11px] font-bold text-slate-700 truncate">{currentUser.displayName || currentUser.email}</p>
-                           <p className="text-[9px] text-slate-400 truncate">{currentUser.email}</p>
-                        </div>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="rounded-lg text-xs font-bold focus:bg-blue-50 focus:text-blue-700 gap-2 cursor-pointer" onClick={saveToFirebase}>
-                          <Save className="w-3.5 h-3.5" />
-                          Cloud Backup
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="rounded-lg text-xs font-bold focus:bg-blue-50 focus:text-blue-700 gap-2 cursor-pointer" onClick={loadFromFirebase}>
-                          <FolderOpen className="w-3.5 h-3.5" />
-                          Open from Cloud
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="rounded-lg text-xs font-bold text-red-600 focus:bg-red-50 focus:text-red-700 gap-2 cursor-pointer" onClick={logout}>
-                          <X className="w-3.5 h-3.5" />
-                          Logout
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="rounded-xl h-8 text-[10px] sm:text-xs font-black uppercase tracking-widest gap-2 bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 transition-all shadow-md shadow-blue-200 px-3"
-                      onClick={login}
-                    >
-                      <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      Login
-                    </Button>
-                  )}
                   
                   <DropdownMenu>
                     <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 text-[10px] sm:text-xs gap-1.5 px-2 sm:px-3 py-1 bg-transparent border border-input hover:bg-accent hover:text-accent-foreground cursor-pointer">
@@ -4269,7 +4107,7 @@ export function App() {
               <div className="mt-32 grid md:grid-cols-3 gap-8">
                 <div className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                   <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
-                    <Maximize2 className="w-6 h-6" />
+                    <Box className="w-6 h-6" />
                   </div>
                   <h3 className="text-xl font-bold mb-3">3D Visualization</h3>
                   <p className="text-slate-600 text-sm leading-relaxed">
@@ -4326,8 +4164,7 @@ export function App() {
                 {/* Left Column: Inputs */}
                 <div className={cn(
                   "lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/30 no-scrollbar print:hidden",
-                  mobileTab !== 'inputs' && "hidden lg:block",
-                  isBiViewMode && "lg:hidden"
+                  mobileTab !== 'inputs' && "hidden lg:block"
                 )}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
                     {/* Analysis Mode Switch */}
@@ -4335,14 +4172,14 @@ export function App() {
                       <Tabs value={calculationMode} onValueChange={(v: any) => {
                         setCalculationMode(v);
                       }} className="w-full">
-                        <TabsList className="grid w-full grid-cols-5 h-9 p-1 bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm rounded-xl">
+                        <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm rounded-xl">
                           <TabsTrigger value="beam" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
-                            <Columns className="w-3 h-3" />
+                            <Box className="w-3 h-3" />
                             <span className="hidden xs:inline">{t.beamMode}</span>
                             <span className="xs:hidden">B</span>
                           </TabsTrigger>
                           <TabsTrigger value="panel" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
-                            <Grid className="w-3 h-3" />
+                            <Square className="w-3 h-3" />
                             <span className="hidden xs:inline">{t.panelMode}</span>
                             <span className="xs:hidden">P</span>
                           </TabsTrigger>
@@ -4352,12 +4189,12 @@ export function App() {
                             <span className="xs:hidden">S</span>
                           </TabsTrigger>
                           <TabsTrigger value="bracket" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
-                            <Wrench className="w-3 h-3" />
+                            <Link className="w-3 h-3" />
                             <span className="hidden xs:inline">Brkt</span>
                             <span className="xs:hidden">BR</span>
                           </TabsTrigger>
                           <TabsTrigger value="cast-in-embed" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
-                            <Anchor className="w-3 h-3" />
+                            <Layers className="w-3 h-3" />
                             <span className="hidden xs:inline">Embed</span>
                             <span className="xs:hidden">EM</span>
                           </TabsTrigger>
@@ -5324,7 +5161,7 @@ export function App() {
                   <Card className="shadow-sm border-slate-200 overflow-hidden">
                     <CardHeader className="p-3 sm:p-4 border-b bg-rose-50/50">
                       <div className="flex items-center gap-2 text-rose-600 mb-0.5">
-                        <Grid className="w-3.5 h-3.5" />
+                        <Layout className="w-3.5 h-3.5" />
                         <span className="text-[10px] font-bold uppercase tracking-widest">{t.stiffenerProps}</span>
                       </div>
                       <CardTitle className="text-sm sm:text-base">Panel Reinforcement</CardTitle>
@@ -5540,7 +5377,7 @@ export function App() {
                         <Plus className="h-3.5 w-3.5" />
                       </Button>
                       <Button size="icon" variant="outline" onClick={() => addLoad('trapezoidal')} className="h-7 w-7" title="Add Trapezoidal Load">
-                        <Activity className="h-3.5 w-3.5" />
+                        <Layout className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </CardHeader>
