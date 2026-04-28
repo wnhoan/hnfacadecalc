@@ -1322,10 +1322,30 @@ const SealantResultsView = ({
 }) => {
   return (
     <div className="space-y-4">
+      <div className={cn(
+        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-gradient-to-r from-sky-500/5 to-transparent border-sky-100",
+        results.status === 'pass' ? "border-l-4 border-l-sky-500" : "border-l-4 border-l-red-500"
+      )}>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-sky-600 rounded-lg text-white">
+            <Droplet className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Structural Silicone Result</h3>
+            <p className="text-[10px] text-slate-500 font-medium tracking-wide italic">ASTM C1135 Method</p>
+          </div>
+        </div>
+        <div className={cn(
+          "px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest",
+          results.status === 'pass' ? "bg-sky-500 text-white" : "bg-red-500 text-white"
+        )}>
+          {results.status === 'pass' ? "PASS" : "FAIL"}
+        </div>
+      </div>
+
       <Card 
         className={cn(
-          "shadow-sm border-slate-200 bg-gradient-to-br from-white to-slate-50/30",
-          results.status === 'pass' ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
+          "shadow-sm border-slate-200 bg-white",
         )}
       >
         <CardContent className="p-4 sm:p-6 text-center">
@@ -1387,10 +1407,30 @@ const BracketResultsView = ({
 }) => {
   return (
     <div className="space-y-4">
+      <div className={cn(
+        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-gradient-to-r from-rose-500/5 to-transparent border-rose-100",
+        results.status === 'pass' ? "border-l-4 border-l-rose-500" : "border-l-4 border-l-red-500"
+      )}>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-rose-600 rounded-lg text-white">
+            <Link className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Bracket Connection Status</h3>
+            <p className="text-[10px] text-slate-500 font-medium tracking-wide italic">Bolted Connection Analysis</p>
+          </div>
+        </div>
+        <div className={cn(
+          "px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest",
+          results.status === 'pass' ? "bg-rose-500 text-white" : "bg-red-500 text-white"
+        )}>
+          {results.status === 'pass' ? "PASS" : "FAIL"}
+        </div>
+      </div>
+
       <Card 
         className={cn(
-          "shadow-sm border-slate-200 bg-gradient-to-br from-white to-slate-50/30",
-          results.status === 'pass' ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
+          "shadow-sm border-slate-200 bg-white",
         )}
       >
         <CardContent className="p-4 sm:p-6 relative overflow-hidden">
@@ -1453,10 +1493,30 @@ const CastInResultsView = ({
 
   return (
     <div className="space-y-4">
+      <div className={cn(
+        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-gradient-to-r from-amber-500/5 to-transparent border-amber-100",
+        results.status === 'pass' ? "border-l-4 border-l-amber-500" : "border-l-4 border-l-red-500"
+      )}>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-amber-600 rounded-lg text-white">
+            <Anchor className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Cast-in Embed Result</h3>
+            <p className="text-[10px] text-slate-500 font-medium tracking-wide italic">ACI 318 - CCD Method</p>
+          </div>
+        </div>
+        <div className={cn(
+          "px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest",
+          results.status === 'pass' ? "bg-amber-500 text-white" : "bg-red-500 text-white"
+        )}>
+          {results.status === 'pass' ? "PASS" : "FAIL"}
+        </div>
+      </div>
+
       <Card 
         className={cn(
-          "shadow-sm border-slate-200 bg-gradient-to-br from-white to-slate-50/30",
-          results.status === 'pass' ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
+          "shadow-sm border-slate-200 bg-white",
         )}
       >
         <CardContent className="p-4 sm:p-6 flex items-center justify-between">
@@ -1571,10 +1631,30 @@ const PanelResultsView = ({
 
   return (
     <div className="space-y-4">
+      <div className={cn(
+        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-gradient-to-r from-emerald-500/5 to-transparent border-emerald-100",
+        results.summary.status === 'pass' ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-red-500"
+      )}>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-emerald-600 rounded-lg text-white">
+            <Square className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Panel Analysis Result</h3>
+            <p className="text-[10px] text-slate-500 font-medium tracking-wide italic">Roark's Formulas Method</p>
+          </div>
+        </div>
+        <div className={cn(
+          "px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest",
+          results.summary.status === 'pass' ? "bg-emerald-500 text-white" : "bg-red-500 text-white"
+        )}>
+          {results.summary.status === 'pass' ? "PASS" : "FAIL"}
+        </div>
+      </div>
+
       <Card 
         className={cn(
-          "shadow-sm border-slate-200 bg-gradient-to-br from-white to-slate-50/30",
-          results.summary.status === 'pass' ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
+          "shadow-sm border-slate-200 bg-white",
         )}
       >
         <CardContent className="p-4 sm:p-6">
@@ -1618,7 +1698,7 @@ const PanelResultsView = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Skin Analysis Card */}
         <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-blue-200 transition-colors">
-          <CardHeader className="p-3 sm:p-4 border-b bg-blue-50/30">
+          <CardHeader className="p-3 sm:p-4 border-b bg-gradient-to-r from-blue-500/10 to-transparent">
             <div className="flex items-center gap-2 text-blue-600">
               <Square className="w-4 h-4" />
               <CardTitle className="text-sm font-bold uppercase tracking-wide">Skin Analysis (Panel)</CardTitle>
@@ -1652,7 +1732,7 @@ const PanelResultsView = ({
 
         {/* Stiffener Analysis Card */}
         <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-rose-200 transition-colors">
-          <CardHeader className="p-3 sm:p-4 border-b bg-rose-50/30">
+          <CardHeader className="p-3 sm:p-4 border-b bg-gradient-to-r from-rose-500/10 to-transparent">
             <div className="flex items-center gap-2 text-rose-600">
               <Layout className="w-4 h-4" />
               <CardTitle className="text-sm font-bold uppercase tracking-wide">Stiffener Analysis</CardTitle>
@@ -1779,21 +1859,49 @@ const ProjectResultsView = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-1 sm:mb-2">
-        <h3 className="text-[10px] sm:text-sm font-bold text-slate-500 uppercase tracking-wider truncate max-w-[60%]">{project.projectTitle}</h3>
+      <div className={cn(
+        "flex items-center justify-between mb-3 p-3 rounded-xl border",
+        results.summary.status === 'pass' ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+      )}>
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "p-1.5 rounded-lg text-white shadow-sm",
+            calculationMode === 'beam' ? "bg-blue-600" :
+            calculationMode === 'panel' ? "bg-emerald-600" :
+            calculationMode === 'sealant' ? "bg-sky-600" :
+            calculationMode === 'bracket' ? "bg-rose-600" :
+            "bg-amber-600"
+          )}>
+            {calculationMode === 'beam' && <Box className="w-4 h-4" />}
+            {calculationMode === 'panel' && <Square className="w-4 h-4" />}
+            {calculationMode === 'sealant' && <Droplet className="w-4 h-4" />}
+            {calculationMode === 'bracket' && <Link className="w-4 h-4" />}
+            {calculationMode === 'cast-in-embed' && <Layers className="w-4 h-4" />}
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider leading-none">
+              {calculationMode === 'beam' ? 'Beam Analysis' :
+               calculationMode === 'panel' ? 'Panel Analysis' :
+               calculationMode === 'sealant' ? 'Sealant Analysis' :
+               calculationMode === 'bracket' ? 'Bracket Analysis' :
+               'Cast-in Embed Analysis'}
+            </h3>
+            <p className="text-[10px] text-slate-500 font-medium mt-0.5">{project.projectTitle}</p>
+          </div>
+        </div>
         <div className={cn(
-          "px-1.5 sm:px-2 py-0.5 rounded text-[8px] sm:text-[10px] font-bold uppercase whitespace-nowrap",
-          results.summary.status === 'pass' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+          "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
+          results.summary.status === 'pass' ? "bg-green-500 text-white" : "bg-red-500 text-white"
         )}>
-          {results.summary.status === 'pass' ? "Valid" : "Fails"}
+          {results.summary.status === 'pass' ? "VALID" : "NOT OK"}
         </div>
       </div>
 
       {/* Utilization Overview */}
       <Card 
         className={cn(
-          "shadow-sm border-slate-200 cursor-pointer transition-all hover:ring-2 hover:ring-blue-100",
-          results.summary.status === 'pass' ? "bg-gradient-to-br from-white to-green-50/30" : "bg-gradient-to-br from-white to-red-50/30"
+          "shadow-sm border-slate-200 cursor-pointer transition-all hover:ring-2 hover:ring-blue-100 overflow-hidden",
+          results.summary.status === 'pass' ? "bg-white border-b-green-500 border-b-2" : "bg-white border-b-red-500 border-b-2"
         )}
         onClick={() => setActiveTab('utilization')}
       >
@@ -4163,7 +4271,7 @@ export function App() {
               <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-0 print:block overflow-hidden">
                 {/* Left Column: Inputs */}
                 <div className={cn(
-                  "lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/30 no-scrollbar print:hidden",
+                  "lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/10 no-scrollbar print:hidden shadow-[inset_-1px_0_0_0_rgba(0,0,0,0.05)]",
                   mobileTab !== 'inputs' && "hidden lg:block"
                 )}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
@@ -4172,31 +4280,41 @@ export function App() {
                       <Tabs value={calculationMode} onValueChange={(v: any) => {
                         setCalculationMode(v);
                       }} className="w-full">
-                        <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm rounded-xl">
-                          <TabsTrigger value="beam" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
+                        <TabsList className="grid w-full grid-cols-5 h-11 p-1 bg-white border border-slate-200 shadow-sm rounded-xl">
+                          <TabsTrigger 
+                            value="beam" 
+                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                          >
                             <Box className="w-3 h-3" />
-                            <span className="hidden xs:inline">{t.beamMode}</span>
-                            <span className="xs:hidden">B</span>
+                            <span>Beam</span>
                           </TabsTrigger>
-                          <TabsTrigger value="panel" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
+                          <TabsTrigger 
+                            value="panel" 
+                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                          >
                             <Square className="w-3 h-3" />
-                            <span className="hidden xs:inline">{t.panelMode}</span>
-                            <span className="xs:hidden">P</span>
+                            <span>Panel</span>
                           </TabsTrigger>
-                          <TabsTrigger value="sealant" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
+                          <TabsTrigger 
+                            value="sealant" 
+                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-sky-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                          >
                             <Droplet className="w-3 h-3" />
-                            <span className="hidden xs:inline">Seal</span>
-                            <span className="xs:hidden">S</span>
+                            <span>Seal</span>
                           </TabsTrigger>
-                          <TabsTrigger value="bracket" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
+                          <TabsTrigger 
+                            value="bracket" 
+                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-rose-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                          >
                             <Link className="w-3 h-3" />
-                            <span className="hidden xs:inline">Brkt</span>
-                            <span className="xs:hidden">BR</span>
+                            <span>Brkt</span>
                           </TabsTrigger>
-                          <TabsTrigger value="cast-in-embed" className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center gap-1">
+                          <TabsTrigger 
+                            value="cast-in-embed" 
+                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-amber-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                          >
                             <Layers className="w-3 h-3" />
-                            <span className="hidden xs:inline">Embed</span>
-                            <span className="xs:hidden">EM</span>
+                            <span>Embed</span>
                           </TabsTrigger>
                         </TabsList>
                       </Tabs>
@@ -5568,7 +5686,7 @@ export function App() {
 
                 {/* Right Column: Results & Visuals */}
                 <div className={cn(
-                  "h-full overflow-y-auto p-3 sm:p-4 space-y-4 no-scrollbar print:block",
+                  "h-full overflow-y-auto p-4 sm:p-6 space-y-6 no-scrollbar print:block bg-slate-50/50",
                   isBiViewMode ? "lg:col-span-12" : "lg:col-span-8 xl:col-span-9",
                   mobileTab !== 'results' && "hidden lg:block"
                 )}>
