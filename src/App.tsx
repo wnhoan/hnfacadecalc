@@ -128,6 +128,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { BeamVisualizer3D } from './components/BeamVisualizer3D';
+import { BeamDiagrams } from './components/BeamDiagrams';
 import { 
   calculateBeam, 
   calculateRectangularProperties, 
@@ -1111,6 +1112,10 @@ const getProjectResults = (project: Project) => {
     ? calculateChannelProperties(project.width, project.height, project.thickness, project.thickness2)
     : project.sectionType === 'l-plate'
     ? calculateLPlateProperties(project.width, project.height, project.thickness, project.thickness2)
+    : project.sectionType === 'i-beam'
+    ? calculateIBeamProperties(project.width, project.height, project.thickness, project.thickness2)
+    : project.sectionType === 't-section'
+    ? calculateTSectionProperties(project.width, project.height, project.thickness, project.thickness2)
     : calculateHollowRectangularProperties(project.width, project.height, project.thickness, project.thickness2);
 
   const activeCombination = project.combinations.find(c => c.id === project.activeCombinationId) || project.combinations[0];
@@ -1909,27 +1914,14 @@ const BeamAnalysisChart = ({
   unitSystem, 
   u, 
   toDisplay,
-  criticalPoints 
 }: any) => {
   return (
-    <div className="h-full w-full p-4">
-      <ChartContainer 
-        data={results.points.map((p: any) => ({ 
-          ...p, 
-          x: toDisplay(p.x, 'length'), 
-          deflection: toDisplay(p.deflection, 'length'),
-          moment: toDisplay(p.moment, 'moment'),
-          shear: toDisplay(p.shear, 'force')
-        }))} 
-        dataKey="deflection" 
-        color="#3B82F6" 
-        unit={u.length} 
-        label="Structural Diagrams"
-        invert
-        unitSystem={unitSystem as any}
-        u={u}
-        criticalPoints={criticalPoints?.deflection}
-        chartType="line"
+    <div className="h-full w-full overflow-y-auto">
+      <BeamDiagrams 
+        points={results.points} 
+        unitSystem={unitSystem} 
+        u={u} 
+        toDisplay={toDisplay} 
       />
     </div>
   );
@@ -3376,7 +3368,11 @@ export function App() {
 
   // Unit Conversion Helpers
   const toDisplay = (val: number, type: keyof typeof UNITS.metric): number => {
-    if (unitSystem === 'metric') return val;
+    if (unitSystem === 'metric') {
+      if (type === 'momentDisplay') return val / 1000000;
+      if (type === 'forceDisplay') return val / 1000;
+      return val;
+    }
     switch (type) {
       case 'length': return val * CONVERSION.mm_to_in;
       case 'stress': return val * CONVERSION.mpa_to_psi;
