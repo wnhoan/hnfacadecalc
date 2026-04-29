@@ -47,6 +47,8 @@ import {
   Undo2,
   Redo2,
   Zap,
+  Minimize2,
+  ShieldCheck,
   Image as ImageIcon,
   Paperclip,
   Square,
@@ -1116,7 +1118,8 @@ const getProjectResults = (project: Project) => {
         deflectionRatio: 'N/A',
         status: 'fail' as const,
         utilizationStress: 0,
-        utilizationDeflection: 0
+        utilizationDeflection: 0,
+        allowableStress: 0
       }
     };
   }
@@ -1789,6 +1792,92 @@ const PanelResultsView = ({
   );
 };
 
+const BeamAnalysisChart = ({ 
+  results, 
+  unitSystem, 
+  u, 
+  toDisplay,
+  criticalPoints 
+}: any) => {
+  return (
+    <div className="h-full w-full p-4">
+      <ChartContainer 
+        data={results.points.map((p: any) => ({ 
+          ...p, 
+          x: toDisplay(p.x, 'length'), 
+          deflection: toDisplay(p.deflection, 'length'),
+          moment: toDisplay(p.moment, 'moment'),
+          shear: toDisplay(p.shear, 'force')
+        }))} 
+        dataKey="deflection" 
+        color="#3B82F6" 
+        unit={u.length} 
+        label="Structural Diagrams"
+        invert
+        unitSystem={unitSystem as any}
+        u={u}
+        criticalPoints={criticalPoints?.deflection}
+        chartType="line"
+      />
+    </div>
+  );
+};
+
+const UtilizationCards = ({ results, material, governingCriteria }: any) => {
+  return (
+    <div className="grid grid-cols-1 gap-4">
+      <Card className="border-slate-200 overflow-hidden rounded-2xl bg-white shadow-sm">
+        <div className="p-6 border-b bg-slate-50/50 flex items-center justify-between">
+           <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-xl text-blue-600">
+                 <Activity className="w-5 h-5" />
+              </div>
+              <div>
+                 <h4 className="text-sm font-black text-slate-900 uppercase">Analysis Results</h4>
+                 <p className="text-[10px] text-slate-500 font-medium tracking-wide">Detailed utilization breakdown</p>
+              </div>
+           </div>
+        </div>
+        <CardContent className="p-0">
+           <div className="divide-y divide-slate-100">
+              <div className="p-6 flex items-center justify-between group hover:bg-slate-50/50 transition-colors">
+                 <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Flexural Stress</span>
+                    <p className="text-sm font-bold text-slate-900">Bending capacity check</p>
+                 </div>
+                 <div className="text-right">
+                    <p className="text-xl font-black text-slate-900">{(results.summary.utilizationStress * 100).toFixed(1)}%</p>
+                    <Badge variant={(results.summary.utilizationStress > 1) ? "destructive" : "secondary"}>
+                      {(results.summary.utilizationStress > 1) ? "Yielding" : "Safe"}
+                    </Badge>
+                 </div>
+              </div>
+              <div className="p-6 flex items-center justify-between group hover:bg-slate-50/50 transition-colors">
+                 <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Span Deflection</span>
+                    <p className="text-sm font-bold text-slate-900">Global displacement check</p>
+                 </div>
+                 <div className="text-right">
+                    <p className="text-xl font-black text-slate-900">{(results.summary.utilizationDeflection * 100).toFixed(1)}%</p>
+                    <Badge variant={(results.summary.utilizationDeflection > 1) ? "destructive" : "secondary"}>
+                      {(results.summary.utilizationDeflection > 1) ? "Exceeded" : "Safe"}
+                    </Badge>
+                 </div>
+              </div>
+           </div>
+        </CardContent>
+      </Card>
+      
+      <div className="p-6 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 text-center">
+         <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+         <p className="text-xs text-slate-500 font-medium italic leading-relaxed">
+            Theoretical analysis based on Euler-Bernoulli beam theory. Lateral torsional buckling is assumed to be restrained by curtain wall infill panels.
+         </p>
+      </div>
+    </div>
+  );
+};
+
 const ProjectResultsView = ({ 
   project, 
   results, 
@@ -1842,286 +1931,264 @@ const ProjectResultsView = ({
     return <CastInResultsView results={castInResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
   }
 
+  const activeCombination = project.combinations.find(c => c.id === project.activeCombinationId) || project.combinations[0];
+
+  const { 
+    projectTitle, 
+    selectedCodeId, 
+    material, 
+    supportCondition, 
+    length,
+    width,
+    height,
+    thickness,
+    thickness2,
+    sectionType,
+    intermediateSupports
+  } = project;
+
   const governingCriteria = results.summary.utilizationStress >= results.summary.utilizationDeflection ? 'Stress' : 'Deflection';
   const maxUtilization = Math.max(0, results.summary.utilizationStress || 0, results.summary.utilizationDeflection || 0);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-1 sm:mb-2 lg:hidden">
-        <Button variant="ghost" size="sm" onClick={() => setMobileTab('inputs')} className="h-7 text-[10px] gap-1 px-2">
-          <ArrowLeft className="w-3 h-3" />
-          Back to Config
-        </Button>
-        <div className="flex items-center gap-2">
-          <div className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
-            Live Analysis
-          </div>
-        </div>
-      </div>
-
+      {/* Top Hero Status & KPI Row */}
       <div className={cn(
-        "flex items-center justify-between mb-3 p-3 rounded-xl border",
-        results.summary.status === 'pass' ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+        "p-6 rounded-[2rem] border-2 shadow-sm flex flex-col md:flex-row items-center justify-between transition-all gap-6",
+        results.summary.status === 'pass' 
+          ? "bg-gradient-to-br from-emerald-500/5 via-white to-emerald-500/10 border-emerald-500/20" 
+          : "bg-gradient-to-br from-red-500/5 via-white to-red-500/10 border-red-500/20"
       )}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-5 w-full md:w-auto">
           <div className={cn(
-            "p-1.5 rounded-lg text-white shadow-sm",
-            calculationMode === 'beam' ? "bg-blue-600" :
-            calculationMode === 'panel' ? "bg-emerald-600" :
-            calculationMode === 'sealant' ? "bg-sky-600" :
-            calculationMode === 'bracket' ? "bg-rose-600" :
-            "bg-amber-600"
+            "w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-lg relative overflow-hidden",
+            results.summary.status === 'pass' ? "bg-emerald-600 shadow-emerald-200" : "bg-red-600 shadow-red-200"
           )}>
-            {calculationMode === 'beam' && <Box className="w-4 h-4" />}
-            {calculationMode === 'panel' && <Square className="w-4 h-4" />}
-            {calculationMode === 'sealant' && <Droplet className="w-4 h-4" />}
-            {calculationMode === 'bracket' && <Link className="w-4 h-4" />}
-            {calculationMode === 'cast-in-embed' && <Layers className="w-4 h-4" />}
+            <div className="absolute inset-0 bg-white/20 animate-pulse opacity-50" />
+            <Activity className="w-8 h-8 text-white relative z-10" />
           </div>
-          <div>
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider leading-none">
-              {calculationMode === 'beam' ? 'Beam Analysis' :
-               calculationMode === 'panel' ? 'Panel Analysis' :
-               calculationMode === 'sealant' ? 'Sealant Analysis' :
-               calculationMode === 'bracket' ? 'Bracket Analysis' :
-               'Cast-in Embed Analysis'}
-            </h3>
-            <p className="text-[10px] text-slate-500 font-medium mt-0.5">{project.projectTitle}</p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <Badge className={cn(
+                 "text-[9px] font-black uppercase tracking-widest px-2 py-0.5",
+                 results.summary.status === 'pass' ? "bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-sm" : "bg-red-500 hover:bg-red-600 text-white border-none shadow-sm"
+              )}>
+                {results.summary.status === 'pass' ? "Pass" : "Overloaded"}
+              </Badge>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedCodeId} Code</span>
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 leading-tight uppercase tracking-tighter">
+              {project.projectTitle}
+            </h2>
+            <p className="text-xs text-slate-500 font-medium">Governing: <span className="font-bold text-slate-700 italic">{governingCriteria} Control</span></p>
           </div>
         </div>
-        <div className={cn(
-          "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
-          results.summary.status === 'pass' ? "bg-green-500 text-white" : "bg-red-500 text-white"
-        )}>
-          {results.summary.status === 'pass' ? "VALID" : "NOT OK"}
+
+        <div className="flex items-center gap-8 w-full md:w-auto px-4 md:px-0">
+           <div className="text-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Utilization</p>
+              <p className={cn("text-3xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-red-600" : "text-slate-900")}>
+                {(maxUtilization * 100).toFixed(1)}<span className="text-lg ml-0.5 opacity-50">%</span>
+              </p>
+           </div>
+           <div className="h-10 w-[1px] bg-slate-200 hidden md:block" />
+           <div className="text-right hidden md:block">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Factor of Safety</p>
+              <p className={cn("text-3xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-slate-300" : "text-emerald-600")}>
+                {maxUtilization > 1 ? "0.0" : (1 / (maxUtilization || 0.01)).toFixed(2)}<span className="text-lg ml-0.5 opacity-50">FS</span>
+              </p>
+           </div>
         </div>
       </div>
 
-      {/* Utilization Overview */}
-      <Card 
-        className={cn(
-          "shadow-sm border-slate-200 cursor-pointer transition-all hover:ring-2 hover:ring-blue-100 overflow-hidden",
-          results.summary.status === 'pass' ? "bg-white border-b-green-500 border-b-2" : "bg-white border-b-red-500 border-b-2"
-        )}
-        onClick={() => setActiveTab('utilization')}
-      >
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <div className="space-y-0.5 sm:space-y-1">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="text-xl sm:text-2xl font-black tracking-tighter text-slate-900">
-                  {(maxUtilization * 100).toFixed(1)}%
-                </span>
-                <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase">Utilization</span>
-              </div>
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className={cn(
-                  "text-[8px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0.5 rounded uppercase tracking-wider",
-                  results.summary.status === 'pass' ? "bg-green-500 text-white" : "bg-red-500 text-white"
-                )}>
-                  {results.summary.status === 'pass' ? "Pass" : "Fail"}
-                </span>
-                <span className="text-[8px] sm:text-[10px] font-medium text-slate-500 truncate max-w-[80px] sm:max-w-none">
-                  Gov: <span className="font-bold text-slate-700">{governingCriteria}</span>
-                </span>
-              </div>
+      {/* Detailed Analysis Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-20">
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="flex items-center justify-between mb-4">
+               <TabsList className="bg-slate-100 p-1 rounded-xl h-10 border border-slate-200 shadow-sm">
+                 <TabsTrigger value="diagrams" className="text-[10px] font-black uppercase tracking-tight rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">Structural Diagrams</TabsTrigger>
+                 <TabsTrigger value="utilization" className="text-[10px] font-black uppercase tracking-tight rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">Detailed Analysis</TabsTrigger>
+               </TabsList>
+               <Button variant="outline" size="sm" className="h-10 px-3 rounded-xl border-slate-200 text-slate-500 hover:text-blue-600" onClick={() => setIsChartExpanded(!isChartExpanded)}>
+                  {isChartExpanded ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
+                  <span className="text-[10px] font-black uppercase tracking-widest">{isChartExpanded ? 'Shrink' : 'Expand'}</span>
+               </Button>
             </div>
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full border-2 sm:border-4 border-slate-100 flex items-center justify-center relative">
-              <svg className="h-full w-full -rotate-90">
-                <circle
-                  cx="20" cy="20" r="18"
-                  fill="transparent"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  className="text-slate-100 sm:hidden"
-                />
-                <circle
-                  cx="24" cy="24" r="20"
-                  fill="transparent"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  className="text-slate-100 hidden sm:block"
-                />
-                <circle
-                  cx="20" cy="20" r="18"
-                  fill="transparent"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeDasharray={113}
-                  strokeDashoffset={113 * (1 - Math.min(1, maxUtilization))}
-                  className={cn(
-                    "transition-all duration-1000 sm:hidden",
-                    maxUtilization > 1 ? "text-red-500" : maxUtilization > 0.8 ? "text-amber-500" : "text-blue-500"
-                  )}
-                />
-                <circle
-                  cx="24" cy="24" r="20"
-                  fill="transparent"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  strokeDasharray={125.6}
-                  strokeDashoffset={125.6 * (1 - Math.min(1, maxUtilization))}
-                  className={cn(
-                    "transition-all duration-1000 hidden sm:block",
-                    maxUtilization > 1 ? "text-red-500" : maxUtilization > 0.8 ? "text-amber-500" : "text-blue-500"
-                  )}
-                />
-              </svg>
-              <Activity className="w-3 h-3 sm:w-4 sm:h-4 absolute text-slate-300" />
-            </div>
-          </div>
-          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, maxUtilization * 100)}%` }}
-              className={cn(
-                "h-full rounded-full",
-                maxUtilization > 1 ? "bg-red-500" : maxUtilization > 0.8 ? "bg-amber-500" : "bg-blue-500"
-              )}
-            />
-          </div>
-        </CardContent>
-      </Card>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-      <SummaryCard 
-        label={t.maxDeflection} 
-        value={`${toDisplay(results.summary.maxDeflection ?? 0, 'length').toFixed(unitSystem === 'metric' ? 2 : 4)} ${u.length}`} 
-        subValue={results.summary.deflectionRatio}
-        icon={<Maximize2 className="w-4 h-4 text-blue-500" />}
-        status={(results.summary.utilizationDeflection ?? 0) > 1 ? 'fail' : 'pass'}
-        progress={results.summary.utilizationDeflection ?? 0}
-        tooltip="Maximum vertical displacement of the beam under applied loads."
-      />
-      <SummaryCard 
-        label={t.maxStress} 
-        value={`${toDisplay(results.summary.maxStress ?? 0, 'stress').toFixed(unitSystem === 'metric' ? 2 : 4)} ${u.stress}`} 
-        icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
-        status={(results.summary.utilizationStress ?? 0) > 1 ? 'fail' : 'pass'}
-        progress={results.summary.utilizationStress ?? 0}
-        tooltip="Maximum internal stress in the material. Must be less than the allowable yield strength."
-      />
-      <SummaryCard 
-        label={t.maxMoment} 
-        value={unitSystem === 'metric' 
-          ? `${((results.summary.maxMoment ?? 0) / 1000000).toFixed(2)} kNm` 
-          : `${(toDisplay(results.summary.maxMoment ?? 0, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1)} lb-ft`} 
-        icon={<Layout className="w-4 h-4 text-purple-500" />}
-        tooltip="Maximum bending moment occurring along the beam span."
-      />
-      <SummaryCard 
-        label={t.maxShear} 
-        value={unitSystem === 'metric'
-          ? `${((results.summary.maxShear ?? 0) / 1000).toFixed(2)} kN`
-          : `${(toDisplay(results.summary.maxShear ?? 0, 'force') / 1000).toFixed(2)} kip`} 
-        icon={<ChevronRight className="w-4 h-4 text-green-500" />}
-        tooltip="Maximum internal shear force acting perpendicular to the beam axis."
-      />
+            <TabsContent value="diagrams" className="mt-0 ring-offset-background focus-visible:outline-none">
+              <Card className="border-slate-200 shadow-lg overflow-hidden rounded-[2rem] bg-white">
+                <div className="bg-slate-50/50 px-6 py-4 border-b flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-blue-600">
+                        <Activity className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-none mb-1">Interactive Results</span>
+                        <span className="text-sm font-bold text-slate-800">Shear, Moment & Deflection</span>
+                      </div>
+                   </div>
+                   <div className="flex gap-4">
+                      <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-blue-50/50 border border-blue-100">
+                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                        <span className="text-[9px] font-black text-blue-700 uppercase">V</span>
+                      </div>
+                      <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-emerald-50/50 border border-emerald-100">
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                        <span className="text-[9px] font-black text-emerald-700 uppercase">M</span>
+                      </div>
+                      <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-rose-50/50 border border-rose-100">
+                        <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                        <span className="text-[9px] font-black text-rose-700 uppercase">δ</span>
+                      </div>
+                   </div>
+                </div>
+                <CardContent className="p-0">
+                  <div className={cn("bg-white transition-all duration-500", isChartExpanded ? "h-[700px]" : "h-[400px]")}>
+                    <BeamAnalysisChart 
+                      results={results} 
+                      unitSystem={unitSystem} 
+                      u={u} 
+                      toDisplay={toDisplay}
+                      criticalPoints={criticalPoints}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="utilization" className="mt-0 ring-offset-background focus-visible:outline-none">
+               <UtilizationCards 
+                  results={results} 
+                  material={material} 
+                  governingCriteria={governingCriteria} 
+               />
+            </TabsContent>
+          </Tabs>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="p-5 border-slate-200 shadow-sm rounded-2xl bg-white group hover:border-blue-200 transition-all">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                    <Maximize2 className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Max Deflection</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black tabular-nums">{toDisplay(results.summary.maxDeflection ?? 0, 'length').toFixed(2)}</span>
+                  <span className="text-sm font-bold text-slate-400 uppercase">{u.length}</span>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <Badge variant="outline" className={cn(
+                    "text-[9px] font-bold h-5",
+                    (results.summary.utilizationDeflection ?? 0) > 1 ? "border-red-200 bg-red-50 text-red-700" : "border-blue-100 bg-blue-50 text-blue-700"
+                  )}>
+                    Ratio: {results.summary.deflectionRatio}
+                  </Badge>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">{(results.summary.utilizationDeflection * 100).toFixed(0)}% Util</span>
+                </div>
+            </Card>
+
+            <Card className="p-5 border-slate-200 shadow-sm rounded-2xl bg-white group hover:border-amber-200 transition-all">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Yield Check</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black tabular-nums">{toDisplay(results.summary.maxStress ?? 0, 'stress').toFixed(1)}</span>
+                  <span className="text-sm font-bold text-slate-400 uppercase">{u.stress}</span>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <Badge variant="outline" className={cn(
+                    "text-[9px] font-bold h-5",
+                    (results.summary.utilizationStress ?? 0) > 1 ? "border-red-200 bg-red-50 text-red-700" : "border-amber-100 bg-amber-50 text-amber-700"
+                  )}>
+                    Allow: {toDisplay(results.summary.allowableStress, 'stress').toFixed(0)} {u.stress}
+                  </Badge>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">{(results.summary.utilizationStress * 100).toFixed(0)}% Util</span>
+                </div>
+            </Card>
+          </div>
+        </div>
+
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <Card className="border-slate-200 shadow-lg overflow-hidden rounded-[2rem] group transition-all hover:shadow-xl bg-white h-fit">
+            <div className="bg-slate-50/50 px-6 py-4 border-b flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 rounded-lg border border-slate-200 shadow-sm text-blue-600">
+                     <Box className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-none mb-1">Interactive</span>
+                    <span className="text-sm font-bold text-slate-800">3D Visualizer</span>
+                  </div>
+               </div>
+            </div>
+            <div className="aspect-square relative bg-slate-900 overflow-hidden">
+               <BeamVisualizer3D 
+                 length={length} 
+                 width={width} 
+                 height={height} 
+                 thickness={thickness}
+                 thickness2={thickness2}
+                 sectionType={sectionType}
+                 supportCondition={supportCondition as any}
+                 intermediateSupports={intermediateSupports}
+                 unitSystem={unitSystem as any}
+               />
+            </div>
+            <CardContent className="p-6 bg-white border-t border-slate-100">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Efficiency Index</p>
+               <div className="space-y-4">
+                  <div className="space-y-2">
+                     <div className="flex justify-between text-[10px] font-bold">
+                        <span className="text-slate-600 uppercase">Mass Intensity</span>
+                        <span className="text-slate-900 uppercase">{(results.summary.weight / length).toFixed(2)} kg/m</span>
+                     </div>
+                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (results.summary.weight / length) / 10 * 100)}%` }} />
+                     </div>
+                  </div>
+               </div>
+               <div className="mt-5 p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200">
+                  <div className="flex items-center gap-2 text-slate-500 mb-1">
+                     <ShieldCheck className="w-3.5 h-3.5" />
+                     <span className="text-[10px] font-black uppercase tracking-widest leading-none">Code Integrity</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 italic font-medium leading-relaxed">
+                     Geometric constraints such as local buckling and flange slenderness are verified according to {selectedCodeId} Eurocode or AISC standards.
+                  </p>
+               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+             <CardHeader className="p-4 border-b bg-slate-50/50">
+               <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400">Analysis Environment</CardTitle>
+             </CardHeader>
+             <CardContent className="p-6 space-y-4">
+                <div className="flex justify-between items-center text-[10px] font-bold">
+                  <span className="text-slate-400 uppercase">Standard</span>
+                  <Badge variant="secondary" className="rounded-md bg-blue-50 text-blue-700 px-2 py-0.5">{selectedCodeId}</Badge>
+                </div>
+                <div className="flex justify-between items-center text-[10px] font-bold">
+                  <span className="text-slate-400 uppercase">Material</span>
+                  <Badge variant="secondary" className="rounded-md bg-slate-100 text-slate-600 px-2 py-0.5">{MATERIALS[material].name}</Badge>
+                </div>
+                <div className="flex justify-between items-center text-[10px] font-bold">
+                  <span className="text-slate-400 uppercase">Supports</span>
+                  <Badge variant="secondary" className="rounded-md bg-slate-100 text-slate-600 px-2 py-0.5">{supportCondition.replace('_', ' ')}</Badge>
+                </div>
+                <div className="flex justify-between items-center text-[10px] font-bold">
+                  <span className="text-slate-400 uppercase">Load Case</span>
+                  <Badge variant="secondary" className="rounded-md bg-slate-100 text-slate-600 px-2 py-0.5">{activeCombination.name}</Badge>
+                </div>
+             </CardContent>
+          </Card>
+        </div>
       </div>
-
-      <Card className="shadow-sm border-slate-200 overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="px-4 pt-4 border-b bg-slate-50/50 flex items-center justify-between overflow-x-auto no-scrollbar">
-            <TabsList className="bg-transparent border-none h-auto p-0 gap-4 flex-nowrap">
-              <TabsTrigger value="deflection" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.deflection}</TabsTrigger>
-              <TabsTrigger value="moment" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.moment}</TabsTrigger>
-              <TabsTrigger value="shear" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.shear}</TabsTrigger>
-              <TabsTrigger value="stress" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.stress}</TabsTrigger>
-              <TabsTrigger value="utilization" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">Utilization</TabsTrigger>
-              <TabsTrigger value="3d" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none px-0 pb-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap">3D Model</TabsTrigger>
-            </TabsList>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-slate-400 hover:text-blue-600 shrink-0 ml-2 hidden sm:flex"
-              onClick={() => setIsChartExpanded(!isChartExpanded)}
-            >
-              <Maximize2 className="w-4 h-4" />
-            </Button>
-          </div>
-          
-          <div className={cn("p-3 sm:p-4", isChartExpanded ? "h-[600px]" : "h-[280px] sm:h-[350px]")}>
-            <TabsContent value="deflection" className="h-full m-0">
-              <ChartContainer 
-                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), deflection: toDisplay(p.deflection, 'length') }))} 
-                dataKey="deflection" 
-                color="#3B82F6" 
-                unit={u.length} 
-                label={t.deflection}
-                invert
-                unitSystem={unitSystem as any}
-                u={u}
-                criticalPoints={criticalPoints?.deflection}
-                chartType="line"
-              />
-            </TabsContent>
-            <TabsContent value="moment" className="h-full m-0">
-              <ChartContainer 
-                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), moment: toDisplay(p.moment, 'moment') }))} 
-                dataKey="moment" 
-                color="#8B5CF6" 
-                unit={u.moment} 
-                label={t.moment}
-                formatter={(v) => unitSystem === 'metric' ? (v / 1000000).toFixed(2) + ' kNm' : (v * CONVERSION.lbin_to_lbft).toFixed(1) + ' lb-ft'}
-                unitSystem={unitSystem as any}
-                u={u}
-                criticalPoints={criticalPoints?.moment}
-              />
-            </TabsContent>
-            <TabsContent value="shear" className="h-full m-0">
-              <ChartContainer 
-                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), shear: toDisplay(p.shear, 'force') }))} 
-                dataKey="shear" 
-                color="#10B981" 
-                unit={u.force} 
-                label={t.shear}
-                formatter={(v) => unitSystem === 'metric' ? (v / 1000).toFixed(2) + ' kN' : (v / 1000).toFixed(2) + ' kip'}
-                unitSystem={unitSystem as any}
-                u={u}
-                criticalPoints={criticalPoints?.shear}
-              />
-            </TabsContent>
-            <TabsContent value="stress" className="h-full m-0">
-              <ChartContainer 
-                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), stress: toDisplay(p.stress, 'stress') }))} 
-                dataKey="stress" 
-                color="#F59E0B" 
-                unit={u.stress} 
-                label={t.stress}
-                formatter={(v) => v.toFixed(unitSystem === 'metric' ? 1 : 0) + ' ' + u.stress}
-                unitSystem={unitSystem as any}
-                u={u}
-                criticalPoints={criticalPoints?.stress}
-              />
-            </TabsContent>
-            <TabsContent value="utilization" className="h-full m-0">
-              <ChartContainer 
-                data={results.points.map((p: any) => ({ ...p, x: toDisplay(p.x, 'length'), utilization: Math.max(p.utilizationStress, p.utilizationDeflection) * 100 }))} 
-                dataKey="utilization" 
-                color="#EF4444" 
-                unit="%" 
-                label="Total Utilization"
-                formatter={(v) => v.toFixed(1) + '%'}
-                unitSystem={unitSystem as any}
-                u={u}
-              />
-            </TabsContent>
-            <TabsContent value="3d" className="h-full m-0">
-              <BeamVisualizer3D 
-                length={project.length} 
-                width={project.width} 
-                height={project.height} 
-                thickness={project.thickness} 
-                thickness2={project.thickness2 || project.thickness}
-                sectionType={project.sectionType} 
-                supportCondition={project.supportCondition}
-                intermediateSupports={project.intermediateSupports}
-                unitSystem={unitSystem as any}
-              />
-            </TabsContent>
-          </div>
-        </Tabs>
-      </Card>
     </div>
   );
 };
@@ -3611,7 +3678,8 @@ export function App() {
           deflectionRatio: 'N/A',
           status: 'fail' as const,
           utilizationStress: 0,
-          utilizationDeflection: 0
+          utilizationDeflection: 0,
+          allowableStress: 0
         }
       };
     }
@@ -4268,52 +4336,53 @@ export function App() {
                 </Tabs>
               </div>
 
-              <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-0 print:block overflow-hidden">
+              <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-0 print:block overflow-hidden bg-white">
                 {/* Left Column: Inputs */}
                 <div className={cn(
-                  "lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-3 sm:p-4 border-r border-slate-200 bg-slate-50/10 no-scrollbar print:hidden shadow-[inset_-1px_0_0_0_rgba(0,0,0,0.05)]",
+                  "lg:col-span-4 xl:col-span-3 h-full overflow-y-auto p-4 sm:p-5 border-r border-slate-200 bg-slate-50/20 no-scrollbar print:hidden shadow-[inset_-1px_0_0_0_rgba(0,0,0,0.03)]",
                   mobileTab !== 'inputs' && "hidden lg:block"
                 )}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
+                  <div className="flex flex-col gap-5">
                     {/* Analysis Mode Switch */}
-                    <div className="px-1">
+                    <div className="bg-white p-1 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
                       <Tabs value={calculationMode} onValueChange={(v: any) => {
                         setCalculationMode(v);
                       }} className="w-full">
-                        <TabsList className="grid w-full grid-cols-5 h-10 p-1 bg-white border border-slate-200 shadow-sm rounded-xl">
+                        <TabsList className="grid w-full grid-cols-5 h-10 p-1 bg-slate-100/50 rounded-xl border-none">
                           <TabsTrigger 
                             value="beam" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
-                            <Box className="w-3 h-3" />
+                            <Box className="w-3.5 h-3.5" />
                             <span>Beam</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="panel" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
-                            <Square className="w-3 h-3" />
+                            <Square className="w-3.5 h-3.5" />
                             <span>Panel</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="sealant" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-sky-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-sky-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
-                            <Droplet className="w-3 h-3" />
+                            <Droplet className="w-3.5 h-3.5" />
                             <span>Seal</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="bracket" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-rose-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-rose-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
-                            <Link className="w-3 h-3" />
+                            <Link className="w-3.5 h-3.5" />
                             <span>Brkt</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="cast-in-embed" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-amber-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-amber-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
-                            <Layers className="w-3 h-3" />
+                            <Layers className="w-3.5 h-3.5" />
                             <span>Embed</span>
                           </TabsTrigger>
                         </TabsList>

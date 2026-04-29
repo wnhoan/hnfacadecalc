@@ -47,6 +47,7 @@ export interface SummaryResults {
   status: 'pass' | 'fail';
   utilizationStress: number;
   utilizationDeflection: number;
+  allowableStress: number;
 }
 
 export function calculateBeam(
@@ -76,7 +77,8 @@ export function calculateBeam(
         deflectionRatio: 'N/A',
         status: 'fail',
         utilizationStress: 0,
-        utilizationDeflection: 0
+        utilizationDeflection: 0,
+        allowableStress: 0
       }
     };
   }
@@ -459,6 +461,7 @@ export function calculateBeam(
       status,
       utilizationStress: maxUtilizationStress,
       utilizationDeflection: maxUtilizationDeflection,
+      allowableStress,
     },
   };
 }
