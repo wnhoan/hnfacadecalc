@@ -1531,7 +1531,7 @@ const BracketResultsView = ({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
+      <div className="grid grid-cols-1 min-[500px]:grid-cols-3 gap-3 text-center">
          <Card className="p-3 border-slate-100 shadow-sm">
             <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Bolt Shear</p>
             <p className="text-sm font-black text-slate-800">{(results.boltShearStress ?? 0).toFixed(1)} MPa</p>
@@ -1630,7 +1630,7 @@ const CastInResultsView = ({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
          <Card className="p-3 border-slate-200 shadow-sm relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-16 h-16 -mr-8 -mt-8 bg-blue-50/50 rounded-full group-hover:scale-110 transition-transform" />
             <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 relative z-10">Tension Capacity</p>
@@ -1771,7 +1771,7 @@ const PanelResultsView = ({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 min-[580px]:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Skin Analysis Card */}
         <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-blue-200 transition-colors flex flex-col">
           <CardHeader className="p-3 sm:p-4 border-b bg-gradient-to-r from-blue-500/10 to-transparent">
@@ -2066,28 +2066,28 @@ const ProjectResultsView = ({
     <div className="space-y-6">
       {/* Top Hero Status & KPI Row */}
       <div className={cn(
-        "p-5 rounded-[1.5rem] border shadow-sm flex flex-col md:flex-row items-center justify-between transition-all gap-6 bg-white overflow-hidden relative",
+        "p-4 sm:p-5 rounded-[1.25rem] sm:rounded-[1.5rem] border shadow-sm flex flex-col sm:flex-row items-center justify-between transition-all gap-4 sm:gap-6 bg-white overflow-hidden relative",
         results.summary.status === 'pass' 
           ? "border-emerald-500/20" 
           : "border-red-500/20"
       )}>
         <div className={cn(
-          "absolute top-0 left-0 w-1.5 h-full",
+          "absolute top-0 left-0 w-full h-1 sm:w-1.5 sm:h-full",
           results.summary.status === 'pass' ? "bg-emerald-500" : "bg-red-500"
         )} />
         
-        <div className="flex items-center gap-4 w-full md:w-auto">
+        <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
           <div className={cn(
-            "w-14 h-14 rounded-2xl flex items-center justify-center shadow-md relative overflow-hidden shrink-0",
+            "w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-md relative overflow-hidden shrink-0",
             results.summary.status === 'pass' ? "bg-emerald-600 shadow-emerald-100" : "bg-red-600 shadow-red-100"
           )}>
-            <Activity className="w-7 h-7 text-white" />
+            <Activity className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedCodeId} Design Result</span>
+              <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedCodeId} Design Result</span>
             </div>
-            <h2 className="text-xl font-black text-slate-900 leading-tight uppercase tracking-tighter truncate">
+            <h2 className="text-lg sm:text-xl font-black text-slate-900 leading-tight uppercase tracking-tighter truncate">
               {project.projectTitle}
             </h2>
             <div className="flex items-center gap-2 mt-1">
@@ -2097,22 +2097,22 @@ const ProjectResultsView = ({
               )}>
                 {results.summary.status === 'pass' ? "PASS" : "FAIL"}
               </Badge>
-              <p className="text-[10px] text-slate-500 font-medium whitespace-nowrap">Control: <span className="font-bold text-slate-700">{governingCriteria}</span></p>
+              <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium whitespace-nowrap">Control: <span className="font-bold text-slate-700">{governingCriteria}</span></p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end px-2 md:px-0">
-           <div className="text-center md:text-right">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Utilization</p>
-              <p className={cn("text-2xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-red-600" : "text-slate-900")}>
-                {(maxUtilization * 100).toFixed(1)}<span className="text-base ml-0.5 opacity-50">%</span>
+        <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-end px-1 sm:px-0">
+           <div className="text-center sm:text-right">
+              <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Utilization</p>
+              <p className={cn("text-xl sm:text-2xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-red-600" : "text-slate-900")}>
+                {(maxUtilization * 100).toFixed(1)}<span className="text-sm sm:text-base ml-0.5 opacity-50">%</span>
               </p>
            </div>
            <div className="h-8 w-[1px] bg-slate-100" />
            <div className="text-right">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Factor of Safety</p>
-              <p className={cn("text-2xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-slate-300" : "text-emerald-600")}>
+              <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">FS</p>
+              <p className={cn("text-xl sm:text-2xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-slate-300" : "text-emerald-600")}>
                 {maxUtilization > 1 ? "0.00" : (1 / (maxUtilization || 0.01)).toFixed(2)}
               </p>
            </div>
@@ -2184,48 +2184,48 @@ const ProjectResultsView = ({
             </TabsContent>
           </Tabs>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Card className="p-5 border-slate-200 shadow-sm rounded-2xl bg-white group hover:border-blue-200 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                    <Maximize2 className="w-4 h-4" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+            <Card className="p-4 sm:p-5 border-slate-200 shadow-sm rounded-2xl bg-white group hover:border-blue-200 transition-all">
+                <div className="flex items-center gap-3 mb-3 sm:mb-4">
+                  <div className="p-1.5 sm:p-2 bg-blue-50 rounded-lg text-blue-600">
+                    <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Max Deflection</span>
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">Max Deflection</span>
                 </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black tabular-nums">{toDisplay(results.summary.maxDeflection ?? 0, 'length').toFixed(2)}</span>
-                  <span className="text-sm font-bold text-slate-400 uppercase">{u.length}</span>
+                <div className="flex items-baseline gap-1.5 sm:gap-2">
+                  <span className="text-2xl sm:text-3xl font-black tabular-nums">{toDisplay(results.summary.maxDeflection ?? 0, 'length').toFixed(2)}</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-400 uppercase">{u.length}</span>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <Badge variant="outline" className={cn(
-                    "text-[9px] font-bold h-5",
+                    "text-[8px] sm:text-[9px] font-bold h-4 sm:h-5",
                     (results.summary.utilizationDeflection ?? 0) > 1 ? "border-red-200 bg-red-50 text-red-700" : "border-blue-100 bg-blue-50 text-blue-700"
                   )}>
                     Ratio: {results.summary.deflectionRatio}
                   </Badge>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">{(results.summary.utilizationDeflection * 100).toFixed(0)}% Util</span>
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase">{(results.summary.utilizationDeflection * 100).toFixed(0)}% Util</span>
                 </div>
             </Card>
 
-            <Card className="p-5 border-slate-200 shadow-sm rounded-2xl bg-white group hover:border-amber-200 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
-                    <Zap className="w-4 h-4" />
+            <Card className="p-4 sm:p-5 border-slate-200 shadow-sm rounded-2xl bg-white group hover:border-amber-200 transition-all">
+                <div className="flex items-center gap-3 mb-3 sm:mb-4">
+                  <div className="p-1.5 sm:p-2 bg-amber-50 rounded-lg text-amber-600">
+                    <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Yield Check</span>
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">Yield Check</span>
                 </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black tabular-nums">{toDisplay(results.summary.maxStress ?? 0, 'stress').toFixed(1)}</span>
-                  <span className="text-sm font-bold text-slate-400 uppercase">{u.stress}</span>
+                <div className="flex items-baseline gap-1.5 sm:gap-2">
+                  <span className="text-2xl sm:text-3xl font-black tabular-nums">{toDisplay(results.summary.maxStress ?? 0, 'stress').toFixed(1)}</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-400 uppercase">{u.stress}</span>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <Badge variant="outline" className={cn(
-                    "text-[9px] font-bold h-5",
+                    "text-[8px] sm:text-[9px] font-bold h-4 sm:h-5",
                     (results.summary.utilizationStress ?? 0) > 1 ? "border-red-200 bg-red-50 text-red-700" : "border-amber-100 bg-amber-50 text-amber-700"
                   )}>
                     Allow: {toDisplay(results.summary.allowableStress, 'stress').toFixed(0)} {u.stress}
                   </Badge>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">{(results.summary.utilizationStress * 100).toFixed(0)}% Util</span>
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase">{(results.summary.utilizationStress * 100).toFixed(0)}% Util</span>
                 </div>
             </Card>
           </div>
@@ -4248,10 +4248,12 @@ export function App() {
                       <Menu className="w-4 h-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                       <DropdownMenuLabel>Settings & View</DropdownMenuLabel>
-                       <DropdownMenuSeparator />
-                       <DropdownMenuItem onClick={() => setView('calculator')}>Calculator</DropdownMenuItem>
-                       <DropdownMenuItem onClick={() => setView('docs')}>Documentation</DropdownMenuItem>
+                       <DropdownMenuGroup>
+                         <DropdownMenuLabel>Settings & View</DropdownMenuLabel>
+                         <DropdownMenuSeparator />
+                         <DropdownMenuItem onClick={() => setView('calculator')}>Calculator</DropdownMenuItem>
+                         <DropdownMenuItem onClick={() => setView('docs')}>Documentation</DropdownMenuItem>
+                       </DropdownMenuGroup>
                        <DropdownMenuSeparator />
                        <div className="p-2 space-y-2">
                          <div className="flex items-center justify-between">
