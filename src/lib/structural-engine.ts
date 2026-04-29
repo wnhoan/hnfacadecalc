@@ -554,6 +554,57 @@ export function calculateLPlateProperties(width: number, height: number, thickne
   return { area, momentOfInertia, sectionModulus };
 }
 
+export function calculateIBeamProperties(width: number, height: number, thicknessWeb: number, thicknessFlange: number) {
+  const w = Math.max(0, width);
+  const h = Math.max(0, height);
+  const tw = Math.max(0, thicknessWeb);
+  const tf = Math.max(0, thicknessFlange);
+
+  if (tw <= 0 || tf <= 0 || w <= tw || h <= 2 * tf) {
+    return calculateRectangularProperties(w, h);
+  }
+
+  // Area: 2 flanges + 1 web
+  const area = 2 * w * tf + (h - 2 * tf) * tw;
+
+  // Moment of Inertia (Ix) about major horizontal axis
+  // I = (w * h^3)/12 - ((w - tw) * (h - 2tf)^3)/12
+  const momentOfInertia = (w * Math.pow(h, 3)) / 12 - ((w - tw) * Math.pow(h - 2 * tf, 3)) / 12;
+  const sectionModulus = h > 0 ? momentOfInertia / (h / 2) : 0;
+
+  return { area, momentOfInertia, sectionModulus };
+}
+
+export function calculateTSectionProperties(width: number, height: number, thicknessWeb: number, thicknessFlange: number) {
+  const w = Math.max(0, width);
+  const h = Math.max(0, height);
+  const tw = Math.max(0, thicknessWeb);
+  const tf = Math.max(0, thicknessFlange);
+
+  if (tw <= 0 || tf <= 0 || w <= tw || h <= tf) {
+    return calculateRectangularProperties(w, h);
+  }
+
+  // A1: flange (top), A2: web (bottom)
+  const a1 = w * tf;
+  const y1 = h - tf / 2;
+  const a2 = (h - tf) * tw;
+  const y2 = (h - tf) / 2;
+
+  const area = a1 + a2;
+  const yc = (a1 * y1 + a2 * y2) / area;
+
+  // Moment of Inertia (Ix) about centroidal axis
+  const i1 = (w * Math.pow(tf, 3)) / 12 + a1 * Math.pow(y1 - yc, 2);
+  const i2 = (tw * Math.pow(h - tf, 3)) / 12 + a2 * Math.pow(y2 - yc, 2);
+  const momentOfInertia = i1 + i2;
+
+  const y_max = Math.max(yc, h - yc);
+  const sectionModulus = y_max > 0 ? momentOfInertia / y_max : 0;
+
+  return { area, momentOfInertia, sectionModulus };
+}
+
 /**
  * Cast-in Embed Analysis (Simplified ACI 318 / EOTA TR 029)
  */

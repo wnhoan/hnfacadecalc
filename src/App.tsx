@@ -134,6 +134,8 @@ import {
   calculateHollowRectangularProperties,
   calculateChannelProperties,
   calculateLPlateProperties,
+  calculateIBeamProperties,
+  calculateTSectionProperties,
   calculateCastInEmbed,
   BeamProperties,
   Load
@@ -330,6 +332,10 @@ const TRANSLATIONS = {
     sectionType: 'Section Type',
     solid: 'Solid',
     hollow: 'Hollow',
+    channel: 'Channel',
+    lPlate: 'L-Plate',
+    iBeam: 'I-Beam',
+    tSection: 'T-Section',
     width: 'Width',
     height: 'Height',
     thickness: 'Thickness',
@@ -383,6 +389,8 @@ const TRANSLATIONS = {
     skinMaterial: 'Skin Material',
     skinThickness: 'Skin Thickness',
     stiffenerSpacing: 'Stiffener Spacing',
+    stiffenerCountV: 'Vertical Stiffeners',
+    stiffenerCountH: 'Horizontal Stiffeners',
     maxSkinDeflection: 'Max Skin Deflection',
     maxSkinStress: 'Max Skin Stress',
     sealantMode: 'Structural Sealant',
@@ -419,6 +427,10 @@ const TRANSLATIONS = {
     sectionType: '截面类型',
     solid: '实心',
     hollow: '空心',
+    channel: '工字钢/槽钢 (Channel)',
+    lPlate: '角钢 (L-Plate)',
+    iBeam: 'I字钢 (I-Beam)',
+    tSection: 'T字钢 (T-Section)',
     width: '宽度',
     height: '高度',
     thickness: '厚度',
@@ -472,6 +484,8 @@ const TRANSLATIONS = {
     skinMaterial: '面板材料',
     skinThickness: '面板厚度',
     stiffenerSpacing: '筋条间距',
+    stiffenerCountV: '垂直加强肋数量',
+    stiffenerCountH: '水平加强肋数量',
     maxSkinDeflection: '最大面板挠度',
     maxSkinStress: '最大面板应力',
     sealantMode: '结构硅酮胶',
@@ -508,6 +522,10 @@ const TRANSLATIONS = {
     sectionType: 'ประเภทหน้าตัด',
     solid: 'ทึบ',
     hollow: 'กลวง',
+    channel: 'Channel',
+    lPlate: 'L-Plate',
+    iBeam: 'I-Beam',
+    tSection: 'T-Section',
     width: 'ความกว้าง',
     height: 'ความสูง',
     thickness: 'ความหนา',
@@ -561,6 +579,8 @@ const TRANSLATIONS = {
     skinMaterial: 'วัสดุผิว',
     skinThickness: 'ความหนาของผิว',
     stiffenerSpacing: 'ระยะห่างตัวเสริม',
+    stiffenerCountV: 'Vertical Stiffeners',
+    stiffenerCountH: 'Horizontal Stiffeners',
     maxSkinDeflection: 'การโก่งตัวสูงสุดของผิว',
     maxSkinStress: 'หน่วยแรงสูงสุดของผิว',
     sealantMode: 'Structural Sealant',
@@ -597,6 +617,10 @@ const TRANSLATIONS = {
     sectionType: 'Jenis Keratan',
     solid: 'Padu',
     hollow: 'Berongga',
+    channel: 'Channel',
+    lPlate: 'L-Plate',
+    iBeam: 'I-Beam',
+    tSection: 'T-Section',
     width: 'Lebar',
     height: 'Tinggi',
     thickness: 'Ketebalan',
@@ -650,6 +674,8 @@ const TRANSLATIONS = {
     skinMaterial: 'Bahan Kulit',
     skinThickness: 'Ketebalan Kulit',
     stiffenerSpacing: 'Jarak Pengeras',
+    stiffenerCountV: 'Vertical Stiffeners',
+    stiffenerCountH: 'Horizontal Stiffeners',
     maxSkinDeflection: 'Pesongan Kulit Maks',
     maxSkinStress: 'Tegangan Kulit Maks',
     sealantMode: 'Structural Sealant',
@@ -982,7 +1008,7 @@ interface HistoryState {
   panelMaterialId: keyof typeof PANEL_MATERIALS;
   sealantMaterialId: keyof typeof SEALANT_MATERIALS;
   bracketTypeId: keyof typeof BRACKET_TYPES;
-  sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate';
+  sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate' | 'i-beam' | 't-section';
   beamType: 'mullion' | 'transom';
   width: number;
   height: number;
@@ -991,7 +1017,8 @@ interface HistoryState {
   supportCondition: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous';
   intermediateSupports: number[];
   safetyFactor: number;
-  stiffenerCount: number;
+  stiffenerCountV: number;
+  stiffenerCountH: number;
   stiffenerWidth: number;
   stiffenerHeight: number;
   stiffenerThickness: number;
@@ -1047,7 +1074,8 @@ const createNewProject = (id: string, title: string): Project => ({
   supportCondition: 'simply_supported',
   intermediateSupports: [],
   safetyFactor: 1.5,
-  stiffenerCount: 0,
+  stiffenerCountV: 0,
+  stiffenerCountH: 0,
   stiffenerWidth: 40,
   stiffenerHeight: 40,
   stiffenerThickness: 2,
@@ -1142,9 +1170,13 @@ const calculatePanelResults = (project: Project) => {
   const b_panel = Math.min(project.width, project.length);
   const a_panel = Math.max(project.width, project.length);
   
-  const stiffenerCount = project.stiffenerCount ?? 0;
-  const b_eff = stiffenerCount > 0 ? (project.length / (stiffenerCount + 1)) : b_panel;
-  const a_eff = project.width;
+  const stiffenerCountV = project.stiffenerCountV ?? 0;
+  const stiffenerCountH = project.stiffenerCountH ?? 0;
+  
+  // Effective sub-panel dimensions
+  const b_eff = project.width / (stiffenerCountV + 1);
+  const a_eff = project.length / (stiffenerCountH + 1);
+  
   const s_min = Math.min(a_eff, b_eff);
   const s_max = Math.max(a_eff, b_eff);
   const ratio = s_max / s_min;
@@ -1176,15 +1208,11 @@ const calculatePanelResults = (project: Project) => {
   const maxSkinDeflection = (alpha * q_wind_factored * Math.pow(s_min, 4)) / D;
   const maxSkinStress = (beta * q_wind_factored * Math.pow(s_min, 2)) / (t * t);
 
-  const tribWidth = project.width / (stiffenerCount + 1);
-  const stiffenerLoads = project.loads.map(l => ({
-    ...l,
-    value: l.type === 'udl' ? l.value * tribWidth : l.value,
-    value2: l.value2 !== undefined ? l.value2 * tribWidth : undefined,
-  }));
-
+  // Analyze vertical stiffeners as beams
+  const tribWidthV = project.width / (stiffenerCountV + 1);
   const stiffProps = calculateLPlateProperties(project.stiffenerWidth, project.stiffenerHeight, project.stiffenerThickness, project.stiffenerThickness);
-  const stiffenerBeamProps = {
+  
+  const stiffenerBeamPropsV = {
     length: project.length,
     elasticModulus: 70000,
     momentOfInertia: stiffProps.momentOfInertia,
@@ -1194,11 +1222,42 @@ const calculatePanelResults = (project: Project) => {
     supportCondition: 'simply_supported' as any,
   };
 
-  const stiffenerAnalysis = calculateBeam(stiffenerBeamProps, stiffenerLoads.map(l => ({
+  const vStiffenerLoads = project.loads.map(l => ({
     ...l,
-    value: safeParseNumber(l.value, 0) * (activeCombination.factors[l.category] || 0),
-    value2: l.value2 !== undefined ? safeParseNumber(l.value2, 0) * (activeCombination.factors[l.category] || 0) : undefined,
-  })));
+    value: safeParseNumber(l.value, 0) * (activeCombination.factors[l.category] || 0) * (l.type === 'udl' ? tribWidthV : 1),
+    value2: l.value2 !== undefined ? safeParseNumber(l.value2, 0) * (activeCombination.factors[l.category] || 0) * (l.type === 'udl' ? tribWidthV : 1) : undefined,
+  }));
+
+  const stiffenerAnalysisV = stiffenerCountV > 0 
+    ? calculateBeam(stiffenerBeamPropsV, vStiffenerLoads)
+    : null;
+
+  // Analyze horizontal stiffeners as beams
+  const tribWidthH = project.length / (stiffenerCountH + 1);
+  const stiffenerBeamPropsH = {
+    length: project.width,
+    elasticModulus: 70000,
+    momentOfInertia: stiffProps.momentOfInertia,
+    sectionModulus: stiffProps.sectionModulus,
+    yieldStrength: 160,
+    safetyFactor: project.safetyFactor,
+    supportCondition: 'simply_supported' as any,
+  };
+
+  const hStiffenerLoads = project.loads.map(l => ({
+    ...l,
+    value: safeParseNumber(l.value, 0) * (activeCombination.factors[l.category] || 0) * (l.type === 'udl' ? tribWidthH : 1),
+    value2: l.value2 !== undefined ? safeParseNumber(l.value2, 0) * (activeCombination.factors[l.category] || 0) * (l.type === 'udl' ? tribWidthH : 1) : undefined,
+  }));
+
+  const stiffenerAnalysisH = stiffenerCountH > 0 
+    ? calculateBeam(stiffenerBeamPropsH, hStiffenerLoads)
+    : null;
+
+  const vUtilStress = stiffenerAnalysisV ? stiffenerAnalysisV.summary.utilizationStress : 0;
+  const hUtilStress = stiffenerAnalysisH ? stiffenerAnalysisH.summary.utilizationStress : 0;
+  const vUtilDefl = stiffenerAnalysisV ? stiffenerAnalysisV.summary.utilizationDeflection : 0;
+  const hUtilDefl = stiffenerAnalysisH ? stiffenerAnalysisH.summary.utilizationDeflection : 0;
 
   return {
     skin: {
@@ -1213,14 +1272,28 @@ const calculatePanelResults = (project: Project) => {
       a: s_max,
       b: s_min
     },
-    stiffener: stiffenerCount > 0 ? {
-      ...stiffenerAnalysis.summary,
-      loadWidth: tribWidth,
-      count: stiffenerCount
+    stiffenersV: stiffenerAnalysisV ? {
+      ...stiffenerAnalysisV.summary,
+      loadWidth: tribWidthV,
+      count: stiffenerCountV
+    } : null,
+    stiffenersH: stiffenerAnalysisH ? {
+      ...stiffenerAnalysisH.summary,
+      loadWidth: tribWidthH,
+      count: stiffenerCountH
     } : null,
     summary: {
-       utilization: Math.max(maxSkinStress / (mat.yield / project.safetyFactor), maxSkinDeflection / (s_min / 60), (stiffenerCount > 0 ? stiffenerAnalysis.summary.utilizationStress : 0)),
-       status: (maxSkinStress / (mat.yield / project.safetyFactor) <= 1 && maxSkinDeflection / (s_min / 60) <= 1 && (stiffenerCount > 0 ? stiffenerAnalysis.summary.status === 'pass' : true)) ? 'pass' as const : 'fail' as const,
+       utilization: Math.max(
+         maxSkinStress / (mat.yield / project.safetyFactor), 
+         maxSkinDeflection / (s_min / 60), 
+         vUtilStress, hUtilStress, vUtilDefl, hUtilDefl
+       ),
+       status: (
+         maxSkinStress / (mat.yield / project.safetyFactor) <= 1 && 
+         maxSkinDeflection / (s_min / 60) <= 1 && 
+         (!stiffenerAnalysisV || stiffenerAnalysisV.summary.status === 'pass') &&
+         (!stiffenerAnalysisH || stiffenerAnalysisH.summary.status === 'pass')
+       ) ? 'pass' as const : 'fail' as const,
        weight: (mat.density * project.width * project.length * t * 1e-9) // Added weight field back into summary for view
     },
     totalWeight: (mat.density * project.width * project.length * t * 1e-9)
@@ -1635,7 +1708,7 @@ const PanelResultsView = ({
   return (
     <div className="space-y-4">
       <div className={cn(
-        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-gradient-to-r from-emerald-500/5 to-transparent border-emerald-100",
+        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-white border-emerald-100 relative overflow-hidden",
         results.summary.status === 'pass' ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-red-500"
       )}>
         <div className="flex items-center gap-3">
@@ -1649,7 +1722,7 @@ const PanelResultsView = ({
         </div>
         <div className={cn(
           "px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest",
-          results.summary.status === 'pass' ? "bg-emerald-500 text-white" : "bg-red-500 text-white"
+          results.summary.status === 'pass' ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
         )}>
           {results.summary.status === 'pass' ? "PASS" : "FAIL"}
         </div>
@@ -1698,16 +1771,16 @@ const PanelResultsView = ({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Skin Analysis Card */}
-        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-blue-200 transition-colors">
+        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-blue-200 transition-colors flex flex-col">
           <CardHeader className="p-3 sm:p-4 border-b bg-gradient-to-r from-blue-500/10 to-transparent">
             <div className="flex items-center gap-2 text-blue-600">
               <Square className="w-4 h-4" />
               <CardTitle className="text-sm font-bold uppercase tracking-wide">Skin Analysis (Panel)</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="p-4 space-y-4">
+          <CardContent className="p-4 space-y-4 flex-1">
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
@@ -1725,7 +1798,7 @@ const PanelResultsView = ({
                 </div>
              </div>
              <Separator className="bg-slate-100" />
-             <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 italic">
+             <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 italic pb-2">
                <div>a: {(results.dimensions?.a ?? 0).toFixed(0)}mm</div>
                <div className="text-center">b: {(results.dimensions?.b ?? 0).toFixed(0)}mm</div>
                <div className="text-right">a/b: {((results.dimensions?.a ?? 0) / (results.dimensions?.b ?? 1)).toFixed(2)}</div>
@@ -1733,40 +1806,79 @@ const PanelResultsView = ({
           </CardContent>
         </Card>
 
-        {/* Stiffener Analysis Card */}
-        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-rose-200 transition-colors">
+        {/* Vertical Stiffener Analysis Card */}
+        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-rose-200 transition-colors flex flex-col">
           <CardHeader className="p-3 sm:p-4 border-b bg-gradient-to-r from-rose-500/10 to-transparent">
             <div className="flex items-center gap-2 text-rose-600">
               <Layout className="w-4 h-4" />
-              <CardTitle className="text-sm font-bold uppercase tracking-wide">Stiffener Analysis</CardTitle>
+              <CardTitle className="text-sm font-bold uppercase tracking-wide">Vertical Stiffeners</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="p-4 space-y-4">
-             {results.stiffener ? (
+          <CardContent className="p-4 space-y-4 flex-1 flex flex-col justify-center">
+             {results.stiffenersV ? (
                <>
                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
-                      <p className="text-lg font-black text-slate-900">{(results.stiffener?.maxDeflection ?? 0).toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
-                      <Badge variant={(results.stiffener?.utilizationDeflection ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
-                        U: {((results.stiffener?.utilizationDeflection ?? 0) * 100).toFixed(1)}%
+                      <p className="text-lg font-black text-slate-900">{(results.stiffenersV?.maxDeflection ?? 0).toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
+                      <Badge variant={(results.stiffenersV?.utilizationDeflection ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
+                        U: {((results.stiffenersV?.utilizationDeflection ?? 0) * 100).toFixed(1)}%
                       </Badge>
                     </div>
                     <div className="space-y-1 text-right">
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress</p>
-                      <p className="text-lg font-black text-slate-900">{(results.stiffener?.maxStress ?? 0).toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
-                      <Badge variant={(results.stiffener?.utilizationStress ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
-                        U: {((results.stiffener?.utilizationStress ?? 0) * 100).toFixed(1)}%
+                      <p className="text-lg font-black text-slate-900">{(results.stiffenersV?.maxStress ?? 0).toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
+                      <Badge variant={(results.stiffenersV?.utilizationStress ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
+                        U: {((results.stiffenersV?.utilizationStress ?? 0) * 100).toFixed(1)}%
                       </Badge>
                     </div>
                  </div>
                  <div className="pt-2">
-                   <p className="text-[10px] text-slate-400 font-mono">Tributary: {(results.stiffener?.loadWidth ?? 0).toFixed(0)} mm | Count: {results.stiffener?.count}</p>
+                   <p className="text-[10px] text-slate-400 font-mono">Trib: {(results.stiffenersV?.loadWidth ?? 0).toFixed(0)}mm | Qty: {results.stiffenersV?.count}</p>
                  </div>
                </>
              ) : (
-               <div className="h-full flex items-center justify-center py-6 text-slate-400 italic text-xs">
-                 No stiffeners added
+               <div className="h-full flex items-center justify-center py-6 text-slate-400 italic text-[10px] uppercase font-bold tracking-tight">
+                 N/A
+               </div>
+             )}
+          </CardContent>
+        </Card>
+
+        {/* Horizontal Stiffener Analysis Card */}
+        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-amber-200 transition-colors flex flex-col md:col-span-2 lg:col-span-1">
+          <CardHeader className="p-3 sm:p-4 border-b bg-gradient-to-r from-amber-500/10 to-transparent">
+            <div className="flex items-center gap-2 text-amber-600">
+              <Layout className="w-4 h-4 rotate-90" />
+              <CardTitle className="text-sm font-bold uppercase tracking-wide">Horizontal Stiffeners</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 space-y-4 flex-1 flex flex-col justify-center">
+             {results.stiffenersH ? (
+               <>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
+                      <p className="text-lg font-black text-slate-900">{(results.stiffenersH?.maxDeflection ?? 0).toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
+                      <Badge variant={(results.stiffenersH?.utilizationDeflection ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
+                        U: {((results.stiffenersH?.utilizationDeflection ?? 0) * 100).toFixed(1)}%
+                      </Badge>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress</p>
+                      <p className="text-lg font-black text-slate-900">{(results.stiffenersH?.maxStress ?? 0).toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
+                      <Badge variant={(results.stiffenersH?.utilizationStress ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
+                        U: {((results.stiffenersH?.utilizationStress ?? 0) * 100).toFixed(1)}%
+                      </Badge>
+                    </div>
+                 </div>
+                 <div className="pt-2">
+                   <p className="text-[10px] text-slate-400 font-mono">Trib: {(results.stiffenersH?.loadWidth ?? 0).toFixed(0)}mm | Qty: {results.stiffenersH?.count}</p>
+                 </div>
+               </>
+             ) : (
+               <div className="h-full flex items-center justify-center py-6 text-slate-400 italic text-[10px] uppercase font-bold tracking-tight">
+                 N/A
                </div>
              )}
           </CardContent>
@@ -1954,48 +2066,54 @@ const ProjectResultsView = ({
     <div className="space-y-6">
       {/* Top Hero Status & KPI Row */}
       <div className={cn(
-        "p-6 rounded-[2rem] border-2 shadow-sm flex flex-col md:flex-row items-center justify-between transition-all gap-6",
+        "p-5 rounded-[1.5rem] border shadow-sm flex flex-col md:flex-row items-center justify-between transition-all gap-6 bg-white overflow-hidden relative",
         results.summary.status === 'pass' 
-          ? "bg-gradient-to-br from-emerald-500/5 via-white to-emerald-500/10 border-emerald-500/20" 
-          : "bg-gradient-to-br from-red-500/5 via-white to-red-500/10 border-red-500/20"
+          ? "border-emerald-500/20" 
+          : "border-red-500/20"
       )}>
-        <div className="flex items-center gap-5 w-full md:w-auto">
+        <div className={cn(
+          "absolute top-0 left-0 w-1.5 h-full",
+          results.summary.status === 'pass' ? "bg-emerald-500" : "bg-red-500"
+        )} />
+        
+        <div className="flex items-center gap-4 w-full md:w-auto">
           <div className={cn(
-            "w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-lg relative overflow-hidden",
-            results.summary.status === 'pass' ? "bg-emerald-600 shadow-emerald-200" : "bg-red-600 shadow-red-200"
+            "w-14 h-14 rounded-2xl flex items-center justify-center shadow-md relative overflow-hidden shrink-0",
+            results.summary.status === 'pass' ? "bg-emerald-600 shadow-emerald-100" : "bg-red-600 shadow-red-100"
           )}>
-            <div className="absolute inset-0 bg-white/20 animate-pulse opacity-50" />
-            <Activity className="w-8 h-8 text-white relative z-10" />
+            <Activity className="w-7 h-7 text-white" />
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Badge className={cn(
-                 "text-[9px] font-black uppercase tracking-widest px-2 py-0.5",
-                 results.summary.status === 'pass' ? "bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-sm" : "bg-red-500 hover:bg-red-600 text-white border-none shadow-sm"
-              )}>
-                {results.summary.status === 'pass' ? "Pass" : "Overloaded"}
-              </Badge>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedCodeId} Code</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedCodeId} Design Result</span>
             </div>
-            <h2 className="text-2xl font-black text-slate-900 leading-tight uppercase tracking-tighter">
+            <h2 className="text-xl font-black text-slate-900 leading-tight uppercase tracking-tighter truncate">
               {project.projectTitle}
             </h2>
-            <p className="text-xs text-slate-500 font-medium">Governing: <span className="font-bold text-slate-700 italic">{governingCriteria} Control</span></p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge className={cn(
+                  "text-[8px] font-black uppercase tracking-widest px-1.5 py-0",
+                  results.summary.status === 'pass' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none" : "bg-red-100 text-red-700 hover:bg-red-100 border-none"
+              )}>
+                {results.summary.status === 'pass' ? "PASS" : "FAIL"}
+              </Badge>
+              <p className="text-[10px] text-slate-500 font-medium whitespace-nowrap">Control: <span className="font-bold text-slate-700">{governingCriteria}</span></p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-8 w-full md:w-auto px-4 md:px-0">
-           <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Utilization</p>
-              <p className={cn("text-3xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-red-600" : "text-slate-900")}>
-                {(maxUtilization * 100).toFixed(1)}<span className="text-lg ml-0.5 opacity-50">%</span>
+        <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end px-2 md:px-0">
+           <div className="text-center md:text-right">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Utilization</p>
+              <p className={cn("text-2xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-red-600" : "text-slate-900")}>
+                {(maxUtilization * 100).toFixed(1)}<span className="text-base ml-0.5 opacity-50">%</span>
               </p>
            </div>
-           <div className="h-10 w-[1px] bg-slate-200 hidden md:block" />
-           <div className="text-right hidden md:block">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Factor of Safety</p>
-              <p className={cn("text-3xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-slate-300" : "text-emerald-600")}>
-                {maxUtilization > 1 ? "0.0" : (1 / (maxUtilization || 0.01)).toFixed(2)}<span className="text-lg ml-0.5 opacity-50">FS</span>
+           <div className="h-8 w-[1px] bg-slate-100" />
+           <div className="text-right">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Factor of Safety</p>
+              <p className={cn("text-2xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-slate-300" : "text-emerald-600")}>
+                {maxUtilization > 1 ? "0.00" : (1 / (maxUtilization || 0.01)).toFixed(2)}
               </p>
            </div>
         </div>
@@ -2003,7 +2121,7 @@ const ProjectResultsView = ({
 
       {/* Detailed Analysis Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-20">
-        <div className="lg:col-span-8 flex flex-col gap-6">
+        <div className="lg:col-span-9 flex flex-col gap-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="flex items-center justify-between mb-4">
                <TabsList className="bg-slate-100 p-1 rounded-xl h-10 border border-slate-200 shadow-sm">
@@ -2113,7 +2231,7 @@ const ProjectResultsView = ({
           </div>
         </div>
 
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-3 flex flex-col gap-6">
           <Card className="border-slate-200 shadow-lg overflow-hidden rounded-[2rem] group transition-all hover:shadow-xl bg-white h-fit">
             <div className="bg-slate-50/50 px-6 py-4 border-b flex items-center justify-between">
                <div className="flex items-center gap-3">
@@ -2948,7 +3066,7 @@ export function App() {
     }
     return 'aluminum_6061_t6';
   });
-  const [sectionType, setSectionType] = useState<'solid' | 'hollow' | 'channel' | 'l-plate'>(() => {
+  const [sectionType, setSectionType] = useState<'solid' | 'hollow' | 'channel' | 'l-plate' | 'i-beam' | 't-section'>(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
       try {
@@ -3159,7 +3277,8 @@ export function App() {
   });
 
   const [stiffenerSpacing, setStiffenerSpacing] = useState(600);
-  const [stiffenerCount, setStiffenerCount] = useState(1);
+  const [stiffenerCountV, setStiffenerCountV] = useState(0);
+  const [stiffenerCountH, setStiffenerCountH] = useState(0);
   const [stiffenerWidth, setStiffenerWidth] = useState(40);
   const [stiffenerHeight, setStiffenerHeight] = useState(40);
   const [stiffenerThickness, setStiffenerThickness] = useState(2.0);
@@ -3374,7 +3493,8 @@ export function App() {
     supportCondition,
     intermediateSupports,
     safetyFactor,
-    stiffenerCount,
+    stiffenerCountV,
+    stiffenerCountH,
     stiffenerWidth,
     stiffenerHeight,
     stiffenerThickness,
@@ -3423,7 +3543,8 @@ export function App() {
     setSupportCondition(state.supportCondition);
     setIntermediateSupports(state.intermediateSupports ?? []);
     setSafetyFactor(state.safetyFactor);
-    setStiffenerCount(state.stiffenerCount ?? 0);
+    setStiffenerCountV(state.stiffenerCountV ?? 0);
+    setStiffenerCountH(state.stiffenerCountH ?? 0);
     setStiffenerWidth(state.stiffenerWidth ?? 40);
     setStiffenerHeight(state.stiffenerHeight ?? 40);
     setStiffenerThickness(state.stiffenerThickness ?? 2);
@@ -3636,6 +3757,10 @@ export function App() {
       return calculateChannelProperties(width, height, thickness, thickness2);
     } else if (sectionType === 'l-plate') {
       return calculateLPlateProperties(width, height, thickness, thickness2);
+    } else if (sectionType === 'i-beam') {
+      return calculateIBeamProperties(width, height, thickness, thickness2);
+    } else if (sectionType === 't-section') {
+      return calculateTSectionProperties(width, height, thickness, thickness2);
     }
     return calculateHollowRectangularProperties(width, height, thickness, thickness2);
   }, [width, height, thickness, thickness2, sectionType]);
@@ -3691,7 +3816,7 @@ export function App() {
 
   const panelResults = useMemo(() => {
     return calculatePanelResults({ ...getCurrentState(), id: activeProjectId });
-  }, [calculationMode, panelMaterialId, width, length, loads, activeCombinationId, combinations, stiffenerCount, stiffenerWidth, stiffenerHeight, stiffenerThickness, safetyFactor]);
+  }, [calculationMode, panelMaterialId, width, length, loads, activeCombinationId, combinations, stiffenerCountV, stiffenerCountH, stiffenerWidth, stiffenerHeight, stiffenerThickness, safetyFactor]);
 
   const sealantResults = useMemo(() => {
     return calculateSealantResults({ ...getCurrentState(), id: activeProjectId });
@@ -5237,11 +5362,13 @@ export function App() {
                         <div className="grid gap-1.5">
                           <Label className="text-[10px] uppercase font-bold text-slate-400">{t.sectionType}</Label>
                           <Tabs value={sectionType} onValueChange={(v: any) => setSectionType(v)} className="w-full">
-                            <TabsList className="grid w-full grid-cols-4 h-8">
+                            <TabsList className="grid w-full grid-cols-6 h-8">
                               <TabsTrigger value="solid" className="text-[10px]">{t.solid}</TabsTrigger>
                               <TabsTrigger value="hollow" className="text-[10px]">{t.hollow}</TabsTrigger>
                               <TabsTrigger value="channel" className="text-[10px]">Channel</TabsTrigger>
                               <TabsTrigger value="l-plate" className="text-[10px]">L-Plate</TabsTrigger>
+                              <TabsTrigger value="i-beam" className="text-[10px]">I-Beam</TabsTrigger>
+                              <TabsTrigger value="t-section" className="text-[10px]">T-Section</TabsTrigger>
                             </TabsList>
                           </Tabs>
                         </div>
@@ -5279,7 +5406,8 @@ export function App() {
                               <Label htmlFor="thickness" className="text-[10px] uppercase font-bold text-slate-400">
                                 {sectionType === 'hollow' ? 'Width Thickness (tx)' : 
                                  sectionType === 'channel' ? 'Web Thickness (tw)' : 
-                                 'Horiz. Thickness (th)'} ({u.length})
+                                 sectionType === 'l-plate' ? 'Horiz. Thickness (th)' :
+                                 'Web Thickness (tw)'} ({u.length})
                               </Label>
                               <NumericInputWithControls 
                                 id="thickness" 
@@ -5295,7 +5423,8 @@ export function App() {
                               <Label htmlFor="thickness2" className="text-[10px] uppercase font-bold text-slate-400">
                                 {sectionType === 'hollow' ? 'Height Thickness (ty)' : 
                                  sectionType === 'channel' ? 'Flange Thickness (tf)' : 
-                                 'Vert. Thickness (tv)'} ({u.length})
+                                 sectionType === 'l-plate' ? 'Vert. Thickness (tv)' :
+                                 'Flange Thickness (tf)'} ({u.length})
                               </Label>
                               <NumericInputWithControls 
                                 id="thickness2" 
@@ -5363,20 +5492,34 @@ export function App() {
                       <CardTitle className="text-sm sm:text-base">Panel Reinforcement</CardTitle>
                     </CardHeader>
                     <CardContent className="p-3 sm:p-4 space-y-3">
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="stiffener-count" className="text-[10px] uppercase font-bold text-slate-400">Total Stiffeners</Label>
-                        <NumericInputWithControls 
-                          id="stiffener-count"
-                          min={0}
-                          max={20}
-                          step={1}
-                          precision={0}
-                          value={stiffenerCount}
-                          onChange={(val) => setStiffenerCount(val)}
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-1.5">
+                          <Label htmlFor="stiffener-count-v" className="text-[10px] uppercase font-bold text-slate-400">{t.stiffenerCountV}</Label>
+                          <NumericInputWithControls 
+                            id="stiffener-count-v"
+                            min={0}
+                            max={20}
+                            step={1}
+                            precision={0}
+                            value={stiffenerCountV}
+                            onChange={(val) => setStiffenerCountV(val)}
+                          />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label htmlFor="stiffener-count-h" className="text-[10px] uppercase font-bold text-slate-400">{t.stiffenerCountH}</Label>
+                          <NumericInputWithControls 
+                            id="stiffener-count-h"
+                            min={0}
+                            max={20}
+                            step={1}
+                            precision={0}
+                            value={stiffenerCountH}
+                            onChange={(val) => setStiffenerCountH(val)}
+                          />
+                        </div>
                       </div>
                       
-                      {stiffenerCount > 0 && (
+                      {(stiffenerCountV > 0 || stiffenerCountH > 0) && (
                         <>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="grid gap-1.5">
@@ -5416,9 +5559,9 @@ export function App() {
                               onChange={setStiffenerThickness} 
                             />
                           </div>
-                          <div className="p-2 bg-rose-50 border border-rose-100 rounded-md">
-                            <p className="text-[9px] text-rose-700 leading-tight">
-                              <strong>Note:</strong> Stiffeners are assumed to span vertically (parallel to panel height). Tributary width is calculated as Panel Width / (N+1).
+                          <div className="p-2 bg-rose-50 border border-slate-100 rounded-md">
+                            <p className="text-[9px] text-slate-600 leading-tight">
+                              <strong>Note:</strong> Stiffeners divide the panel into sub-panels. Vertical stiffeners span panel height, Horizontal stiffeners span panel width. Analysis uses Roark's formulas for individual sub-panels.
                             </p>
                           </div>
                         </>
@@ -5764,7 +5907,7 @@ export function App() {
 
                 {/* Right Column: Results & Visuals */}
                 <div className={cn(
-                  "h-full overflow-y-auto p-4 sm:p-6 space-y-6 no-scrollbar print:block bg-slate-50/50",
+                  "h-full overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 no-scrollbar print:block bg-slate-50/50",
                   isBiViewMode ? "lg:col-span-12" : "lg:col-span-8 xl:col-span-9",
                   mobileTab !== 'results' && "hidden lg:block"
                 )}>
@@ -5781,7 +5924,7 @@ export function App() {
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{MATERIALS[material].name}</span></div>
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}</span></div>
-                          <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{sectionType === 'hollow' ? `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 1 : 3)}${u.length}` : `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}${u.length}`}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{(['hollow', 'channel', 'i-beam', 't-section'].includes(sectionType)) ? `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 1 : 3)}${u.length}` : `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}${u.length}`}</span></div>
                         </div>
                         {projectNotes && (
                           <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
@@ -6171,16 +6314,29 @@ export function App() {
                     height: `${Math.min(240, (length/width)*200)}px`,
                     maxHeight: '240px' 
                  }}>
-                   {/* Stiffeners */}
-                   {[...Array(stiffenerCount)].map((_, i) => (
+                   {/* Vertical Stiffeners */}
+                   {[...Array(stiffenerCountV)].map((_, i) => (
                      <div 
-                       key={i} 
+                       key={`v-${i}`} 
                        className="absolute bg-rose-500/40 border-x border-rose-600/50" 
                        style={{ 
                          width: '8px', 
                          height: '100%', 
-                         left: `${(i + 1) * (100 / (stiffenerCount + 1))}%`,
+                         left: `${(i + 1) * (100 / (stiffenerCountV + 1))}%`,
                          transform: 'translateX(-50%)'
+                       }} 
+                     />
+                   ))}
+                   {/* Horizontal Stiffeners */}
+                   {[...Array(stiffenerCountH)].map((_, i) => (
+                     <div 
+                       key={`h-${i}`} 
+                       className="absolute bg-amber-500/40 border-y border-amber-600/50" 
+                       style={{ 
+                         height: '8px', 
+                         width: '100%', 
+                         top: `${(i + 1) * (100 / (stiffenerCountH + 1))}%`,
+                         transform: 'translateY(-50%)'
                        }} 
                      />
                    ))}
@@ -6192,9 +6348,11 @@ export function App() {
                  </div>
                  <div className="absolute bottom-4 right-4 flex flex-col gap-1 text-[9px] text-slate-500 font-mono">
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-200 border border-slate-400" /> Skin</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-rose-400" /> Stiffeners</div>
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-rose-400" /> V-Stiffeners</div>
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-amber-400" /> H-Stiffeners</div>
                  </div>
                </CardContent>
+
             </Card>
           )}
           {/* Calculation Notes */}

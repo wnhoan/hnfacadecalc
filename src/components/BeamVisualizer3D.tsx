@@ -9,7 +9,7 @@ interface BeamVisualizer3DProps {
   height: number;
   thickness: number;
   thickness2: number;
-  sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate';
+  sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate' | 'i-beam' | 't-section';
   supportCondition?: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous';
   materialColor?: string;
   unitSystem?: 'metric' | 'imperial';
@@ -78,6 +78,57 @@ const BeamModel: React.FC<BeamVisualizer3DProps> = ({
       shape.lineTo(-hw + tv, hh);
       shape.lineTo(-hw, hh);
       shape.lineTo(-hw, -hh);
+      shape.closePath();
+    } else if (sectionType === 'i-beam') {
+      // I-Beam shape
+      const tw = tx; // Web thickness
+      const tf = ty; // Flange thickness
+      // Start at web bottom-left
+      shape.moveTo(-tw / 2, -hh + tf);
+      shape.lineTo(tw / 2, -hh + tf);
+      shape.lineTo(tw / 2, hh - tf);
+      shape.lineTo(hw, hh - tf);
+      shape.lineTo(hw, hh);
+      shape.lineTo(-hw, hh);
+      shape.lineTo(-hw, hh - tf);
+      shape.lineTo(-tw / 2, hh - tf);
+      shape.lineTo(-tw / 2, -hh + tf); // back to start of loop-ish? wait
+      shape.closePath(); // Let's rebuild properly
+      
+      shape.currentPoint.set(0, 0); // reset
+      shape.curves = [];
+      
+      // Bottom flange
+      shape.moveTo(-hw, -hh);
+      shape.lineTo(hw, -hh);
+      shape.lineTo(hw, -hh + tf);
+      // To web
+      shape.lineTo(tw / 2, -hh + tf);
+      shape.lineTo(tw / 2, hh - tf);
+      // Top flange
+      shape.lineTo(hw, hh - tf);
+      shape.lineTo(hw, hh);
+      shape.lineTo(-hw, hh);
+      shape.lineTo(-hw, hh - tf);
+      // To web left
+      shape.lineTo(-tw / 2, hh - tf);
+      shape.lineTo(-tw / 2, -hh + tf);
+      shape.lineTo(-hw, -hh + tf);
+      shape.lineTo(-hw, -hh);
+      shape.closePath();
+    } else if (sectionType === 't-section') {
+      // T-Section shape
+      const tw = tx; // Web thickness
+      const tf = ty; // Flange thickness
+      // Top flange
+      shape.moveTo(-hw, hh);
+      shape.lineTo(hw, hh);
+      shape.lineTo(hw, hh - tf);
+      shape.lineTo(tw/2, hh - tf);
+      shape.lineTo(tw/2, -hh);
+      shape.lineTo(-tw/2, -hh);
+      shape.lineTo(-tw/2, hh - tf);
+      shape.lineTo(-hw, hh - tf);
       shape.closePath();
     } else {
       // Outer rectangle for solid/hollow
