@@ -4280,38 +4280,38 @@ export function App() {
                       <Tabs value={calculationMode} onValueChange={(v: any) => {
                         setCalculationMode(v);
                       }} className="w-full">
-                        <TabsList className="grid w-full grid-cols-5 h-11 p-1 bg-white border border-slate-200 shadow-sm rounded-xl">
+                        <TabsList className="grid w-full grid-cols-5 h-10 p-1 bg-white border border-slate-200 shadow-sm rounded-xl">
                           <TabsTrigger 
                             value="beam" 
-                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-blue-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
                             <Box className="w-3 h-3" />
                             <span>Beam</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="panel" 
-                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
                             <Square className="w-3 h-3" />
                             <span>Panel</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="sealant" 
-                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-sky-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-sky-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
                             <Droplet className="w-3 h-3" />
                             <span>Seal</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="bracket" 
-                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-rose-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-rose-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
                             <Link className="w-3 h-3" />
                             <span>Brkt</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="cast-in-embed" 
-                            className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-amber-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
+                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-amber-600 data-[state=active]:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
                           >
                             <Layers className="w-3 h-3" />
                             <span>Embed</span>
@@ -4665,6 +4665,15 @@ export function App() {
                                       ))}
                                       <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-1">
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className={cn("h-8 w-8", activeCombinationId === comb.id ? "text-blue-600" : "text-slate-300 hover:text-blue-400")}
+                                            onClick={() => setActiveCombinationId(comb.id)}
+                                            title="Set as Active"
+                                          >
+                                            <CheckCircle2 className="h-4 w-4" />
+                                          </Button>
                                           <Button 
                                             variant="ghost" 
                                             size="icon" 
@@ -6880,7 +6889,7 @@ function NumericInputWithControls({
   };
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <span className={cn("flex items-center gap-1", className)}>
       <Button 
         variant="outline" 
         size="icon" 
@@ -6908,6 +6917,6 @@ function NumericInputWithControls({
       >
         <Plus className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
       </Button>
-    </div>
+    </span>
   );
 }
