@@ -54,9 +54,7 @@ import {
   Square,
   Link,
   Droplet,
-  Anchor,
-  Sun,
-  Moon
+  Anchor
 } from 'lucide-react';
 import { 
   Card, 
@@ -1932,7 +1930,7 @@ const BeamAnalysisChart = ({
 const UtilizationCards = ({ results, material, governingCriteria }: any) => {
   return (
     <div className="grid grid-cols-1 gap-4">
-      <Card className="border-slate-200 overflow-hidden rounded-2xl bg-white shadow-sm">
+      <Card className="border-slate-200 overflow-hidden rounded-2xl bg-card shadow-sm">
         <div className="p-6 border-b bg-slate-50/50 flex items-center justify-between">
            <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-xl text-blue-600">
@@ -2060,7 +2058,7 @@ const ProjectResultsView = ({
     <div className="space-y-6">
       {/* Top Hero Status & KPI Row */}
       <div className={cn(
-        "p-4 sm:p-5 rounded-[1.25rem] sm:rounded-[1.5rem] border shadow-sm flex flex-col sm:flex-row items-center justify-between transition-all gap-4 sm:gap-6 bg-white overflow-hidden relative",
+        "p-4 sm:p-5 rounded-[1.25rem] sm:rounded-[1.5rem] border shadow-sm flex flex-col sm:flex-row items-center justify-between transition-all gap-4 sm:gap-6 bg-card overflow-hidden relative",
         results.summary.status === 'pass' 
           ? "border-emerald-500/20" 
           : "border-red-500/20"
@@ -2179,7 +2177,7 @@ const ProjectResultsView = ({
           </Tabs>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
-            <Card className="p-4 sm:p-5 border-slate-200 shadow-sm rounded-2xl bg-white group hover:border-blue-200 transition-all">
+            <Card className="p-4 sm:p-5 border-slate-200 shadow-sm rounded-2xl bg-card group hover:border-blue-200 transition-all">
                 <div className="flex items-center gap-3 mb-3 sm:mb-4">
                   <div className="p-1.5 sm:p-2 bg-blue-50 rounded-lg text-blue-600">
                     <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -2201,7 +2199,7 @@ const ProjectResultsView = ({
                 </div>
             </Card>
 
-            <Card className="p-4 sm:p-5 border-slate-200 shadow-sm rounded-2xl bg-white group hover:border-amber-200 transition-all">
+            <Card className="p-4 sm:p-5 border-slate-200 shadow-sm rounded-2xl bg-card group hover:border-amber-200 transition-all">
                 <div className="flex items-center gap-3 mb-3 sm:mb-4">
                   <div className="p-1.5 sm:p-2 bg-amber-50 rounded-lg text-amber-600">
                     <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -2226,7 +2224,7 @@ const ProjectResultsView = ({
         </div>
 
         <div className="lg:col-span-3 flex flex-col gap-6">
-          <Card className="border-slate-200 shadow-lg overflow-hidden rounded-[2rem] group transition-all hover:shadow-xl bg-white h-fit">
+          <Card className="border-slate-200 shadow-lg overflow-hidden rounded-[2rem] group transition-all hover:shadow-xl bg-card h-fit">
             <div className="bg-slate-50/50 px-6 py-4 border-b flex items-center justify-between">
                <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-50 rounded-lg border border-slate-200 shadow-sm text-blue-600">
@@ -2251,7 +2249,7 @@ const ProjectResultsView = ({
                  unitSystem={unitSystem as any}
                />
             </div>
-            <CardContent className="p-6 bg-white border-t border-slate-100">
+            <CardContent className="p-6 bg-card border-t border-slate-100">
                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Efficiency Index</p>
                <div className="space-y-4">
                   <div className="space-y-2">
@@ -2276,7 +2274,7 @@ const ProjectResultsView = ({
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+          <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-card">
              <CardHeader className="p-4 border-b bg-slate-50/50">
                <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400">Analysis Environment</CardTitle>
              </CardHeader>
@@ -3039,16 +3037,6 @@ function KeyMapDialog({ onSelect }: { onSelect: (location: string) => void }) {
 }
 
 export function App() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  React.useEffect(() => {
-    const root = window.document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [theme]);
   // Beam State
   const [length, setLength] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -4139,13 +4127,6 @@ export function App() {
             </div>
 
             <nav className="hidden md:flex items-center gap-6">
-              <button
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                className="text-slate-500 hover:text-blue-600 transition-colors"
-                title="Toggle Theme"
-              >
-                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </button>
               <button 
                 onClick={() => setView('calculator')}
                 className={cn(
@@ -4271,17 +4252,6 @@ export function App() {
                        </DropdownMenuGroup>
                        <DropdownMenuSeparator />
                        <div className="p-2 space-y-2">
-                         <div className="flex items-center justify-between">
-                            <span className="text-xs">Theme</span>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="h-7 w-[80px] text-[10px]"
-                              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                            >
-                              {theme === 'light' ? 'Dark' : 'Light'}
-                            </Button>
-                         </div>
                          <div className="flex items-center justify-between">
                             <span className="text-xs">Language</span>
                             <Select value={lang} onValueChange={(v: any) => setLang(v)}>
@@ -4848,7 +4818,19 @@ export function App() {
                                     </TableHead>
                                     {Object.entries(LOAD_CATEGORIES).map(([key, cat]) => (
                                       <TableHead key={key} className="text-center px-2">
-                                        <div className="text-[10px] uppercase text-slate-400">{key}</div>
+                                        <div className="flex items-center justify-center gap-1">
+                                           <div className="text-[10px] uppercase text-slate-400">{key}</div>
+                                           <TooltipProvider>
+                                             <Tooltip>
+                                               <TooltipTrigger>
+                                                 <Info className="h-3 w-3 text-slate-400" />
+                                               </TooltipTrigger>
+                                               <TooltipContent className="text-xs">
+                                                 {cat.name}
+                                               </TooltipContent>
+                                             </Tooltip>
+                                           </TooltipProvider>
+                                        </div>
                                         <div className="text-[10px] font-bold">{cat.name.split(' ')[0]}</div>
                                       </TableHead>
                                     ))}
