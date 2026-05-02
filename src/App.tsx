@@ -54,7 +54,9 @@ import {
   Square,
   Link,
   Droplet,
-  Anchor
+  Anchor,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { 
   Card, 
@@ -3037,6 +3039,16 @@ function KeyMapDialog({ onSelect }: { onSelect: (location: string) => void }) {
 }
 
 export function App() {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  React.useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [theme]);
   // Beam State
   const [length, setLength] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
@@ -4127,6 +4139,13 @@ export function App() {
             </div>
 
             <nav className="hidden md:flex items-center gap-6">
+              <button
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                className="text-slate-500 hover:text-blue-600 transition-colors"
+                title="Toggle Theme"
+              >
+                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              </button>
               <button 
                 onClick={() => setView('calculator')}
                 className={cn(
@@ -4252,6 +4271,17 @@ export function App() {
                        </DropdownMenuGroup>
                        <DropdownMenuSeparator />
                        <div className="p-2 space-y-2">
+                         <div className="flex items-center justify-between">
+                            <span className="text-xs">Theme</span>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-7 w-[80px] text-[10px]"
+                              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                            >
+                              {theme === 'light' ? 'Dark' : 'Light'}
+                            </Button>
+                         </div>
                          <div className="flex items-center justify-between">
                             <span className="text-xs">Language</span>
                             <Select value={lang} onValueChange={(v: any) => setLang(v)}>
