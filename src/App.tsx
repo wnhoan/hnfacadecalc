@@ -702,6 +702,10 @@ const TRANSLATIONS = {
 
 // Mapping for automatic design code selection based on location input in multiple languages
 const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[] }> = {
+  'China': {
+    codes: ['China (National)'],
+    matches: ['china', 'beijing', 'chengdu', 'chongqing', 'tianjin', 'wuhan', '中国', '中國', '北京', '成都', '重庆', '天津', '武汉']
+  },
   'Hong Kong': {
     codes: ['Hong Kong'],
     matches: ['hong kong', 'hk', 'kowloon', 'lantau', '香港', '九龙', '九龍', '大屿山', '大嶼山']
@@ -739,7 +743,7 @@ const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[]
     matches: ['vietnam', 'hanoi', 'ho chi minh', 'hcmc', 'da nang', '越南', '河内', '胡志明', '岘港']
   },
   'Taiwan': {
-    codes: ['China (National)'],
+    codes: ['Taiwan'],
     matches: ['taiwan', 'taipei', 'kaohsiung', 'taichung', '台湾', '台北', '高雄', '台中']
   },
   'Spain': {
@@ -778,6 +782,18 @@ const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[]
     codes: ['India'],
     matches: ['india', 'mumbai', 'delhi', 'bangalore', 'chennai', 'kolkata', '印度', '孟买', '德里']
   },
+  'Philippines': {
+    codes: ['Philippines'],
+    matches: ['philippines', 'manila', 'quezon', 'cebu', 'davao', '菲律宾', '马尼拉']
+  },
+  'Indonesia': {
+    codes: ['Indonesia'],
+    matches: ['indonesia', 'jakarta', 'surabaya', 'bandung', 'medan', '印度尼西亚', '雅加达']
+  },
+  'Qatar': {
+    codes: ['Qatar'],
+    matches: ['qatar', 'doha', 'lusail', 'al rayyan', '卡塔尔', '多哈']
+  },
   'UAE': {
     codes: ['UAE / Dubai'],
     matches: ['uae', 'united arab emirates', 'dubai', 'abu dhabi', 'sharjah', '阿联酋', '迪拜', '阿布扎比']
@@ -802,6 +818,10 @@ const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[]
     codes: ['Italy'],
     matches: ['italy', 'it ', 'rome', 'milan', 'venice', 'florence', 'naples', '意大利', '義大利', '罗马', '米兰']
   },
+  'Netherlands': {
+    codes: ['Eurocodes (EU-General)'],
+    matches: ['netherlands', 'holland', 'amsterdam', 'rotterdam', 'utrecht', '荷兰', '荷蘭', '阿姆斯特丹']
+  },
   'Brazil': {
     codes: ['Brazil'],
     matches: ['brazil', 'brasil', 'rio de janeiro', 'sao paulo', 'brasilia', 'curitiba', '巴西', '里约', '圣保罗']
@@ -811,7 +831,7 @@ const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[]
     matches: ['oman', 'muscat', '阿曼', '马斯喀特']
   },
   'Egypt': {
-    codes: ['Eurocodes (EU-General)'],
+    codes: ['Egypt'],
     matches: ['egypt', 'cairo', 'alexandria', '埃及', '开罗']
   },
   'Nigeria': {
@@ -6843,6 +6863,30 @@ export function App() {
                 </div>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 bg-slate-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl border border-white/10"
+          >
+            <div className="bg-blue-600 p-2 rounded-xl shadow-lg ring-4 ring-blue-600/20">
+              <Globe className="w-5 h-5 text-white animate-pulse" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">System Notification</span>
+              <p className="text-[11px] font-bold text-slate-100">{notification.message}</p>
+            </div>
+            <button 
+              onClick={() => setNotification(null)}
+              className="ml-2 p-1 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4 text-slate-400" />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
