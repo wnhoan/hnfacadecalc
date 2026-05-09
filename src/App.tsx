@@ -1179,8 +1179,6 @@ const getProjectResults = (project: Project) => {
 };
 
 const calculatePanelResults = (project: Project) => {
-  if (project.calculationMode !== 'panel') return null;
-
   const mat = PANEL_MATERIALS[project.panelMaterialId];
   const E = mat.e;
   const nu = mat.poisson;
@@ -1326,8 +1324,6 @@ const calculatePanelResults = (project: Project) => {
 };
 
 const calculateSealantResults = (project: Project) => {
-  if (project.calculationMode !== 'sealant') return null;
-
   const mat = SEALANT_MATERIALS[project.sealantMaterialId];
   const w = project.glassWidth;
   const h = project.glassHeight;
@@ -1351,8 +1347,6 @@ const calculateSealantResults = (project: Project) => {
 };
 
 const calculateBracketResults = (project: Project) => {
-  if (project.calculationMode !== 'bracket') return null;
-
   const mat = MATERIALS[project.material];
   const fy = mat.yield;
   const q_wind = project.windPressureInput;
@@ -1386,8 +1380,6 @@ const calculateBracketResults = (project: Project) => {
 };
 
 const calculateCastInEmbedResults = (project: Project) => {
-  if (project.calculationMode !== 'cast-in-embed') return null;
-
   const q_wind = project.windPressureInput ?? 1.5; 
   const q_dead = project.deadLoadInput ?? 0.5;
   const tribArea = project.tributaryArea ?? 4.5;
@@ -4495,35 +4487,50 @@ export function App() {
                         <TabsList className="grid w-full grid-cols-5 h-10 p-1 bg-slate-100/50 rounded-xl border-none">
                           <TabsTrigger 
                             value="beam" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className={cn(
+                              "text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2",
+                              results?.summary?.status === 'fail' && "text-red-500 data-[state=active]:text-red-500"
+                            )}
                           >
                             <Box className="w-3.5 h-3.5" />
                             <span>Beam</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="panel" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className={cn(
+                              "text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2",
+                              panelResults?.summary?.status === 'fail' && "text-red-500 data-[state=active]:text-red-500"
+                            )}
                           >
                             <Square className="w-3.5 h-3.5" />
                             <span>Panel</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="sealant" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-sky-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className={cn(
+                              "text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-sky-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2",
+                              sealantResults?.status === 'fail' && "text-red-500 data-[state=active]:text-red-500"
+                            )}
                           >
                             <Droplet className="w-3.5 h-3.5" />
                             <span>Seal</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="bracket" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-rose-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className={cn(
+                              "text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-rose-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2",
+                              bracketResults?.status === 'fail' && "text-red-500 data-[state=active]:text-red-500"
+                            )}
                           >
                             <Link className="w-3.5 h-3.5" />
                             <span>Brkt</span>
                           </TabsTrigger>
                           <TabsTrigger 
                             value="cast-in-embed" 
-                            className="text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-amber-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2"
+                            className={cn(
+                              "text-[9px] font-black uppercase tracking-tight data-[state=active]:bg-white data-[state=active]:text-amber-600 data-[state=active]:shadow-sm rounded-lg transition-all duration-300 flex items-center justify-center gap-1.5 px-2",
+                              castInResults?.status === 'fail' && "text-red-500 data-[state=active]:text-red-500"
+                            )}
                           >
                             <Layers className="w-3.5 h-3.5" />
                             <span>Embed</span>
