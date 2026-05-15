@@ -4,7 +4,7 @@
  */
 
 import * as React from 'react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   Calculator, 
   Plus, 
@@ -54,8 +54,11 @@ import {
   Square,
   Link,
   Droplet,
-  Anchor
+  Anchor,
+  AlertTriangle,
+  Eye
 } from 'lucide-react';
+
 import { 
   Card, 
   CardContent, 
@@ -73,7 +76,7 @@ import {
   SelectContent, 
   SelectGroup,
   SelectItem, 
-  SelectLabel,
+  SelectLabel, 
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
@@ -113,23 +116,71 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Switch } from '@/components/ui/switch';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/lib/utils';
+import { v4 as uuidv4 } from 'uuid';
+
 import { 
-  LineChart, 
-  Line, 
+  AreaChart, 
+  Area, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip as ChartTooltip, 
-  ResponsiveContainer,
-  AreaChart,
-  Area,
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer, 
+  LineChart, 
+  Line, 
   ReferenceLine,
   Label as RechartsLabel
 } from 'recharts';
-import { motion, AnimatePresence } from 'motion/react';
+
+// Custom Components
 import { BeamVisualizer3D } from './components/BeamVisualizer3D';
 import { BeamDiagrams } from './components/BeamDiagrams';
+import { SummaryCard } from './components/SummaryCard';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ReportViewer } from './components/ReportViewer';
+import { KeyMapDialog } from './components/LocationMap';
+import { CalculusStepsCard } from './components/CalculusSteps';
+import { ProjectResultsView, ReferenceAttachmentCard } from './components/ProjectResultsView';
+import { NumericInputWithControls } from './components/NumericInputWithControls';
 import { 
+  SealantResultsView, 
+  BracketResultsView, 
+  CastInResultsView, 
+  PanelResultsView, 
+  BeamAnalysisChart, 
+  UtilizationCards 
+} from './components/ResultViews';
+
+// Constants and Logic
+import {
+  MATERIALS,
+  LOAD_CATEGORIES,
+  SEISMIC_REGIONS,
+  LOCATION_SEISMIC_MAPPING,
+  PANEL_MATERIALS,
+  SEALANT_MATERIALS,
+  BRACKET_TYPES,
+  TRANSLATIONS,
+  LOCATION_CODE_MAPPING,
+  CODES_OF_PRACTICE,
+  UNITS,
+  CONVERSION,
+  DEFAULT_COMBINATIONS,
+  PRESET_PROFILES,
+  REGIONS_DISPLAY
+} from './constants';
+
+import { 
+  getProjectResults, 
+  calculatePanelResults, 
+  calculateSealantResults, 
+  calculateBracketResults, 
+  calculateCastInEmbedResults,
+  safeParseNumber,
+  createNewProject,
+  getCriticalPoints,
   calculateBeam, 
   calculateRectangularProperties, 
   calculateHollowRectangularProperties,
@@ -137,2919 +188,21 @@ import {
   calculateLPlateProperties,
   calculateIBeamProperties,
   calculateTSectionProperties,
-  calculateCastInEmbed,
+  calculateCastInEmbed
+} from './lib/structural-logic';
+
+import type { 
+  Project, 
+  ProjectState, 
+  HistoryState as FullHistoryState, 
+  Combination, 
   BeamProperties,
-  Load
-} from '@/lib/structural-engine';
-import { cn } from '@/lib/utils';
+  Load 
+} from './lib/structural-logic';
 
-// Error fallback for robustness
-function ErrorFallback() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 text-center">
-      <Card className="max-w-md w-full">
-        <CardHeader>
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <CardTitle>Something went wrong</CardTitle>
-          <CardDescription>
-            The calculation engine encountered an error. This might be due to invalid input values.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => window.location.reload()} className="w-full">
-            Reset Application
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+// Main App Component
 
-const MATERIALS = {
-  aluminum_6063_t6: { name: 'Aluminum 6063-T6 (Extrusion)', e: 70000, yield: 160, poisson: 0.33, category: 'Aluminum', density: 2700 },
-  aluminum_6063_t66: { name: 'Aluminum 6063-T66 (High Strength Extrusion)', e: 70000, yield: 200, poisson: 0.33, category: 'Aluminum', density: 2700 },
-  aluminum_6063_t5: { name: 'Aluminum 6063-T5', e: 70000, yield: 110, poisson: 0.33, category: 'Aluminum', density: 2700 },
-  aluminum_6061_t6: { name: 'Aluminum 6061-T6 (Structural)', e: 70000, yield: 240, poisson: 0.33, category: 'Aluminum', density: 2710 },
-  aluminum_6082_t6: { name: 'Aluminum 6082-T6 (Structural)', e: 70000, yield: 250, poisson: 0.33, category: 'Aluminum', density: 2710 },
-  aluminum_3003_h14: { name: 'Aluminum 3003-H14 (Cladding)', e: 70000, yield: 145, poisson: 0.33, category: 'Aluminum', density: 2730 },
-  aluminum_5005_h34: { name: 'Aluminum 5005-H34 (Anodized)', e: 70000, yield: 135, poisson: 0.33, category: 'Aluminum', density: 2700 },
-  aluminum_5754_h22: { name: 'Aluminum 5754-H22 (High Strength)', e: 70000, yield: 190, poisson: 0.33, category: 'Aluminum', density: 2660 },
-  steel_s235: { name: 'Steel S235', e: 210000, yield: 235, poisson: 0.30, category: 'Steel', density: 7850 },
-  steel_s275: { name: 'Steel S275', e: 210000, yield: 275, poisson: 0.30, category: 'Steel', density: 7850 },
-  steel_s355: { name: 'Steel S355', e: 210000, yield: 355, poisson: 0.30, category: 'Steel', density: 7850 },
-  steel_s420: { name: 'Steel S420', e: 210000, yield: 420, poisson: 0.30, category: 'Steel', density: 7850 },
-  steel_s460: { name: 'Steel S460', e: 210000, yield: 460, poisson: 0.30, category: 'Steel', density: 7850 },
-  stainless_304: { name: 'Stainless Steel 304', e: 193000, yield: 205, poisson: 0.30, category: 'Stainless Steel', density: 8000 },
-  stainless_316: { name: 'Stainless Steel 316', e: 200000, yield: 215, poisson: 0.30, category: 'Stainless Steel', density: 8000 },
-  stainless_2205: { name: 'Stainless Steel 2205 (Duplex)', e: 200000, yield: 450, poisson: 0.30, category: 'Stainless Steel', density: 7800 },
-  concrete_c25: { name: 'Concrete C25/30', e: 31000, yield: 25, poisson: 0.20, category: 'Concrete', density: 2400 },
-  concrete_c30: { name: 'Concrete C30/37', e: 33000, yield: 30, poisson: 0.20, category: 'Concrete', density: 2400 },
-  concrete_c40: { name: 'Concrete C40/50', e: 35000, yield: 40, poisson: 0.20, category: 'Concrete', density: 2400 },
-  timber_softwood: { name: 'Timber (Softwood C24)', e: 11000, yield: 24, poisson: 0.30, category: 'Timber', density: 420 },
-  timber_hardwood: { name: 'Timber (Hardwood D40)', e: 14000, yield: 40, poisson: 0.30, category: 'Timber', density: 700 },
-  timber_glulam: { name: 'Timber (Glulam GL24h)', e: 11500, yield: 24, poisson: 0.30, category: 'Timber', density: 450 },
-  timber_clt: { name: 'Timber (CLT)', e: 11000, yield: 24, poisson: 0.30, category: 'Timber', density: 500 },
-  glass_annealed: { name: 'Glass (Annealed Soda-Lime)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass', density: 2500 },
-  glass_tempered: { name: 'Glass (Fully Tempered Soda-Lime)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass', density: 2500 },
-  glass_hs: { name: 'Glass (Heat Strengthened Soda-Lime)', e: 70000, yield: 70, poisson: 0.22, category: 'Glass', density: 2500 },
-  glass_low_iron_annealed: { name: 'Glass (Low Iron Annealed)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass', density: 2500 },
-  glass_low_iron_tempered: { name: 'Glass (Low Iron Tempered)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass', density: 2500 },
-  glass_laminated_pvb: { name: 'Glass (Laminated PVB - Effective)', e: 70000, yield: 45, poisson: 0.22, category: 'Glass', density: 2500 },
-  glass_laminated_sgp: { name: 'Glass (Laminated SentryGlas - Effective)', e: 70000, yield: 120, poisson: 0.22, category: 'Glass', density: 2500 },
-  glass_borosilicate_annealed: { name: 'Glass (Borosilicate Annealed)', e: 64000, yield: 50, poisson: 0.20, category: 'Glass', density: 2200 },
-  glass_borosilicate_tempered: { name: 'Glass (Borosilicate Tempered)', e: 64000, yield: 150, poisson: 0.20, category: 'Glass', density: 2200 },
-  glass_ceramic: { name: 'Glass (Ceramic / Fire Rated)', e: 92000, yield: 180, poisson: 0.24, category: 'Glass', density: 2600 },
-  glass_wired: { name: 'Glass (Wired / Safety)', e: 70000, yield: 30, poisson: 0.22, category: 'Glass', density: 2500 },
-  glass_patterned: { name: 'Glass (Patterned / Textured)', e: 70000, yield: 35, poisson: 0.22, category: 'Glass', density: 2500 },
-  stone_granite: { name: 'Stone (Granite)', e: 60000, yield: 10, poisson: 0.25, category: 'Stone', density: 2700 },
-  stone_marble: { name: 'Stone (Marble)', e: 50000, yield: 8, poisson: 0.25, category: 'Stone', density: 2600 },
-  stone_limestone: { name: 'Stone (Limestone)', e: 40000, yield: 5, poisson: 0.25, category: 'Stone', density: 2400 },
-  stone_sandstone: { name: 'Stone (Sandstone)', e: 20000, yield: 3, poisson: 0.25, category: 'Stone', density: 2300 },
-  plastic_polycarb: { name: 'Polycarbonate', e: 2300, yield: 60, poisson: 0.37, category: 'Plastics', density: 1200 },
-  plastic_acrylic: { name: 'Acrylic (PMMA)', e: 3200, yield: 70, poisson: 0.35, category: 'Plastics', density: 1180 },
-  plastic_pvc: { name: 'PVC (Rigid)', e: 3000, yield: 50, poisson: 0.38, category: 'Plastics', density: 1400 },
-  composite_acm: { name: 'ACM (Aluminum Composite)', e: 70000, yield: 100, poisson: 0.33, category: 'Composites', density: 1500 },
-  composite_hpl: { name: 'HPL (High Pressure Laminate)', e: 9000, yield: 80, poisson: 0.30, category: 'Composites', density: 1350 },
-  metal_copper: { name: 'Copper', e: 117000, yield: 70, poisson: 0.34, category: 'Other Metals', density: 8960 },
-  metal_zinc: { name: 'Zinc', e: 90000, yield: 100, poisson: 0.25, category: 'Other Metals', density: 7140 },
-  metal_brass: { name: 'Brass', e: 105000, yield: 200, poisson: 0.34, category: 'Other Metals', density: 8500 },
-  grc: { name: 'GRC Panel', e: 15000, yield: 8, poisson: 0.24, category: 'Other', density: 2100 },
-  terracotta: { name: 'Terracotta', e: 30000, yield: 15, poisson: 0.20, category: 'Other', density: 2100 },
-  custom: { name: 'Custom', e: 200000, yield: 200, poisson: 0.30, category: 'Other', density: 7850 },
-};
-
-const LOAD_CATEGORIES = {
-  dead: { name: 'Dead Load (D)', color: 'text-slate-500', bg: 'bg-slate-100' },
-  live: { name: 'Live Load (L)', color: 'text-blue-500', bg: 'bg-blue-100' },
-  wind: { name: 'Wind Load (W)', color: 'text-green-500', bg: 'bg-green-100' },
-  snow: { name: 'Snow Load (S)', color: 'text-cyan-500', bg: 'bg-cyan-100' },
-  seismic: { name: 'Seismic Load (E)', color: 'text-rose-500', bg: 'bg-rose-100' },
-};
-
-const SEISMIC_REGIONS = {
-  china: { name: 'China (GB 50011)', coeff: 0.16, desc: 'Intensity 7, αmax=0.16', accel: 0.16, importance: 1.0, respMod: 1.0 },
-  eurocode: { name: 'Eurocode (EN 1998)', coeff: 0.15, desc: 'ag=0.15g, S=1.2', accel: 0.15, importance: 1.0, respMod: 1.0 },
-  hongkong: { name: 'Hong Kong (CoP)', coeff: 0.12, desc: 'ag=0.12g', accel: 0.12, importance: 1.0, respMod: 1.0 },
-  thailand: { name: 'Thailand (DPT)', coeff: 0.10, desc: 'Zone 1', accel: 0.10, importance: 1.0, respMod: 1.0 },
-  malaysia: { name: 'Malaysia (MS EN)', coeff: 0.07, desc: 'ag=0.07g', accel: 0.07, importance: 1.0, respMod: 1.0 },
-  singapore: { name: 'Singapore (BC)', coeff: 0.05, desc: 'Low seismicity', accel: 0.05, importance: 1.0, respMod: 1.0 },
-  usa_west: { name: 'US West (ASCE 7)', coeff: 0.30, desc: 'High Seismicity, Sds=1.0g', accel: 1.0, importance: 1.0, respMod: 1.0 },
-  usa_east: { name: 'US East (ASCE 7)', coeff: 0.10, desc: 'Low Seismicity, Sds=0.33g', accel: 0.33, importance: 1.0, respMod: 1.0 },
-  japan: { name: 'Japan (BCJ)', coeff: 0.40, desc: 'Z=1.0, Co=0.2', accel: 1.0, importance: 1.0, respMod: 1.0 },
-  philippines: { name: 'Philippines (NSCP)', coeff: 0.35, desc: 'Zone 4, Cv=0.44', accel: 0.44, importance: 1.0, respMod: 1.0 },
-  india: { name: 'India (IS 1893)', coeff: 0.24, desc: 'Zone IV, ag=0.24g', accel: 0.24, importance: 1.0, respMod: 1.0 },
-  korea: { name: 'South Korea (KDS)', coeff: 0.22, desc: 'Zone 1, S=0.22g', accel: 0.22, importance: 1.0, respMod: 1.0 },
-  turkey: { name: 'Turkey (TBDY)', coeff: 0.45, desc: 'High Seismicity, Sds=1.5', accel: 1.5, importance: 1.0, respMod: 1.0 },
-};
-
-const LOCATION_SEISMIC_MAPPING: Record<string, keyof typeof SEISMIC_REGIONS> = {
-  'shanghai': 'china',
-  'beijing': 'china',
-  'guangzhou': 'china',
-  'shenzhen': 'china',
-  'hong kong': 'hongkong',
-  'macau': 'hongkong',
-  'bangkok': 'thailand',
-  'kuala lumpur': 'malaysia',
-  'johor bahru': 'malaysia',
-  'singapore': 'singapore',
-  'london': 'eurocode',
-  'paris': 'eurocode',
-  'berlin': 'eurocode',
-  'munich': 'eurocode',
-  'madrid': 'eurocode',
-  'rome': 'eurocode',
-  'athens': 'turkey', // High seismic in Eurocode region
-  'istanbul': 'turkey',
-  'ankara': 'turkey',
-  'vancouver': 'philippines', // Higher seismic
-  'toronto': 'usa_east',
-  'mexico city': 'philippines', // Very high seismic
-  'los angeles': 'usa_west',
-  'san francisco': 'usa_west',
-  'seattle': 'usa_west',
-  'new york': 'usa_east',
-  'chicago': 'usa_east',
-  'houston': 'usa_east',
-  'tokyo': 'japan',
-  'osaka': 'japan',
-  'nagoya': 'japan',
-  'yokohama': 'japan',
-  'taipei': 'japan', // High seismic
-  'hanoi': 'thailand', // moderate
-  'ho chi minh': 'thailand',
-  'manila': 'philippines',
-  'cebu': 'philippines',
-  'davao': 'philippines',
-  'jakarta': 'philippines',
-  'mumbai': 'india',
-  'delhi': 'india',
-  'bangalore': 'india',
-  'chennai': 'india',
-  'seoul': 'korea',
-  'busan': 'korea',
-  'dubai': 'singapore', // Relatively low
-  'abu dhabi': 'singapore',
-  'riyadh': 'singapore',
-  'doha': 'singapore',
-  'muscat': 'singapore',
-  'cairo': 'thailand', // moderate
-  'johannesburg': 'singapore',
-  'cape town': 'singapore',
-};
-
-const PANEL_MATERIALS = {
-  aluminum_solid: { name: 'Solid Aluminum (3mm)', e: 70000, yield: 160, density: 2700, poisson: 0.33 },
-  aluminum_solid_high: { name: 'Solid Aluminum (High Strength)', e: 70000, yield: 240, density: 2700, poisson: 0.33 },
-  acm_4mm: { name: 'ACM / Composite (4mm)', e: 70000, yield: 120, density: 1500, poisson: 0.25, skinThickness: 0.5, totalThickness: 4.0 },
-  acm_3mm: { name: 'ACM / Composite (3mm)', e: 70000, yield: 120, density: 1500, poisson: 0.25, skinThickness: 0.5, totalThickness: 3.0 },
-};
-
-const SEALANT_MATERIALS = {
-  silicone_structural: { name: 'Structural Silicone', dynamicStress: 0.14, staticStress: 0.011, eModulus: 1.5 },
-  silicone_weather: { name: 'Weather Silicone', dynamicStress: 0.05, staticStress: 0.005, eModulus: 0.8 },
-  pu_sealant: { name: 'PU Sealant', dynamicStress: 0.08, staticStress: 0.008, eModulus: 1.2 },
-};
-
-const BRACKET_TYPES = {
-  dead_load: { name: 'Dead Load Bracket', description: 'Supports vertical gravity loads' },
-  wind_load: { name: 'Wind Load Bracket (Slotted)', description: 'Supports horizontal wind while allowing vertical movement' },
-  combined: { name: 'Fixed Connection (Dead + Wind)', description: 'Supports all directions' },
-};
-
-const TRANSLATIONS = {
-  en: {
-    title: 'FacadeCalc',
-    subtitle: 'Structural Analysis Tool',
-    activeCase: 'Active Case',
-    print: 'Print Report',
-    valid: 'Design Valid',
-    fail: 'Design Fails',
-    combinations: 'Load Combinations',
-    properties: 'Beam Properties',
-    span: 'Span Length',
-    material: 'Material',
-    safetyFactor: 'Safety Factor',
-    sectionType: 'Section Type',
-    solid: 'Solid',
-    hollow: 'Hollow',
-    channel: 'Channel',
-    lPlate: 'L-Plate',
-    iBeam: 'I-Beam',
-    tSection: 'T-Section',
-    width: 'Width',
-    height: 'Height',
-    thickness: 'Thickness',
-    loading: 'Applied Loads',
-    results: 'Analysis Diagrams',
-    deflection: 'Deflection',
-    moment: 'Moment',
-    shear: 'Shear',
-    stress: 'Stress',
-    model3d: '3D Model',
-    structuralModel: 'Structural Model',
-    notes: 'Calculation Notes',
-    codes: 'Codes of Practice',
-    assumptions: 'Assumptions',
-    limits: 'Design Limits',
-    materialProps: 'Material Properties',
-    adjustSpan: 'Adjust Span Length',
-    supportCondition: 'Support Condition',
-    simplySupported: 'Simply Supported',
-    cantilever: 'Cantilever',
-    fixedFixed: 'Fixed-Fixed',
-    fixedPinned: 'Fixed-Pinned',
-    proppedCantilever: 'Propped Cantilever',
-    continuous: 'Continuous Beam',
-    seismic: 'Seismic Analysis',
-    seismicRegion: 'Seismic Region',
-    seismicCoeff: 'Seismic Coeff (Cs)',
-    applySeismic: 'Apply Seismic Load',
-    saveProject: 'Save Project',
-    loadProject: 'Load Project',
-    projectSaved: 'Project saved to local storage',
-    projectLoaded: 'Project loaded successfully',
-    noProject: 'No saved project found',
-    navIntro: 'Introduction',
-    navCalculator: 'Calculator',
-    navDocs: 'Documentation',
-    heroTitle: 'Professional Facade Structural Analysis',
-    heroDesc: 'A powerful, web-based tool for engineers to analyze and validate facade beam designs with real-time 3D visualization.',
-    getStarted: 'Start Analysis',
-    howItWorks: 'How it Works',
-    features: 'Key Features',
-    footerRights: 'All rights reserved.',
-    unitSystem: 'Unit System',
-    metric: 'Metric (mm, MPa)',
-    imperial: 'Imperial (in, psi)',
-    analysisMode: 'Analysis Mode',
-    beamMode: 'Beam Member',
-    panelMode: 'Cladding Panel',
-    panelProps: 'Panel Properties',
-    stiffenerProps: 'Backing Stiffeners',
-    skinMaterial: 'Skin Material',
-    skinThickness: 'Skin Thickness',
-    stiffenerSpacing: 'Stiffener Spacing',
-    stiffenerCountV: 'Vertical Stiffeners',
-    stiffenerCountH: 'Horizontal Stiffeners',
-    maxSkinDeflection: 'Max Skin Deflection',
-    maxSkinStress: 'Max Skin Stress',
-    sealantMode: 'Structural Sealant',
-    bracketMode: 'Fixing Bracket',
-    castInMode: 'Cast-in Embed',
-    sealantProps: 'Sealant Properties',
-    bracketProps: 'Bracket Properties',
-    embedProps: 'Embedment Properties',
-    glassDims: 'Glass Dimensions',
-    biteDept: 'Bite Depth',
-    contactWidth: 'Contact Width',
-    tributaryArea: 'Tributary Area',
-    boltProps: 'Bolt Specification',
-    boltDiameter: 'Bolt Diameter',
-    boltCount: 'Bolt Count',
-    embedDepth: 'Embedment Depth',
-    edgeDistance: 'Edge Distance',
-    concreteGrade: 'Concrete Grade',
-    deadLoad: 'Dead Load',
-    windPressure: 'Wind Pressure',
-  },
-  zh: {
-    title: '幕墙结构计算',
-    subtitle: '结构分析工具',
-    activeCase: '当前工况',
-    print: '打印报告',
-    valid: '设计合格',
-    fail: '设计不合格',
-    combinations: '荷载组合',
-    properties: '梁构件属性',
-    span: '跨度',
-    material: '材料',
-    safetyFactor: '安全系数',
-    sectionType: '截面类型',
-    solid: '实心',
-    hollow: '空心',
-    channel: '工字钢/槽钢 (Channel)',
-    lPlate: '角钢 (L-Plate)',
-    iBeam: 'I字钢 (I-Beam)',
-    tSection: 'T字钢 (T-Section)',
-    width: '宽度',
-    height: '高度',
-    thickness: '厚度',
-    loading: '施加荷载',
-    results: '分析图表',
-    deflection: '挠度',
-    moment: '弯矩',
-    shear: '剪力',
-    stress: '应力',
-    model3d: '3D 模型',
-    structuralModel: '结构模型',
-    notes: '计算说明',
-    codes: '规范参考',
-    assumptions: '计算假设',
-    limits: '设计限值',
-    materialProps: '材料属性',
-    adjustSpan: '调整跨度',
-    supportCondition: '支撑条件',
-    simplySupported: '简支',
-    cantilever: '悬臂',
-    fixedFixed: '双端固定',
-    fixedPinned: '一端固定一端简支',
-    proppedCantilever: '支承悬臂梁',
-    continuous: '连续梁',
-    seismic: '地震分析',
-    seismicRegion: '地震区域',
-    seismicCoeff: '地震系数 (Cs)',
-    applySeismic: '应用地震荷载',
-    saveProject: '保存项目',
-    loadProject: '加载项目',
-    projectSaved: '项目已保存到本地存储',
-    projectLoaded: '项目加载成功',
-    noProject: '未找到保存的项目',
-    navIntro: '介绍',
-    navCalculator: '计算器',
-    navDocs: '文档',
-    heroTitle: '专业幕墙结构分析',
-    heroDesc: '功能强大的网页版工具，为工程师提供实时 3D 可视化的幕墙梁设计分析与验证。',
-    getStarted: '开始分析',
-    howItWorks: '工作原理',
-    features: '核心功能',
-    footerRights: '版权所有。',
-    unitSystem: '单位制',
-    metric: '公制 (mm, MPa)',
-    imperial: '英制 (in, psi)',
-    analysisMode: '分析模式',
-    beamMode: '结构梁',
-    panelMode: '幕墙面板',
-    panelProps: '面板属性',
-    stiffenerProps: '加强肋/后置筋',
-    skinMaterial: '面板材料',
-    skinThickness: '面板厚度',
-    stiffenerSpacing: '筋条间距',
-    stiffenerCountV: '垂直加强肋数量',
-    stiffenerCountH: '水平加强肋数量',
-    maxSkinDeflection: '最大面板挠度',
-    maxSkinStress: '最大面板应力',
-    sealantMode: '结构硅酮胶',
-    bracketMode: '连接转接件',
-    castInMode: '预埋件分析',
-    sealantProps: '密封胶属性',
-    bracketProps: '支座/转接件属性',
-    embedProps: '埋件属性',
-    glassDims: '玻璃尺寸',
-    biteDept: '打胶深度 (Bite)',
-    contactWidth: '接触宽度',
-    tributaryArea: '受荷面积',
-    boltProps: '螺栓规格',
-    boltDiameter: '螺栓直径',
-    boltCount: '螺栓数量',
-    embedDepth: '埋设深度',
-    edgeDistance: '边缘距离',
-    concreteGrade: '混凝土等级',
-    deadLoad: '恒载 (Dead Load)',
-    windPressure: '风压 (Wind)',
-  },
-  th: {
-    title: 'FacadeCalc',
-    subtitle: 'เครื่องมือวิเคราะห์โครงสร้าง',
-    activeCase: 'กรณีที่ใช้งาน',
-    print: 'พิมพ์รายงาน',
-    valid: 'การออกแบบผ่าน',
-    fail: 'การออกแบบไม่ผ่าน',
-    combinations: 'การรวมน้ำหนักบรรทุก',
-    properties: 'คุณสมบัติของคาน',
-    span: 'ความยาวช่วง',
-    material: 'วัสดุ',
-    safetyFactor: 'ตัวคูณความปลอดภัย',
-    sectionType: 'ประเภทหน้าตัด',
-    solid: 'ทึบ',
-    hollow: 'กลวง',
-    channel: 'Channel',
-    lPlate: 'L-Plate',
-    iBeam: 'I-Beam',
-    tSection: 'T-Section',
-    width: 'ความกว้าง',
-    height: 'ความสูง',
-    thickness: 'ความหนา',
-    loading: 'น้ำหนักบรรทุกที่ใช้',
-    results: 'แผนภาพการวิเคราะห์',
-    deflection: 'การโก่งตัว',
-    moment: 'โมเมนต์',
-    shear: 'แรงเฉือน',
-    stress: 'หน่วยแรง',
-    model3d: 'โมเดล 3 มิติ',
-    structuralModel: 'แบบจำลองโครงสร้าง',
-    notes: 'บันทึกการคำนวณ',
-    codes: 'มาตรฐานการออกแบบ',
-    assumptions: 'ข้อสมมติฐาน',
-    limits: 'ขีดจำกัดการออกแบบ',
-    materialProps: 'คุณสมบัติวัสดุ',
-    adjustSpan: 'ปรับความยาวช่วง',
-    supportCondition: 'เงื่อนไขการรองรับ',
-    simplySupported: 'รองรับแบบจุดหมุน',
-    cantilever: 'คานยื่น',
-    fixedFixed: 'ยึดแน่นทั้งสองด้าน',
-    fixedPinned: 'ยึดแน่นหนึ่งด้าน',
-    proppedCantilever: 'คานยื่นแบบมีจุดรองรับ',
-    continuous: 'คานต่อเนื่อง',
-    seismic: 'การวิเคราะห์แผ่นดินไหว',
-    seismicRegion: 'ภูมิภาคแผ่นดินไหว',
-    seismicCoeff: 'สัมประสิทธิ์แผ่นดินไหว (Cs)',
-    applySeismic: 'ใช้น้ำหนักบรรทุกแผ่นดินไหว',
-    saveProject: 'บันทึกโครงการ',
-    loadProject: 'โหลดโครงการ',
-    projectSaved: 'บันทึกโครงการลงในที่เก็บข้อมูลในตัวเครื่องแล้ว',
-    projectLoaded: 'โหลดโครงการสำเร็จแล้ว',
-    noProject: 'ไม่พบโครงการที่บันทึกไว้',
-    navIntro: 'บทนำ',
-    navCalculator: 'เครื่องคำนวณ',
-    navDocs: 'เอกสาร',
-    heroTitle: 'การวิเคราะห์โครงสร้างฟาซาดระดับมืออาชีพ',
-    heroDesc: 'เครื่องมือบนเว็บที่ทรงพลังสำหรับวิศวกรในการวิเคราะห์และตรวจสอบการออกแบบคานฟาซาดพร้อมการแสดงภาพ 3 มิติแบบเรียลไทม์',
-    getStarted: 'เริ่มการวิเคราะห์',
-    howItWorks: 'วิธีการทำงาน',
-    features: 'คุณสมบัติหลัก',
-    footerRights: 'สงวนลิขสิทธิ์.',
-    unitSystem: 'ระบบหน่วย',
-    metric: 'เมตริก (mm, MPa)',
-    imperial: 'อิมพีเรียล (in, psi)',
-    analysisMode: 'โหมดการวิเคราะห์',
-    beamMode: 'คานโครงสร้าง',
-    panelMode: 'แผงหุ้ม',
-    panelProps: 'คุณสมบัติของแผง',
-    stiffenerProps: 'ตัวเสริมความแข็งแรง',
-    skinMaterial: 'วัสดุผิว',
-    skinThickness: 'ความหนาของผิว',
-    stiffenerSpacing: 'ระยะห่างตัวเสริม',
-    stiffenerCountV: 'Vertical Stiffeners',
-    stiffenerCountH: 'Horizontal Stiffeners',
-    maxSkinDeflection: 'การโก่งตัวสูงสุดของผิว',
-    maxSkinStress: 'หน่วยแรงสูงสุดของผิว',
-    sealantMode: 'Structural Sealant',
-    bracketMode: 'Fixing Bracket',
-    castInMode: 'Cast-in Embed',
-    sealantProps: 'Sealant Properties',
-    bracketProps: 'Bracket Properties',
-    embedProps: 'Embedment Properties',
-    glassDims: 'Glass Dimensions',
-    biteDept: 'Bite Depth',
-    contactWidth: 'Contact Width',
-    tributaryArea: 'Tributary Area',
-    boltProps: 'Bolt Specification',
-    boltDiameter: 'Bolt Diameter',
-    boltCount: 'Bolt Count',
-    embedDepth: 'Embedment Depth',
-    edgeDistance: 'Edge Distance',
-    concreteGrade: 'Concrete Grade',
-    deadLoad: 'Dead Load',
-    windPressure: 'Wind Pressure',
-  },
-  ms: {
-    title: 'FacadeCalc',
-    subtitle: 'Alat Analisis Struktur',
-    activeCase: 'Kes Aktif',
-    print: 'Cetak Laporan',
-    valid: 'Reka Bentuk Sah',
-    fail: 'Reka Bentuk Gagal',
-    combinations: 'Kombinasi Beban',
-    properties: 'Sifat Rasuk',
-    span: 'Panjang Rentang',
-    material: 'Bahan',
-    safetyFactor: 'Faktor Keselamatan',
-    sectionType: 'Jenis Keratan',
-    solid: 'Padu',
-    hollow: 'Berongga',
-    channel: 'Channel',
-    lPlate: 'L-Plate',
-    iBeam: 'I-Beam',
-    tSection: 'T-Section',
-    width: 'Lebar',
-    height: 'Tinggi',
-    thickness: 'Ketebalan',
-    loading: 'Beban Dikenakan',
-    results: 'Diagram Analisis',
-    deflection: 'Pesongan',
-    moment: 'Momen',
-    shear: ' ricih',
-    stress: 'Tegasan',
-    model3d: 'Model 3D',
-    structuralModel: 'Model Struktur',
-    notes: 'Nota Pengiraan',
-    codes: 'Kod Amalan',
-    assumptions: 'Andaian',
-    limits: 'Had Reka Bentuk',
-    materialProps: 'Sifat Bahan',
-    adjustSpan: 'Laraskan Panjang Rentang',
-    supportCondition: 'Keadaan Sokongan',
-    simplySupported: 'Sokongan Mudah',
-    cantilever: 'Cantilever',
-    fixedFixed: 'Tetap-Tetap',
-    fixedPinned: 'Tetap-Pin',
-    proppedCantilever: 'Propped Cantilever',
-    continuous: 'Rasuk Berterusan',
-    seismic: 'Analisis Seismik',
-    seismicRegion: 'Wilayah Seismik',
-    seismicCoeff: 'Pekali Seismik (Cs)',
-    applySeismic: 'Gunakan Beban Seismik',
-    saveProject: 'Simpan Projek',
-    loadProject: 'Muat Projek',
-    projectSaved: 'Projek disimpan ke storan tempatan',
-    projectLoaded: 'Projek berjaya dimuatkan',
-    noProject: 'Tiada projek yang disimpan ditemui',
-    navIntro: 'Pengenalan',
-    navCalculator: 'Kalkulator',
-    navDocs: 'Dokumentasi',
-    heroTitle: 'Analisis Struktur Fasad Profesional',
-    heroDesc: 'Alat berasaskan web yang berkuasa untuk jurutera menganalisisและ mengesahkan reka bentuk rasuk fasad dengan visualisasi 3D masa nyata.',
-    getStarted: 'Mula Analisis',
-    howItWorks: 'Cara Ia Berfungsi',
-    features: 'Ciri Utama',
-    footerRights: 'Hak cipta terpelihara.',
-    unitSystem: 'Sistem Unit',
-    metric: 'Metrik (mm, MPa)',
-    imperial: 'Imperial (in, psi)',
-    analysisMode: 'Mod Analisis',
-    beamMode: 'Rasuk Struktur',
-    panelMode: 'Panel Kemasan',
-    panelProps: 'Sifat Panel',
-    stiffenerProps: 'Pengeras Belakang',
-    skinMaterial: 'Bahan Kulit',
-    skinThickness: 'Ketebalan Kulit',
-    stiffenerSpacing: 'Jarak Pengeras',
-    stiffenerCountV: 'Vertical Stiffeners',
-    stiffenerCountH: 'Horizontal Stiffeners',
-    maxSkinDeflection: 'Pesongan Kulit Maks',
-    maxSkinStress: 'Tegangan Kulit Maks',
-    sealantMode: 'Structural Sealant',
-    bracketMode: 'Fixing Bracket',
-    castInMode: 'Cast-in Embed',
-    sealantProps: 'Sealant Properties',
-    bracketProps: 'Bracket Properties',
-    embedProps: 'Embedment Properties',
-    glassDims: 'Glass Dimensions',
-    biteDept: 'Bite Depth',
-    contactWidth: 'Contact Width',
-    tributaryArea: 'Tributary Area',
-    boltProps: 'Bolt Specification',
-    boltDiameter: 'Bolt Diameter',
-    boltCount: 'Bolt Count',
-    embedDepth: 'Embedment Depth',
-    edgeDistance: 'Edge Distance',
-    concreteGrade: 'Concrete Grade',
-    deadLoad: 'Dead Load',
-    windPressure: 'Wind Pressure',
-  }
-};
-
-// Mapping for automatic design code selection based on location input in multiple languages
-const LOCATION_CODE_MAPPING: Record<string, { codes: string[], matches: string[] }> = {
-  'China': {
-    codes: ['China (National)'],
-    matches: ['china', 'beijing', 'chengdu', 'chongqing', 'tianjin', 'wuhan', '中国', '中國', '北京', '成都', '重庆', '天津', '武汉']
-  },
-  'Hong Kong': {
-    codes: ['Hong Kong'],
-    matches: ['hong kong', 'hk', 'kowloon', 'lantau', '香港', '九龙', '九龍', '大屿山', '大嶼山']
-  },
-  'Shanghai': {
-    codes: ['Shanghai'],
-    matches: ['shanghai', 'pudong', 'puxi', 'jingan', 'xuhui', '上海', '浦东', '浦西', '静安', '徐汇']
-  },
-  'Shenzhen': {
-    codes: ['Shenzhen'],
-    matches: ['shenzhen', 'futian', 'nanshan', 'baoan', 'luohu', '深圳', '福田', '南山', '宝安', '罗湖']
-  },
-  'Guangzhou': {
-    codes: ['Guangzhou'],
-    matches: ['guangzhou', 'tianhe', 'yuexiu', 'haizhu', 'panyu', '广州', '廣州', '天河', '越秀', '海珠', '番禺']
-  },
-  'Macau': {
-    codes: ['Macau'],
-    matches: ['macau', 'macao', 'taipa', '澳门', '澳門', '氹仔']
-  },
-  'Singapore': {
-    codes: ['Singapore'],
-    matches: ['singapore', 'sg', 'changi', 'jurong', 'sentosa', '新加坡']
-  },
-  'Malaysia': {
-    codes: ['Malaysia'],
-    matches: ['malaysia', 'kuala lumpur', 'kl', 'penang', 'johor', 'selangor', 'putrajaya', '马来西亚', '馬來西亞', '吉隆坡', '槟城', '柔佛']
-  },
-  'Thailand': {
-    codes: ['Thailand'],
-    matches: ['thailand', 'bangkok', 'phuket', 'chiang mai', 'pattaya', 'samui', '泰国', '泰國', '曼谷', '普吉', '清迈', '芭提雅']
-  },
-  'Viet Nam': {
-    codes: ['Vietnam'],
-    matches: ['vietnam', 'hanoi', 'ho chi minh', 'hcmc', 'da nang', '越南', '河内', '胡志明', '岘港']
-  },
-  'Taiwan': {
-    codes: ['Taiwan'],
-    matches: ['taiwan', 'taipei', 'kaohsiung', 'taichung', '台湾', '台北', '高雄', '台中']
-  },
-  'Spain': {
-    codes: ['Eurocodes (EU-General)'],
-    matches: ['spain', 'madrid', 'barcelona', 'valencia', 'seville', '西班牙', '马德里', '巴塞罗那']
-  },
-  'United Kingdom': {
-    codes: ['United Kingdom'],
-    matches: ['united kingdom', 'uk', 'england', 'london', 'manchester', 'birmingham', 'leeds', 'glasgow', '英国', '英國', '伦敦', '曼彻斯特']
-  },
-  'United States': {
-    codes: ['United States'],
-    matches: ['united states', 'usa', 'us ', 'america', 'new york', 'los angeles', 'chicago', 'houston', 'miami', 'seattle', 'san francisco', '美国', '美國', '纽约', '洛杉矶', '迈阿密']
-  },
-  'Canada': {
-    codes: ['Canada'],
-    matches: ['canada', 'toronto', 'vancouver', 'montreal', 'ottawa', 'calgary', '加拿大', '多伦多', '温哥华']
-  },
-  'Australia': {
-    codes: ['Australia'],
-    matches: ['australia', 'au ', 'sydney', 'melbourne', 'brisbane', 'perth', 'adelaide', '澳大利亚', '澳洲', '悉尼', '墨尔本']
-  },
-  'New Zealand': {
-    codes: ['New Zealand'],
-    matches: ['new zealand', 'nz', 'auckland', 'wellington', 'christchurch', '新西兰', '新西蘭', '奥克兰']
-  },
-  'Japan': {
-    codes: ['Japan'],
-    matches: ['japan', 'jp', 'tokyo', 'osaka', 'kyoto', 'yokohama', 'nagoya', '日本', '东京', '東京', '大阪']
-  },
-  'South Korea': {
-    codes: ['South Korea'],
-    matches: ['korea', 'south korea', 'seoul', 'busan', 'incheon', '韩国', '韓國', '首尔', '釜山']
-  },
-  'India': {
-    codes: ['India'],
-    matches: ['india', 'mumbai', 'delhi', 'bangalore', 'chennai', 'kolkata', '印度', '孟买', '德里']
-  },
-  'Philippines': {
-    codes: ['Philippines'],
-    matches: ['philippines', 'manila', 'quezon', 'cebu', 'davao', '菲律宾', '马尼拉']
-  },
-  'Indonesia': {
-    codes: ['Indonesia'],
-    matches: ['indonesia', 'jakarta', 'surabaya', 'bandung', 'medan', '印度尼西亚', '雅加达']
-  },
-  'Qatar': {
-    codes: ['Qatar'],
-    matches: ['qatar', 'doha', 'lusail', 'al rayyan', '卡塔尔', '多哈']
-  },
-  'UAE': {
-    codes: ['UAE / Dubai'],
-    matches: ['uae', 'united arab emirates', 'dubai', 'abu dhabi', 'sharjah', '阿联酋', '迪拜', '阿布扎比']
-  },
-  'Saudi Arabia': {
-    codes: ['Saudi Arabia'],
-    matches: ['saudi', 'saudi arabia', 'ksa', 'riyadh', 'jeddah', 'dammam', '沙特', '利雅得', '吉达']
-  },
-  'South Africa': {
-    codes: ['South Africa'],
-    matches: ['south africa', 'za', 'cape town', 'johannesburg', 'joburg', 'pretoria', 'durban', '南非', '开普敦']
-  },
-  'Germany': {
-    codes: ['Germany'],
-    matches: ['germany', 'de', 'berlin', 'munich', 'hamburg', 'frankfurt', 'stuttgart', '德国', '德國', '柏林', '慕尼黑']
-  },
-  'France': {
-    codes: ['France'],
-    matches: ['france', 'fr', 'paris', 'lyon', 'marseille', 'bordeaux', '法国', '法國', '巴黎', '里昂']
-  },
-  'Italy': {
-    codes: ['Italy'],
-    matches: ['italy', 'it ', 'rome', 'milan', 'venice', 'florence', 'naples', '意大利', '義大利', '罗马', '米兰']
-  },
-  'Netherlands': {
-    codes: ['Eurocodes (EU-General)'],
-    matches: ['netherlands', 'holland', 'amsterdam', 'rotterdam', 'utrecht', '荷兰', '荷蘭', '阿姆斯特丹']
-  },
-  'Brazil': {
-    codes: ['Brazil'],
-    matches: ['brazil', 'brasil', 'rio de janeiro', 'sao paulo', 'brasilia', 'curitiba', '巴西', '里约', '圣保罗']
-  },
-  'Oman': {
-    codes: ['UAE / Dubai'],
-    matches: ['oman', 'muscat', '阿曼', '马斯喀特']
-  },
-  'Egypt': {
-    codes: ['Egypt'],
-    matches: ['egypt', 'cairo', 'alexandria', '埃及', '开罗']
-  },
-  'Nigeria': {
-    codes: ['Eurocodes (EU-General)'],
-    matches: ['nigeria', 'lagos', 'abuja', '尼日利亚', '拉各斯']
-  },
-  'Eurocodes': {
-    codes: ['Eurocodes (EU-General)'],
-    matches: ['europe', 'eu ', 'spain', 'netherlands', 'belgium', 'austria', 'sweden', 'madrid', 'amsterdam', '欧洲', '歐洲', '西班牙', '荷兰', '比利时']
-  },
-  'China National': {
-    codes: ['China (National)'],
-    matches: ['china', 'beijing', 'tianjin', 'nanjing', 'wuhan', 'chengdu', 'xian', '中国', '中國', '北京', '天津', '南京', '武汉', '成都', '西安']
-  }
-};
-
-const CODES_OF_PRACTICE = [
-  // EUROPE
-  { region: 'Europe', country: 'Eurocodes (EU-General)', codes: ['EN 1990 (Basis)', 'EN 1991 (Actions)', 'EN 1993 (Steel)', 'EN 1999 (Aluminum)', 'EN 1998 (Seismic)'] },
-  { region: 'Europe', country: 'United Kingdom', codes: ['BS EN 1991 (UK NA)', 'BS EN 1993 (Steel)', 'BS EN 1999 (Aluminum)', 'BS EN 1998 (Seismic)', 'BS 6399 (Legacy Wind)'] },
-  { region: 'Europe', country: 'Germany', codes: ['DIN EN 1991 (NA)', 'DIN EN 1993 (Steel)', 'DIN EN 1999 (Aluminum)', 'DIN 18008 (Glass)'] },
-  { region: 'Europe', country: 'France', codes: ['NF EN 1991 (NA)', 'NF EN 1993 (Steel)', 'NF EN 1999 (Aluminum)', 'NF DTU 39 (Glass)'] },
-  { region: 'Europe', country: 'Italy', codes: ['UNI EN 1991 (NA)', 'NTC 2018 (National Code)', 'CNR-DT 210 (Glass)'] },
-
-  // ASIA PACIFIC - EAST ASIA
-  { region: 'Asia', country: 'China (National)', codes: ['GB 50009 (Loads)', 'JGJ 102 (Curtain Wall)', 'GB 50011 (Seismic)', 'GB 50017 (Steel)'] },
-  { region: 'Asia', country: 'Japan', codes: ['AIJ (Loads)', 'BCJ (Building Code)', 'JIS G 3101 (Steel)', 'JASS 14 (Curtain Wall)'] },
-  { region: 'Asia', country: 'South Korea', codes: ['KDS 41 (Building)', 'KDS 14 (Steel)', 'KBC 2022'] },
-  { region: 'Asia', country: 'Hong Kong', codes: ['CoP for Glass 2018', 'CoP on Wind 2019', 'CoP for Seismic Design 2024', 'CoP for Structural Steel 2011'] },
-  { region: 'Asia', country: 'Macau', codes: ['RCAM (Actions)', 'REAE (Seismic)', 'RSM (Steel)'] },
-  { region: 'Asia', country: 'Taiwan', codes: ['Building Structural Design', 'Wind Load Standards', 'Steel Structure Code'] },
-  { region: 'Asia', country: 'Shanghai', codes: ['DGJ08-56 (Curtain Wall)', 'DGJ08-11 (Loads)', 'DGJ08-9 (Steel)'] },
-  { region: 'Asia', country: 'Shenzhen', codes: ['SZJG 48 (Glass)', 'SZJG 54 (Metal/Stone)', 'SJG 15 (Wind)'] },
-  { region: 'Asia', country: 'Guangzhou', codes: ['DBJ/T 15-30 (Curtain Wall)', 'DBJ 15-101 (Wind)', 'GZJG (Guidelines)'] },
-
-  // ASIA PACIFIC - SOUTHEAST ASIA
-  { region: 'Asia', country: 'Singapore', codes: ['SS EN 1991 (Actions)', 'SS EN 1993 (Steel)', 'SS EN 1999 (Aluminum)', 'BC1:2023 (Steel)'] },
-  { region: 'Asia', country: 'Malaysia', codes: ['MS 1553 (Wind)', 'MS EN 1991 (EC1)', 'MS EN 1998 (Seismic)', 'UBBL 2021'] },
-  { region: 'Asia', country: 'Thailand', codes: ['EIT 1011-46 (Steel)', 'DPT 1311-50 (Wind)', 'DPT 1301/1302 (Seismic)'] },
-  { region: 'Asia', country: 'Vietnam', codes: ['TCVN 2737:2023 (Loads)', 'TCVN 5575:2012 (Steel)', 'TCVN 9386:2012 (Seismic)'] },
-  { region: 'Asia', country: 'Philippines', codes: ['NSCP 2015 (Vol 1)', 'ASEP Guidelines', 'DPWH Standards'] },
-  { region: 'Asia', country: 'Indonesia', codes: ['SNI 1727:2020 (Loads)', 'SNI 1726:2019 (Seismic)', 'SNI 1729:2020 (Steel)'] },
-
-  // ASIA PACIFIC - SOUTH ASIA
-  { region: 'Asia', country: 'India', codes: ['IS 875 (Loads)', 'IS 800 (Steel)', 'IS 1893 (Seismic)', 'IS 16231 (Glass)'] },
-
-  // AMERICAS
-  { region: 'Americas', country: 'United States', codes: ['ASCE 7-22 (Loads)', 'AISC 360-22 (Steel)', 'ADM 2020 (Aluminum)', 'ASTM E1300 (Glass)', 'IBC 2024'] },
-  { region: 'Americas', country: 'Canada', codes: ['NBCC 2020 (Loads)', 'CSA S16 (Steel)', 'CSA S157 (Aluminum)', 'CAN/CGSB 12.20 (Glass)'] },
-  { region: 'Americas', country: 'Brazil', codes: ['NBR 6123 (Wind)', 'NBR 8800 (Steel)', 'NBR 7199 (Glass)', 'NBR 14762 (Cold-Formed)'] },
-  { region: 'Americas', country: 'Mexico', codes: ['NTC-EDIF (Building)', 'CFE (Wind/Seismic)', 'IMCA (Steel)'] },
-
-  // OCEANIA
-  { region: 'Oceania', country: 'Australia', codes: ['AS/NZS 1170 (Loads)', 'AS 4100 (Steel)', 'AS/NZS 1664 (Aluminum)', 'AS 1288 (Glass)'] },
-  { region: 'Oceania', country: 'New Zealand', codes: ['AS/NZS 1170 (Loads)', 'NZS 3404 (Steel)', 'AS/NZS 1664 (Aluminum)', 'NZS 4223 (Glass)'] },
-
-  // MIDDLE EAST
-  { region: 'Middle East', country: 'UAE / Dubai', codes: ['DBC (Loads)', 'Dubai Wind Code', 'AISC 360 (Steel)', 'ADM (Aluminum)'] },
-  { region: 'Middle East', country: 'Saudi Arabia', codes: ['SBC 301 (Loads)', 'SBC 304 (Steel)', 'SBC 306 (Aluminum)'] },
-  { region: 'Middle East', country: 'Qatar', codes: ['QCS 2014', 'BS EN / ASCE 7 References'] },
-
-  // AFRICA
-  { region: 'Africa', country: 'South Africa', codes: ['SANS 10160 (Loads)', 'SANS 10162 (Steel)', 'SANS 10137 (Glass)'] },
-  { region: 'Africa', country: 'Egypt', codes: ['ECP 201 (Loads)', 'ECP 205 (Steel)', 'Egyptian Building Code'] },
-];
-
-const UNITS = {
-  metric: {
-    length: 'mm',
-    stress: 'MPa',
-    force: 'N',
-    udl: 'N/mm',
-    moment: 'Nmm',
-    momentDisplay: 'kNm',
-    forceDisplay: 'kN',
-  },
-  imperial: {
-    length: 'in',
-    stress: 'psi',
-    force: 'lbf',
-    udl: 'lb/in',
-    moment: 'lb-in',
-    momentDisplay: 'lb-ft',
-    forceDisplay: 'kip',
-  }
-};
-
-const CONVERSION = {
-  mm_to_in: 1 / 25.4,
-  in_to_mm: 25.4,
-  mpa_to_psi: 145.0377,
-  psi_to_mpa: 1 / 145.0377,
-  n_to_lbf: 1 / 4.44822,
-  lbf_to_n: 4.44822,
-  n_per_mm_to_lb_per_in: 5.710147,
-  lb_per_in_to_n_per_mm: 1 / 5.710147,
-  nmm_to_lbin: 1 / 112.985,
-  lbin_to_nmm: 112.985,
-  lbin_to_lbft: 1 / 12,
-  lbft_to_lbin: 12,
-  n_to_kn: 1 / 1000,
-  lbf_to_kip: 1 / 1000,
-};
-
-interface Combination {
-  id: string;
-  name: string;
-  description: string;
-  factors: Record<keyof typeof LOAD_CATEGORIES, number>;
-}
-
-const DEFAULT_COMBINATIONS: Combination[] = [
-  { 
-    id: 'c1', 
-    name: 'Serviceability (D+L)', 
-    description: 'Used for checking deflection limits (SLS). Ensures the structure remains functional and aesthetically pleasing under normal usage.',
-    factors: { dead: 1.0, live: 1.0, wind: 0, snow: 0, seismic: 0 } 
-  },
-  { 
-    id: 'c2', 
-    name: 'Ultimate (1.2D + 1.6L)', 
-    description: 'Primary strength check (ULS). Applies safety factors to dead and live loads to ensure structural integrity against collapse.',
-    factors: { dead: 1.2, live: 1.6, wind: 0, snow: 0, seismic: 0 } 
-  },
-  { 
-    id: 'c3', 
-    name: 'Wind Dominant (D + W)', 
-    description: 'Checks structural response under maximum design wind pressures. Critical for facade members and external cladding.',
-    factors: { dead: 1.0, live: 0, wind: 1.0, snow: 0, seismic: 0 } 
-  },
-  { 
-    id: 'c4', 
-    name: 'Seismic Dominant (D + E)', 
-    description: 'Evaluates performance during earthquake events. Includes a portion of live load as per most international building codes.',
-    factors: { dead: 1.0, live: 0.5, wind: 0, snow: 0, seismic: 1.0 } 
-  },
-];
-
-// Helper for robust number parsing with clamping
-const safeParseNumber = (val: string | number, fallback: number = 0, min: number = -Infinity, max: number = Infinity): number => {
-  const num = typeof val === 'number' ? val : parseFloat(val);
-  if (isNaN(num)) return fallback;
-  return Math.min(Math.max(num, min), max);
-};
-
-const getCriticalPoints = (results: any, unitSystem: string, u: any, toDisplay: any) => {
-  if (!results || results.points.length === 0) return null;
-  
-  const maxDeflectionPoint = results.points.reduce((max: any, p: any) => Math.abs(p.deflection) > Math.abs(max.deflection) ? p : max, results.points[0]);
-  const maxMomentPoint = results.points.reduce((max: any, p: any) => Math.abs(p.moment) > Math.abs(max.moment) ? p : max, results.points[0]);
-  const maxShearPoint = results.points.reduce((max: any, p: any) => Math.abs(p.shear) > Math.abs(max.shear) ? p : max, results.points[0]);
-  const maxStressPoint = results.points.reduce((max: any, p: any) => p.stress > max.stress ? p : max, results.points[0]);
-
-  return {
-    deflection: [{ 
-      x: Number(toDisplay(maxDeflectionPoint.x, 'length').toFixed(2)), 
-      y: Number(toDisplay(maxDeflectionPoint.deflection, 'length').toFixed(3)), 
-      label: `Δ_max: ${toDisplay(maxDeflectionPoint.deflection, 'length').toFixed(2)} ${u.length}` 
-    }],
-    moment: [{ 
-      x: Number(toDisplay(maxMomentPoint.x, 'length').toFixed(2)), 
-      y: Number(toDisplay(maxMomentPoint.moment, 'moment').toFixed(2)), 
-      label: `M_max: ${unitSystem === 'metric' ? (maxMomentPoint.moment / 1000000).toFixed(2) + ' kNm' : (toDisplay(maxMomentPoint.moment, 'moment') * CONVERSION.lbin_to_lbft).toFixed(1) + ' lb-ft'}` 
-    }],
-    shear: [
-      { 
-        x: Number(toDisplay(results.points[0].x ?? 0, 'length').toFixed(2)), 
-        y: Number(toDisplay(results.points[0].shear ?? 0, 'force').toFixed(2)), 
-        label: `R_left: ${unitSystem === 'metric' ? ((results.points[0].shear ?? 0) / 1000).toFixed(2) + ' kN' : (toDisplay(results.points[0].shear ?? 0, 'force') / 1000).toFixed(2) + ' kip'}` 
-      },
-      { 
-        x: Number(toDisplay(results.points[results.points.length-1].x ?? 0, 'length').toFixed(2)), 
-        y: Number(toDisplay(results.points[results.points.length-1].shear ?? 0, 'force').toFixed(2)), 
-        label: `R_right: ${unitSystem === 'metric' ? (-(results.points[results.points.length-1].shear ?? 0) / 1000).toFixed(2) + ' kN' : (toDisplay(-(results.points[results.points.length-1].shear ?? 0), 'force') / 1000).toFixed(2) + ' kip'}` 
-      }
-    ],
-    stress: [{ 
-      x: Number(toDisplay(maxStressPoint.x ?? 0, 'length').toFixed(2)), 
-      y: Number(toDisplay(maxStressPoint.stress ?? 0, 'stress').toFixed(2)), 
-      label: `σ_max: ${(maxStressPoint.stress ?? 0).toFixed(2)} MPa` 
-    }]
-  };
-};
-
-interface HistoryState {
-  projectTitle: string;
-  projectLocation: string;
-  projectDescription: string;
-  projectDate: string;
-  projectTime: string;
-  projectAttachment?: string;
-  calculationMode: 'beam' | 'panel' | 'bracket' | 'sealant' | 'cast-in-embed';
-  length: number;
-  material: keyof typeof MATERIALS;
-  panelMaterialId: keyof typeof PANEL_MATERIALS;
-  sealantMaterialId: keyof typeof SEALANT_MATERIALS;
-  bracketTypeId: keyof typeof BRACKET_TYPES;
-  sectionType: 'solid' | 'hollow' | 'channel' | 'l-plate' | 'i-beam' | 't-section';
-  beamType: 'mullion' | 'transom';
-  width: number;
-  height: number;
-  thickness: number;
-  thickness2: number;
-  supportCondition: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed' | 'fixed_pinned' | 'continuous';
-  intermediateSupports: number[];
-  safetyFactor: number;
-  stiffenerCountV: number;
-  stiffenerCountH: number;
-  stiffenerWidth: number;
-  stiffenerHeight: number;
-  stiffenerThickness: number;
-  // Sealant specific
-  glassWidth: number;
-  glassHeight: number;
-  windPressureInput: number;
-  deadLoadInput: number;
-  // Bracket specific
-  tributaryArea: number;
-  bracketWidth: number;
-  bracketHeight: number;
-  bracketThickness: number;
-  boltDiameter: number;
-  boltCount: number;
-  embedDepth: number;
-  edgeDistance: number;
-  concreteGrade: number;
-  selectedCodeId: string;
-  loads: Load[];
-  combinations: Combination[];
-  activeCombinationId: string;
-  seismicRegion: keyof typeof SEISMIC_REGIONS;
-  seismicCoeff: number;
-  unitSystem: 'metric' | 'imperial';
-  projectNotes: string;
-}
-
-interface Project extends HistoryState {
-  id: string;
-}
-
-const createNewProject = (id: string, title: string): Project => ({
-  id,
-  projectTitle: title,
-  projectLocation: 'Shanghai, China',
-  projectDescription: 'Structural analysis for Shanghai facade project.',
-  projectDate: new Date().toISOString().split('T')[0],
-  projectTime: new Date().toTimeString().split(' ')[0].slice(0, 5),
-  projectAttachment: '',
-  calculationMode: 'beam',
-  length: 3500,
-  material: 'aluminum_6061_t6',
-  panelMaterialId: 'aluminum_solid',
-  sealantMaterialId: 'silicone_structural',
-  bracketTypeId: 'combined',
-  sectionType: 'hollow',
-  beamType: 'mullion',
-  width: 65,
-  height: 150,
-  thickness: 3.5,
-  thickness2: 3.5,
-  supportCondition: 'simply_supported',
-  intermediateSupports: [],
-  safetyFactor: 1.5,
-  stiffenerCountV: 0,
-  stiffenerCountH: 0,
-  stiffenerWidth: 40,
-  stiffenerHeight: 40,
-  stiffenerThickness: 2,
-  // Sealant defaults
-  glassWidth: 1500,
-  glassHeight: 3000,
-  windPressureInput: 1.5,
-  deadLoadInput: 0.5,
-  // Bracket defaults
-  tributaryArea: 4.5,
-  bracketWidth: 100,
-  bracketHeight: 150,
-  bracketThickness: 10,
-  boltDiameter: 12,
-  boltCount: 2,
-  embedDepth: 120,
-  edgeDistance: 150,
-  concreteGrade: 30,
-  selectedCodeId: 'Shanghai',
-  loads: [{ id: '1', type: 'udl', category: 'dead', value: 0.5 }],
-  combinations: DEFAULT_COMBINATIONS,
-  activeCombinationId: 'c1',
-  seismicRegion: 'china',
-  seismicCoeff: SEISMIC_REGIONS.china.coeff,
-  unitSystem: 'metric',
-  projectNotes: 'Initial structural calculation for project.'
-});
-
-const getProjectResults = (project: Project) => {
-  const sectionProps = project.sectionType === 'solid' 
-    ? calculateRectangularProperties(project.width, project.height)
-    : project.sectionType === 'channel'
-    ? calculateChannelProperties(project.width, project.height, project.thickness, project.thickness2)
-    : project.sectionType === 'l-plate'
-    ? calculateLPlateProperties(project.width, project.height, project.thickness, project.thickness2)
-    : project.sectionType === 'i-beam'
-    ? calculateIBeamProperties(project.width, project.height, project.thickness, project.thickness2)
-    : project.sectionType === 't-section'
-    ? calculateTSectionProperties(project.width, project.height, project.thickness, project.thickness2)
-    : calculateHollowRectangularProperties(project.width, project.height, project.thickness, project.thickness2);
-
-  const activeCombination = project.combinations.find(c => c.id === project.activeCombinationId) || project.combinations[0];
-  
-  const factoredLoads = project.loads.map(load => ({
-    ...load,
-    value: load.value * (activeCombination.factors[load.category] || 0),
-    value2: load.value2 !== undefined ? load.value2 * (activeCombination.factors[load.category] || 0) : undefined,
-  }));
-
-  const beamProps: BeamProperties = {
-    length: project.length,
-    elasticModulus: MATERIALS[project.material].e,
-    momentOfInertia: sectionProps.momentOfInertia,
-    sectionModulus: sectionProps.sectionModulus,
-    yieldStrength: MATERIALS[project.material].yield,
-    safetyFactor: project.safetyFactor,
-    supportCondition: project.supportCondition,
-    beamType: project.beamType,
-    intermediateSupports: project.intermediateSupports,
-  };
-
-  try {
-    return calculateBeam(beamProps, factoredLoads);
-  } catch (error) {
-    return {
-      points: [],
-      summary: {
-        maxDeflection: 0,
-        maxMoment: 0,
-        maxShear: 0,
-        maxStress: 0,
-        deflectionRatio: 'N/A',
-        status: 'fail' as const,
-        utilizationStress: 0,
-        utilizationDeflection: 0,
-        allowableStress: 0
-      }
-    };
-  }
-};
-
-const calculatePanelResults = (project: Project) => {
-  const mat = PANEL_MATERIALS[project.panelMaterialId];
-  const E = mat.e;
-  const nu = mat.poisson;
-  const t = (mat as any).totalThickness ?? project.thickness ?? 3.0;
-  
-  const activeCombination = project.combinations.find(c => c.id === project.activeCombinationId) || project.combinations[0];
-
-  const q_wind_factored = project.loads
-    .filter(l => l.category === 'wind')
-    .reduce((sum, l) => sum + (safeParseNumber(l.value, 0) / 1000) * (activeCombination.factors.wind || 0), 0);
-
-  const b_panel = Math.min(project.width, project.length);
-  const a_panel = Math.max(project.width, project.length);
-  
-  const stiffenerCountV = project.stiffenerCountV ?? 0;
-  const stiffenerCountH = project.stiffenerCountH ?? 0;
-  
-  // Effective sub-panel dimensions
-  const b_eff = project.width / (stiffenerCountV + 1);
-  const a_eff = project.length / (stiffenerCountH + 1);
-  
-  const s_min = Math.min(a_eff, b_eff);
-  const s_max = Math.max(a_eff, b_eff);
-  const ratio = s_max / s_min;
-
-  const alphaMap = [
-    { r: 1.0, a: 0.00406, b: 0.2874 },
-    { r: 1.2, a: 0.00564, b: 0.3762 },
-    { r: 1.4, a: 0.00705, b: 0.4530 },
-    { r: 1.6, a: 0.00830, b: 0.5172 },
-    { r: 1.8, a: 0.00931, b: 0.5688 },
-    { r: 2.0, a: 0.01013, b: 0.6102 },
-    { r: 3.0, a: 0.01223, b: 0.7134 },
-    { r: 5.0, a: 0.01297, b: 0.7410 },
-    { r: 10, a: 0.01302, b: 0.7500 },
-  ];
-
-  let alpha = 0.01302;
-  let beta = 0.7500;
-  for (let i = 0; i < alphaMap.length - 1; i++) {
-    if (ratio >= alphaMap[i].r && ratio <= alphaMap[i+1].r) {
-      const frac = (ratio - alphaMap[i].r) / (alphaMap[i+1].r - alphaMap[i].r);
-      alpha = alphaMap[i].a + frac * (alphaMap[i+1].a - alphaMap[i].a);
-      beta = alphaMap[i].b + frac * (alphaMap[i+1].b - alphaMap[i].b);
-      break;
-    }
-  }
-
-  const D = (E * Math.pow(t, 3)) / (12 * (1 - nu * nu));
-  const maxSkinDeflection = (alpha * q_wind_factored * Math.pow(s_min, 4)) / D;
-  const maxSkinStress = (beta * q_wind_factored * Math.pow(s_min, 2)) / (t * t);
-
-  // Analyze vertical stiffeners as beams
-  const tribWidthV = project.width / (stiffenerCountV + 1);
-  const stiffProps = calculateLPlateProperties(project.stiffenerWidth, project.stiffenerHeight, project.stiffenerThickness, project.stiffenerThickness);
-  
-  const stiffenerBeamPropsV = {
-    length: project.length,
-    elasticModulus: 70000,
-    momentOfInertia: stiffProps.momentOfInertia,
-    sectionModulus: stiffProps.sectionModulus,
-    yieldStrength: 160,
-    safetyFactor: project.safetyFactor,
-    supportCondition: 'simply_supported' as any,
-  };
-
-  const vStiffenerLoads = project.loads.map(l => ({
-    ...l,
-    value: safeParseNumber(l.value, 0) * (activeCombination.factors[l.category] || 0) * (l.type === 'udl' ? tribWidthV : 1),
-    value2: l.value2 !== undefined ? safeParseNumber(l.value2, 0) * (activeCombination.factors[l.category] || 0) * (l.type === 'udl' ? tribWidthV : 1) : undefined,
-  }));
-
-  const stiffenerAnalysisV = stiffenerCountV > 0 
-    ? calculateBeam(stiffenerBeamPropsV, vStiffenerLoads)
-    : null;
-
-  // Analyze horizontal stiffeners as beams
-  const tribWidthH = project.length / (stiffenerCountH + 1);
-  const stiffenerBeamPropsH = {
-    length: project.width,
-    elasticModulus: 70000,
-    momentOfInertia: stiffProps.momentOfInertia,
-    sectionModulus: stiffProps.sectionModulus,
-    yieldStrength: 160,
-    safetyFactor: project.safetyFactor,
-    supportCondition: 'simply_supported' as any,
-  };
-
-  const hStiffenerLoads = project.loads.map(l => ({
-    ...l,
-    value: safeParseNumber(l.value, 0) * (activeCombination.factors[l.category] || 0) * (l.type === 'udl' ? tribWidthH : 1),
-    value2: l.value2 !== undefined ? safeParseNumber(l.value2, 0) * (activeCombination.factors[l.category] || 0) * (l.type === 'udl' ? tribWidthH : 1) : undefined,
-  }));
-
-  const stiffenerAnalysisH = stiffenerCountH > 0 
-    ? calculateBeam(stiffenerBeamPropsH, hStiffenerLoads)
-    : null;
-
-  const vUtilStress = stiffenerAnalysisV ? stiffenerAnalysisV.summary.utilizationStress : 0;
-  const hUtilStress = stiffenerAnalysisH ? stiffenerAnalysisH.summary.utilizationStress : 0;
-  const vUtilDefl = stiffenerAnalysisV ? stiffenerAnalysisV.summary.utilizationDeflection : 0;
-  const hUtilDefl = stiffenerAnalysisH ? stiffenerAnalysisH.summary.utilizationDeflection : 0;
-
-  return {
-    skin: {
-      deflection: maxSkinDeflection,
-      stress: maxSkinStress,
-      allowableStress: mat.yield / project.safetyFactor,
-      allowableDeflection: s_min / 60,
-      utilizationStress: maxSkinStress / (mat.yield / project.safetyFactor),
-      utilizationDeflection: maxSkinDeflection / (s_min / 60)
-    },
-    dimensions: {
-      a: s_max,
-      b: s_min
-    },
-    stiffenersV: stiffenerAnalysisV ? {
-      ...stiffenerAnalysisV.summary,
-      loadWidth: tribWidthV,
-      count: stiffenerCountV
-    } : null,
-    stiffenersH: stiffenerAnalysisH ? {
-      ...stiffenerAnalysisH.summary,
-      loadWidth: tribWidthH,
-      count: stiffenerCountH
-    } : null,
-    summary: {
-       utilization: Math.max(
-         maxSkinStress / (mat.yield / project.safetyFactor), 
-         maxSkinDeflection / (s_min / 60), 
-         vUtilStress, hUtilStress, vUtilDefl, hUtilDefl
-       ),
-       status: (
-         maxSkinStress / (mat.yield / project.safetyFactor) <= 1 && 
-         maxSkinDeflection / (s_min / 60) <= 1 && 
-         (!stiffenerAnalysisV || stiffenerAnalysisV.summary.status === 'pass') &&
-         (!stiffenerAnalysisH || stiffenerAnalysisH.summary.status === 'pass')
-       ) ? 'pass' as const : 'fail' as const,
-       weight: (mat.density * project.width * project.length * t * 1e-9) // Added weight field back into summary for view
-    },
-    totalWeight: (mat.density * project.width * project.length * t * 1e-9)
-  };
-};
-
-const calculateSealantResults = (project: Project) => {
-  const mat = SEALANT_MATERIALS[project.sealantMaterialId];
-  const w = project.glassWidth;
-  const h = project.glassHeight;
-  const q_wind = project.windPressureInput;
-  const dl = project.deadLoadInput;
-  
-  const biteDynamic = (q_wind * Math.min(w, h)) / (2 * mat.dynamicStress);
-  const glassThicknessAssumed = 10;
-  const weight = (w * h * glassThicknessAssumed * 2500 * 9.81 * 1e-9);
-  const biteStatic = weight / ((2 * w + 2 * h) * mat.staticStress);
-
-  const requiredBite = Math.max(0, biteDynamic, biteStatic, 6);
-  
-  return {
-    biteDynamic,
-    biteStatic,
-    requiredBite,
-    utilization: requiredBite / Math.max(1, project.width),
-    status: requiredBite <= project.width ? 'pass' : 'fail'
-  };
-};
-
-const calculateBracketResults = (project: Project) => {
-  const mat = MATERIALS[project.material];
-  const fy = mat.yield;
-  const q_wind = project.windPressureInput;
-  const totalForce = q_wind * project.tributaryArea * 1000;
-  
-  const boltArea = Math.PI * Math.pow(project.boltDiameter / 2, 2);
-  const boltShearStress = totalForce / (project.boltCount * boltArea);
-  const boltUtilization = boltShearStress / (420 / 2);
-  
-  const bearingStress = totalForce / (project.boltCount * project.boltDiameter * project.bracketThickness);
-  const bearingUtilization = bearingStress / (fy / project.safetyFactor);
-  
-  const eccentricity = 50; 
-  const moment = totalForce * eccentricity;
-  const Z = (project.bracketWidth * Math.pow(project.bracketThickness, 2)) / 6;
-  const bendingStress = moment / Z;
-  const bendingUtilization = bendingStress / (fy / project.safetyFactor);
-
-  const maxUtil = Math.max(boltUtilization, bearingUtilization, bendingUtilization);
-
-  return {
-    boltShearStress,
-    bearingStress,
-    bendingStress,
-    boltUtilization,
-    bearingUtilization,
-    bendingUtilization,
-    maxUtilization: maxUtil,
-    status: maxUtil <= 1.0 ? 'pass' : 'fail'
-  };
-};
-
-const calculateCastInEmbedResults = (project: Project) => {
-  const q_wind = project.windPressureInput ?? 1.5; 
-  const q_dead = project.deadLoadInput ?? 0.5;
-  const tribArea = project.tributaryArea ?? 4.5;
-
-  const tensionLoad = q_wind * tribArea * 1000; 
-  const shearLoad = q_dead * tribArea * 1000;
-
-  return calculateCastInEmbed({
-    embedDepth: project.embedDepth ?? 120,
-    edgeDistance: project.edgeDistance ?? 150,
-    concreteGrade: project.concreteGrade ?? 30,
-    boltDiameter: project.boltDiameter ?? 12,
-    boltCount: project.boltCount ?? 2,
-    tensionLoad,
-    shearLoad,
-    safetyFactor: project.safetyFactor
-  });
-};
-
-
-const SealantResultsView = ({
-  results,
-  unitSystem,
-  t,
-  u,
-  toDisplay,
-}: {
-  results: any;
-  unitSystem: string;
-  t: any;
-  u: any;
-  toDisplay: (v: number, type: string) => number;
-}) => {
-  return (
-    <div className="space-y-4">
-      <div className={cn(
-        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-gradient-to-r from-sky-500/5 to-transparent border-sky-100",
-        results.status === 'pass' ? "border-l-4 border-l-sky-500" : "border-l-4 border-l-red-500"
-      )}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-sky-600 rounded-lg text-white">
-            <Droplet className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Structural Silicone Result</h3>
-            <p className="text-[10px] text-slate-500 font-medium tracking-wide italic">ASTM C1135 Method</p>
-          </div>
-        </div>
-        <div className={cn(
-          "px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest",
-          results.status === 'pass' ? "bg-sky-500 text-white" : "bg-red-500 text-white"
-        )}>
-          {results.status === 'pass' ? "PASS" : "FAIL"}
-        </div>
-      </div>
-
-      <Card 
-        className={cn(
-          "shadow-sm border-slate-200 bg-white",
-        )}
-      >
-        <CardContent className="p-4 sm:p-6 text-center">
-          <Droplet className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-          <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Structural Silicone Result</h3>
-          <div className="flex items-center justify-center gap-4 mt-2">
-            <div className="text-sm font-bold text-slate-500">
-               Utilization: <span className={cn("text-xl", (results.utilization ?? 0) > 1 ? "text-red-600" : "text-green-600")}>{((results.utilization ?? 0) * 100).toFixed(1)}%</span>
-            </div>
-            <Badge variant={results.status === 'pass' ? 'outline' : 'destructive'} className={cn(
-              "text-[10px] font-bold uppercase",
-              results.status === 'pass' && "border-green-200 bg-green-50 text-green-700"
-            )}>
-              {results.status === 'pass' ? "PASS" : "FAIL"}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-4 shadow-sm border-slate-200">
-           <p className="text-[10px] font-bold text-slate-400 uppercase">Req. Bite (Dynamic/Wind)</p>
-           <p className="text-xl font-black text-slate-900">{(results.biteDynamic ?? 0).toFixed(2)} mm</p>
-        </Card>
-        <Card className="p-4 shadow-sm border-slate-200">
-           <p className="text-[10px] font-bold text-slate-400 uppercase">Req. Bite (Static/Dead)</p>
-           <p className="text-xl font-black text-slate-900">{(results.biteStatic ?? 0).toFixed(2)} mm</p>
-        </Card>
-      </div>
-      
-      <Card className="p-4 shadow-sm border-blue-100 bg-blue-50/20">
-         <div className="flex items-center justify-between">
-           <div>
-              <p className="text-[10px] font-bold text-blue-600 uppercase">Recommended Bite Depth</p>
-              <p className="text-2xl font-black text-slate-900">{Math.ceil(results.requiredBite)} mm</p>
-           </div>
-           <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Design Rule</p>
-              <p className="text-xs font-medium text-slate-600 italic">ASTM C1184 / GB 16776</p>
-           </div>
-         </div>
-      </Card>
-    </div>
-  );
-};
-
-const BracketResultsView = ({
-  results,
-  unitSystem,
-  t,
-  u,
-  toDisplay,
-}: {
-  results: any;
-  unitSystem: string;
-  t: any;
-  u: any;
-  toDisplay: (v: number, type: string) => number;
-}) => {
-  return (
-    <div className="space-y-4">
-      <div className={cn(
-        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-gradient-to-r from-rose-500/5 to-transparent border-rose-100",
-        results.status === 'pass' ? "border-l-4 border-l-rose-500" : "border-l-4 border-l-red-500"
-      )}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-rose-600 rounded-lg text-white">
-            <Link className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Bracket Connection Status</h3>
-            <p className="text-[10px] text-slate-500 font-medium tracking-wide italic">Bolted Connection Analysis</p>
-          </div>
-        </div>
-        <div className={cn(
-          "px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest",
-          results.status === 'pass' ? "bg-rose-500 text-white" : "bg-red-500 text-white"
-        )}>
-          {results.status === 'pass' ? "PASS" : "FAIL"}
-        </div>
-      </div>
-
-      <Card 
-        className={cn(
-          "shadow-sm border-slate-200 bg-white",
-        )}
-      >
-        <CardContent className="p-4 sm:p-6 relative overflow-hidden">
-          <div className="flex items-center justify-between relative z-10">
-            <div>
-              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Bracket Connection Status</h3>
-              <div className="flex items-center gap-2 mt-1">
-                 <Badge variant={results.status === 'pass' ? 'outline' : 'destructive'} className={cn(
-                  "text-[10px] font-bold uppercase",
-                  results.status === 'pass' && "border-green-200 bg-green-50 text-green-700"
-                )}>
-                  {results.status === 'pass' ? "PASS" : "FAIL"}
-                </Badge>
-                <span className="text-[10px] font-bold text-slate-400">Max Util: {((results.maxUtilization ?? 0) * 100).toFixed(1)}%</span>
-              </div>
-            </div>
-            <Link className="w-10 h-10 text-slate-100 absolute -right-2 -bottom-2 rotate-12" />
-          </div>
-          <div className="mt-4 h-2 bg-slate-100 rounded-full">
-             <div className={cn("h-full rounded-full transition-all", (results.maxUtilization ?? 0) > 1 ? "bg-red-500" : "bg-blue-600")} style={{ width: `${Math.min(100, (results.maxUtilization ?? 0) * 100)}%` }} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 min-[500px]:grid-cols-3 gap-3 text-center">
-         <Card className="p-3 border-slate-100 shadow-sm">
-            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Bolt Shear</p>
-            <p className="text-sm font-black text-slate-800">{(results.boltShearStress ?? 0).toFixed(1)} MPa</p>
-            <div className="text-[8px] font-bold mt-1" style={{ color: (results.boltUtilization ?? 0) > 1 ? 'red' : 'green' }}>{((results.boltUtilization ?? 0) * 100).toFixed(0)}%</div>
-         </Card>
-         <Card className="p-3 border-slate-100 shadow-sm">
-            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Bearing</p>
-            <p className="text-sm font-black text-slate-800">{(results.bearingStress ?? 0).toFixed(1)} MPa</p>
-            <div className="text-[8px] font-bold mt-1" style={{ color: (results.bearingUtilization ?? 0) > 1 ? 'red' : 'green' }}>{((results.bearingUtilization ?? 0) * 100).toFixed(0)}%</div>
-         </Card>
-         <Card className="p-3 border-slate-100 shadow-sm">
-            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Bending</p>
-            <p className="text-sm font-black text-slate-800">{(results.bendingStress ?? 0).toFixed(1)} MPa</p>
-            <div className="text-[8px] font-bold mt-1" style={{ color: (results.bendingUtilization ?? 0) > 1 ? 'red' : 'green' }}>{((results.bendingUtilization ?? 0) * 100).toFixed(0)}%</div>
-         </Card>
-      </div>
-    </div>
-  );
-};
-
-const CastInResultsView = ({
-  results,
-  unitSystem,
-  t,
-  u,
-  toDisplay,
-}: {
-  results: any;
-  unitSystem: string;
-  t: any;
-  u: any;
-  toDisplay: (v: number, type: string) => number;
-}) => {
-  if (!results) return null;
-
-  return (
-    <div className="space-y-4">
-      <div className={cn(
-        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-gradient-to-r from-amber-500/5 to-transparent border-amber-100",
-        results.status === 'pass' ? "border-l-4 border-l-amber-500" : "border-l-4 border-l-red-500"
-      )}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-600 rounded-lg text-white">
-            <Anchor className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Cast-in Embed Result</h3>
-            <p className="text-[10px] text-slate-500 font-medium tracking-wide italic">ACI 318 - CCD Method</p>
-          </div>
-        </div>
-        <div className={cn(
-          "px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest",
-          results.status === 'pass' ? "bg-amber-500 text-white" : "bg-red-500 text-white"
-        )}>
-          {results.status === 'pass' ? "PASS" : "FAIL"}
-        </div>
-      </div>
-
-      <Card 
-        className={cn(
-          "shadow-sm border-slate-200 bg-white",
-        )}
-      >
-        <CardContent className="p-4 sm:p-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center p-2.5",
-              results.status === 'pass' ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
-            )}>
-              <Anchor className="w-full h-full" />
-            </div>
-            <div>
-              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Cast-in Embed Result</h3>
-              <div className="flex items-center gap-2 mt-0.5">
-                <Badge variant={results.status === 'pass' ? 'outline' : 'destructive'} className={cn(
-                  "text-[10px] font-bold uppercase",
-                  results.status === 'pass' && "border-green-200 bg-green-50 text-green-700"
-                )}>
-                  {results.status === 'pass' ? "PASS" : "FAIL"}
-                </Badge>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                   {(results.utilizationInteraction * 100).toFixed(1)}% Interaction
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="hidden sm:block text-right">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Status</p>
-            <p className={cn(
-              "text-sm font-black uppercase italic",
-              results.status === 'pass' ? "text-green-600" : "text-red-600"
-            )}>
-              {results.status === 'pass' ? "Structurally Sound" : "Reinforcement Required"}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-         <Card className="p-3 border-slate-200 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-16 h-16 -mr-8 -mt-8 bg-blue-50/50 rounded-full group-hover:scale-110 transition-transform" />
-            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 relative z-10">Tension Capacity</p>
-            <p className="text-sm font-black text-slate-800 relative z-10">{(results.tensionCapacity / 1000).toFixed(1)} kN</p>
-            <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden relative z-10">
-               <div 
-                 className={cn("h-full rounded-full transition-all duration-700", (results.utilizationTension ?? 0) > 1 ? "bg-red-500" : "bg-blue-600")} 
-                 style={{ width: `${Math.min(100, (results.utilizationTension ?? 0) * 100)}%` }} 
-               />
-            </div>
-            <div className="flex justify-between items-center mt-1">
-               <span className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">Utilization</span>
-               <span className={cn("text-[9px] font-black", (results.utilizationTension ?? 0) > 1 ? "text-red-600" : "text-blue-600")}>
-                  {((results.utilizationTension ?? 0) * 100).toFixed(0)}%
-               </span>
-            </div>
-         </Card>
-
-         <Card className="p-3 border-slate-200 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-16 h-16 -mr-8 -mt-8 bg-blue-50/50 rounded-full group-hover:scale-110 transition-transform" />
-            <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 relative z-10">Shear Capacity</p>
-            <p className="text-sm font-black text-slate-800 relative z-10">{(results.shearCapacity / 1000).toFixed(1)} kN</p>
-            <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden relative z-10">
-               <div 
-                 className={cn("h-full rounded-full transition-all duration-700", (results.utilizationShear ?? 0) > 1 ? "bg-red-500" : "bg-blue-600")} 
-                 style={{ width: `${Math.min(100, (results.utilizationShear ?? 0) * 100)}%` }} 
-               />
-            </div>
-            <div className="flex justify-between items-center mt-1">
-               <span className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">Utilization</span>
-               <span className={cn("text-[9px] font-black", (results.utilizationShear ?? 0) > 1 ? "text-red-600" : "text-blue-600")}>
-                  {((results.utilizationShear ?? 0) * 100).toFixed(0)}%
-               </span>
-            </div>
-         </Card>
-
-         <Card className="p-3 border-blue-100 shadow-sm bg-blue-50/30 md:col-span-2">
-            <p className="text-[9px] font-bold text-blue-600 uppercase mb-2">Interaction Check (Combined N+V)</p>
-            <div className="flex items-center gap-3">
-               <div className="text-2xl font-black text-slate-900 leading-none">{(results.utilizationInteraction * 100).toFixed(1)}%</div>
-               <div className="flex-1 h-3 bg-white/50 border border-blue-100/50 rounded-full overflow-hidden p-0.5 shadow-inner">
-                  <div 
-                    className={cn(
-                      "h-full rounded-full transition-all duration-1000 shadow-sm",
-                      results.utilizationInteraction > 1 ? "bg-gradient-to-r from-red-400 to-red-600" : "bg-gradient-to-r from-blue-400 to-blue-600"
-                    )} 
-                    style={{ width: `${Math.min(100, results.utilizationInteraction * 100)}%` }} 
-                  />
-               </div>
-            </div>
-            <p className="text-[8px] text-slate-400 italic mt-2 uppercase font-medium tracking-wide">
-              * Based on Simplified ACI 318 - CCD Method
-            </p>
-         </Card>
-      </div>
-    </div>
-  );
-};
-
-const PanelResultsView = ({
-  results,
-  unitSystem,
-  t,
-  u,
-  toDisplay,
-}: {
-  results: any;
-  unitSystem: string;
-  t: any;
-  u: any;
-  toDisplay: (v: number, type: string) => number;
-}) => {
-  const maxUtilization = results.summary.utilization;
-
-  return (
-    <div className="space-y-4">
-      <div className={cn(
-        "p-4 rounded-xl border flex items-center justify-between shadow-sm bg-white border-emerald-100 relative overflow-hidden",
-        results.summary.status === 'pass' ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-red-500"
-      )}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-600 rounded-lg text-white">
-            <Square className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Panel Analysis Result</h3>
-            <p className="text-[10px] text-slate-500 font-medium tracking-wide italic">Roark's Formulas Method</p>
-          </div>
-        </div>
-        <div className={cn(
-          "px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest",
-          results.summary.status === 'pass' ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-        )}>
-          {results.summary.status === 'pass' ? "PASS" : "FAIL"}
-        </div>
-      </div>
-
-      <Card 
-        className={cn(
-          "shadow-sm border-slate-200 bg-white",
-        )}
-      >
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-black tracking-tighter text-slate-900">
-                  {(maxUtilization * 100).toFixed(1)}%
-                </span>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Governing Utilization</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={results.summary.status === 'pass' ? 'outline' : 'destructive'} className={cn(
-                  "text-[10px] font-bold uppercase py-0 px-2 h-5",
-                  results.summary.status === 'pass' && "border-green-200 bg-green-50 text-green-700"
-                )}>
-                  {results.summary.status === 'pass' ? "PASS" : "FAIL"}
-                </Badge>
-                <span className="text-[10px] font-medium text-slate-500">
-                  Method: <span className="font-bold text-slate-700">Roark's Formulas</span>
-                </span>
-              </div>
-            </div>
-            <div className="h-12 w-12 rounded-full border-4 border-slate-100 flex items-center justify-center relative">
-               <Activity className="w-5 h-5 text-slate-300" />
-            </div>
-          </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, maxUtilization * 100)}%` }}
-              className={cn(
-                "h-full rounded-full transition-all duration-500",
-                maxUtilization > 1 ? "bg-red-500" : maxUtilization > 0.8 ? "bg-amber-500" : "bg-blue-500"
-              )}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 min-[580px]:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Skin Analysis Card */}
-        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-blue-200 transition-colors flex flex-col">
-          <CardHeader className="p-3 sm:p-4 border-b bg-gradient-to-r from-blue-500/10 to-transparent">
-            <div className="flex items-center gap-2 text-blue-600">
-              <Square className="w-4 h-4" />
-              <CardTitle className="text-sm font-bold uppercase tracking-wide">Skin Analysis (Panel)</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4 flex-1">
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
-                  <p className="text-lg font-black text-slate-900">{(results.skin?.deflection ?? 0).toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
-                  <Badge variant={(results.skin?.utilizationDeflection ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
-                    U: {((results.skin?.utilizationDeflection ?? 0) * 100).toFixed(1)}%
-                  </Badge>
-                </div>
-                <div className="space-y-1 text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Max Stress</p>
-                  <p className="text-lg font-black text-slate-900">{(results.skin?.stress ?? 0).toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
-                  <Badge variant={(results.skin?.utilizationStress ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
-                    U: {((results.skin?.utilizationStress ?? 0) * 100).toFixed(1)}%
-                  </Badge>
-                </div>
-             </div>
-             <Separator className="bg-slate-100" />
-             <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 italic pb-2">
-               <div>a: {(results.dimensions?.a ?? 0).toFixed(0)}mm</div>
-               <div className="text-center">b: {(results.dimensions?.b ?? 0).toFixed(0)}mm</div>
-               <div className="text-right">a/b: {((results.dimensions?.a ?? 0) / (results.dimensions?.b ?? 1)).toFixed(2)}</div>
-             </div>
-          </CardContent>
-        </Card>
-
-        {/* Vertical Stiffener Analysis Card */}
-        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-rose-200 transition-colors flex flex-col">
-          <CardHeader className="p-3 sm:p-4 border-b bg-gradient-to-r from-rose-500/10 to-transparent">
-            <div className="flex items-center gap-2 text-rose-600">
-              <Layout className="w-4 h-4" />
-              <CardTitle className="text-sm font-bold uppercase tracking-wide">Vertical Stiffeners</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4 flex-1 flex flex-col justify-center">
-             {results.stiffenersV ? (
-               <>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
-                      <p className="text-lg font-black text-slate-900">{(results.stiffenersV?.maxDeflection ?? 0).toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
-                      <Badge variant={(results.stiffenersV?.utilizationDeflection ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
-                        U: {((results.stiffenersV?.utilizationDeflection ?? 0) * 100).toFixed(1)}%
-                      </Badge>
-                    </div>
-                    <div className="space-y-1 text-right">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress</p>
-                      <p className="text-lg font-black text-slate-900">{(results.stiffenersV?.maxStress ?? 0).toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
-                      <Badge variant={(results.stiffenersV?.utilizationStress ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
-                        U: {((results.stiffenersV?.utilizationStress ?? 0) * 100).toFixed(1)}%
-                      </Badge>
-                    </div>
-                 </div>
-                 <div className="pt-2">
-                   <p className="text-[10px] text-slate-400 font-mono">Trib: {(results.stiffenersV?.loadWidth ?? 0).toFixed(0)}mm | Qty: {results.stiffenersV?.count}</p>
-                 </div>
-               </>
-             ) : (
-               <div className="h-full flex items-center justify-center py-6 text-slate-400 italic text-[10px] uppercase font-bold tracking-tight">
-                 N/A
-               </div>
-             )}
-          </CardContent>
-        </Card>
-
-        {/* Horizontal Stiffener Analysis Card */}
-        <Card className="shadow-sm border-slate-200 overflow-hidden group hover:border-amber-200 transition-colors flex flex-col md:col-span-2 lg:col-span-1">
-          <CardHeader className="p-3 sm:p-4 border-b bg-gradient-to-r from-amber-500/10 to-transparent">
-            <div className="flex items-center gap-2 text-amber-600">
-              <Layout className="w-4 h-4 rotate-90" />
-              <CardTitle className="text-sm font-bold uppercase tracking-wide">Horizontal Stiffeners</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4 flex-1 flex flex-col justify-center">
-             {results.stiffenersH ? (
-               <>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Deflection</p>
-                      <p className="text-lg font-black text-slate-900">{(results.stiffenersH?.maxDeflection ?? 0).toFixed(2)} <span className="text-xs font-normal text-slate-500">mm</span></p>
-                      <Badge variant={(results.stiffenersH?.utilizationDeflection ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1">
-                        U: {((results.stiffenersH?.utilizationDeflection ?? 0) * 100).toFixed(1)}%
-                      </Badge>
-                    </div>
-                    <div className="space-y-1 text-right">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress</p>
-                      <p className="text-lg font-black text-slate-900">{(results.stiffenersH?.maxStress ?? 0).toFixed(1)} <span className="text-xs font-normal text-slate-500">MPa</span></p>
-                      <Badge variant={(results.stiffenersH?.utilizationStress ?? 0) > 1 ? 'destructive' : 'outline'} className="text-[9px] h-4 px-1 ml-auto">
-                        U: {((results.stiffenersH?.utilizationStress ?? 0) * 100).toFixed(1)}%
-                      </Badge>
-                    </div>
-                 </div>
-                 <div className="pt-2">
-                   <p className="text-[10px] text-slate-400 font-mono">Trib: {(results.stiffenersH?.loadWidth ?? 0).toFixed(0)}mm | Qty: {results.stiffenersH?.count}</p>
-                 </div>
-               </>
-             ) : (
-               <div className="h-full flex items-center justify-center py-6 text-slate-400 italic text-[10px] uppercase font-bold tracking-tight">
-                 N/A
-               </div>
-             )}
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Weight Summary */}
-      <Card className="shadow-sm border-slate-200 bg-slate-50/50">
-        <CardContent className="p-4 flex items-center justify-between">
-           <div className="flex items-center gap-3">
-             <div className="p-2 bg-white rounded-full shadow-sm border">
-               <Scale className="w-4 h-4 text-slate-500" />
-             </div>
-             <p className="text-xs font-bold text-slate-600 uppercase tracking-widest leading-none">Estimated Total Weight</p>
-           </div>
-           <div className="text-right">
-             <p className="text-xl font-black text-slate-900">{((results.summary?.weight ?? 0) / 9.81).toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span></p>
-             <p className="text-[10px] text-slate-400 font-mono">Includes Skin + Stiffeners</p>
-           </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-const BeamAnalysisChart = ({ 
-  results, 
-  unitSystem, 
-  u, 
-  toDisplay,
-}: any) => {
-  return (
-    <div className="h-full w-full overflow-y-auto">
-      <BeamDiagrams 
-        points={results.points} 
-        unitSystem={unitSystem} 
-        u={u} 
-        toDisplay={toDisplay} 
-      />
-    </div>
-  );
-};
-
-const UtilizationCards = ({ results, material, governingCriteria }: any) => {
-  return (
-    <div className="grid grid-cols-1 gap-4">
-      <Card className="border-slate-200 overflow-hidden rounded-2xl bg-card shadow-sm">
-        <div className="p-6 border-b bg-slate-50/50 flex items-center justify-between">
-           <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-xl text-blue-600">
-                 <Activity className="w-5 h-5" />
-              </div>
-              <div>
-                 <h4 className="text-sm font-black text-slate-900 uppercase">Analysis Results</h4>
-                 <p className="text-[10px] text-slate-500 font-medium tracking-wide">Detailed utilization breakdown</p>
-              </div>
-           </div>
-        </div>
-        <CardContent className="p-0">
-           <div className="divide-y divide-slate-100">
-              <div className="p-6 flex items-center justify-between group hover:bg-slate-50/50 transition-colors">
-                 <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Flexural Stress</span>
-                    <p className="text-sm font-bold text-slate-900">Bending capacity check</p>
-                 </div>
-                 <div className="text-right">
-                    <p className="text-xl font-black text-slate-900">{(results.summary.utilizationStress * 100).toFixed(1)}%</p>
-                    <Badge variant={(results.summary.utilizationStress > 1) ? "destructive" : "secondary"}>
-                      {(results.summary.utilizationStress > 1) ? "Yielding" : "Safe"}
-                    </Badge>
-                 </div>
-              </div>
-              <div className="p-6 flex items-center justify-between group hover:bg-slate-50/50 transition-colors">
-                 <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Span Deflection</span>
-                    <p className="text-sm font-bold text-slate-900">Global displacement check</p>
-                 </div>
-                 <div className="text-right">
-                    <p className="text-xl font-black text-slate-900">{(results.summary.utilizationDeflection * 100).toFixed(1)}%</p>
-                    <Badge variant={(results.summary.utilizationDeflection > 1) ? "destructive" : "secondary"}>
-                      {(results.summary.utilizationDeflection > 1) ? "Exceeded" : "Safe"}
-                    </Badge>
-                 </div>
-              </div>
-           </div>
-        </CardContent>
-      </Card>
-      
-      <div className="p-6 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 text-center">
-         <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-         <p className="text-xs text-slate-500 font-medium italic leading-relaxed">
-            Theoretical analysis based on Euler-Bernoulli beam theory. Lateral torsional buckling is assumed to be restrained by curtain wall infill panels.
-         </p>
-      </div>
-    </div>
-  );
-};
-
-const ProjectResultsView = ({ 
-  project, 
-  results, 
-  panelResults,
-  sealantResults,
-  bracketResults,
-  castInResults,
-  calculationMode,
-  unitSystem, 
-  t, 
-  u, 
-  toDisplay, 
-  activeTab, 
-  setActiveTab,
-  isChartExpanded,
-  setIsChartExpanded,
-  criticalPoints,
-  setMobileTab
-}: { 
-  project: Project; 
-  results: any; 
-  panelResults: any;
-  sealantResults: any;
-  bracketResults: any;
-  castInResults: any;
-  calculationMode: string;
-  unitSystem: string; 
-  t: any; 
-  u: any; 
-  toDisplay: any;
-  activeTab: string;
-  setActiveTab: (v: string) => void;
-  isChartExpanded: boolean;
-  setIsChartExpanded: (v: boolean) => void;
-  criticalPoints: any;
-  setMobileTab: (v: 'inputs' | 'results') => void;
-}) => {
-  if (calculationMode === 'panel' && panelResults) {
-    return <PanelResultsView results={panelResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
-  }
-
-  if (calculationMode === 'sealant' && sealantResults) {
-    return <SealantResultsView results={sealantResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
-  }
-
-  if (calculationMode === 'bracket' && bracketResults) {
-    return <BracketResultsView results={bracketResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
-  }
-
-  if (calculationMode === 'cast-in-embed' && castInResults) {
-    return <CastInResultsView results={castInResults} unitSystem={unitSystem} t={t} u={u} toDisplay={toDisplay} />;
-  }
-
-  const activeCombination = project.combinations.find(c => c.id === project.activeCombinationId) || project.combinations[0];
-
-  const { 
-    projectTitle, 
-    selectedCodeId, 
-    material, 
-    supportCondition, 
-    length,
-    width,
-    height,
-    thickness,
-    thickness2,
-    sectionType,
-    intermediateSupports
-  } = project;
-
-  const governingCriteria = results.summary.utilizationStress >= results.summary.utilizationDeflection ? 'Stress' : 'Deflection';
-  const maxUtilization = Math.max(0, results.summary.utilizationStress || 0, results.summary.utilizationDeflection || 0);
-
-  return (
-    <div className="space-y-6">
-      {/* Top Hero Status & KPI Row */}
-      <div className={cn(
-        "p-4 sm:p-5 rounded-[1.25rem] sm:rounded-[1.5rem] border shadow-sm flex flex-col sm:flex-row items-center justify-between transition-all gap-4 sm:gap-6 bg-card overflow-hidden relative",
-        results.summary.status === 'pass' 
-          ? "border-emerald-500/20" 
-          : "border-red-500/20"
-      )}>
-        <div className={cn(
-          "absolute top-0 left-0 w-full h-1 sm:w-1.5 sm:h-full",
-          results.summary.status === 'pass' ? "bg-emerald-500" : "bg-red-500"
-        )} />
-        
-        <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
-          <div className={cn(
-            "w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-md relative overflow-hidden shrink-0",
-            results.summary.status === 'pass' ? "bg-emerald-600 shadow-emerald-100" : "bg-red-600 shadow-red-100"
-          )}>
-            <Activity className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedCodeId} Design Result</span>
-            </div>
-            <h2 className="text-lg sm:text-xl font-black text-slate-900 leading-tight uppercase tracking-tighter truncate">
-              {project.projectTitle}
-            </h2>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge className={cn(
-                  "text-[8px] font-black uppercase tracking-widest px-1.5 py-0",
-                  results.summary.status === 'pass' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none" : "bg-red-100 text-red-700 hover:bg-red-100 border-none"
-              )}>
-                {results.summary.status === 'pass' ? "PASS" : "FAIL"}
-              </Badge>
-              <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium whitespace-nowrap">Control: <span className="font-bold text-slate-700">{governingCriteria}</span></p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-end px-1 sm:px-0">
-           <div className="text-center sm:text-right">
-              <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Utilization</p>
-              <p className={cn("text-xl sm:text-2xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-red-600" : "text-slate-900")}>
-                {(maxUtilization * 100).toFixed(1)}<span className="text-sm sm:text-base ml-0.5 opacity-50">%</span>
-              </p>
-           </div>
-           <div className="h-8 w-[1px] bg-slate-100" />
-           <div className="text-right">
-              <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">FS</p>
-              <p className={cn("text-xl sm:text-2xl font-black tabular-nums tracking-tighter", maxUtilization > 1 ? "text-slate-300" : "text-emerald-600")}>
-                {maxUtilization > 1 ? "0.00" : (1 / (maxUtilization || 0.01)).toFixed(2)}
-              </p>
-           </div>
-        </div>
-      </div>
-
-      {/* Detailed Analysis Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-20">
-        <div className="lg:col-span-9 flex flex-col gap-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex items-center justify-between mb-4">
-               <TabsList className="bg-slate-100 p-1 rounded-xl h-10 border border-slate-200 shadow-sm">
-                 <TabsTrigger value="diagrams" className="text-[10px] font-black uppercase tracking-tight rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">Structural Diagrams</TabsTrigger>
-                 <TabsTrigger value="utilization" className="text-[10px] font-black uppercase tracking-tight rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">Detailed Analysis</TabsTrigger>
-               </TabsList>
-               <Button variant="outline" size="sm" className="h-10 px-3 rounded-xl border-slate-200 text-slate-500 hover:text-blue-600" onClick={() => setIsChartExpanded(!isChartExpanded)}>
-                  {isChartExpanded ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
-                  <span className="text-[10px] font-black uppercase tracking-widest">{isChartExpanded ? 'Shrink' : 'Expand'}</span>
-               </Button>
-            </div>
-
-            <TabsContent value="diagrams" className="mt-0 ring-offset-background focus-visible:outline-none">
-              <Card className="border-slate-200 shadow-lg overflow-hidden rounded-[2rem] bg-white">
-                <div className="bg-slate-50/50 px-6 py-4 border-b flex items-center justify-between">
-                   <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-blue-600">
-                        <Activity className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-none mb-1">Interactive Results</span>
-                        <span className="text-sm font-bold text-slate-800">Shear, Moment & Deflection</span>
-                      </div>
-                   </div>
-                   <div className="flex gap-4">
-                      <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-blue-50/50 border border-blue-100">
-                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                        <span className="text-[9px] font-black text-blue-700 uppercase">V</span>
-                      </div>
-                      <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-emerald-50/50 border border-emerald-100">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                        <span className="text-[9px] font-black text-emerald-700 uppercase">M</span>
-                      </div>
-                      <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-rose-50/50 border border-rose-100">
-                        <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
-                        <span className="text-[9px] font-black text-rose-700 uppercase">δ</span>
-                      </div>
-                   </div>
-                </div>
-                <CardContent className="p-0">
-                  <div className={cn("bg-white transition-all duration-500", isChartExpanded ? "h-[700px]" : "h-[400px]")}>
-                    <BeamAnalysisChart 
-                      results={results} 
-                      unitSystem={unitSystem} 
-                      u={u} 
-                      toDisplay={toDisplay}
-                      criticalPoints={criticalPoints}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="utilization" className="mt-0 ring-offset-background focus-visible:outline-none">
-               <UtilizationCards 
-                  results={results} 
-                  material={material} 
-                  governingCriteria={governingCriteria} 
-               />
-            </TabsContent>
-          </Tabs>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
-            <Card className="p-4 sm:p-5 border-slate-200 shadow-sm rounded-2xl bg-card group hover:border-blue-200 transition-all">
-                <div className="flex items-center gap-3 mb-3 sm:mb-4">
-                  <div className="p-1.5 sm:p-2 bg-blue-50 rounded-lg text-blue-600">
-                    <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </div>
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">Max Deflection</span>
-                </div>
-                <div className="flex items-baseline gap-1.5 sm:gap-2">
-                  <span className="text-2xl sm:text-3xl font-black tabular-nums">{toDisplay(results.summary.maxDeflection ?? 0, 'length').toFixed(2)}</span>
-                  <span className="text-xs sm:text-sm font-bold text-slate-400 uppercase">{u.length}</span>
-                </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <Badge variant="outline" className={cn(
-                    "text-[8px] sm:text-[9px] font-bold h-4 sm:h-5",
-                    (results.summary.utilizationDeflection ?? 0) > 1 ? "border-red-200 bg-red-50 text-red-700" : "border-blue-100 bg-blue-50 text-blue-700"
-                  )}>
-                    Ratio: {results.summary.deflectionRatio}
-                  </Badge>
-                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase">{(results.summary.utilizationDeflection * 100).toFixed(0)}% Util</span>
-                </div>
-            </Card>
-
-            <Card className="p-4 sm:p-5 border-slate-200 shadow-sm rounded-2xl bg-card group hover:border-amber-200 transition-all">
-                <div className="flex items-center gap-3 mb-3 sm:mb-4">
-                  <div className="p-1.5 sm:p-2 bg-amber-50 rounded-lg text-amber-600">
-                    <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </div>
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">Yield Check</span>
-                </div>
-                <div className="flex items-baseline gap-1.5 sm:gap-2">
-                  <span className="text-2xl sm:text-3xl font-black tabular-nums">{toDisplay(results.summary.maxStress ?? 0, 'stress').toFixed(1)}</span>
-                  <span className="text-xs sm:text-sm font-bold text-slate-400 uppercase">{u.stress}</span>
-                </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <Badge variant="outline" className={cn(
-                    "text-[8px] sm:text-[9px] font-bold h-4 sm:h-5",
-                    (results.summary.utilizationStress ?? 0) > 1 ? "border-red-200 bg-red-50 text-red-700" : "border-amber-100 bg-amber-50 text-amber-700"
-                  )}>
-                    Allow: {toDisplay(results.summary.allowableStress, 'stress').toFixed(0)} {u.stress}
-                  </Badge>
-                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase">{(results.summary.utilizationStress * 100).toFixed(0)}% Util</span>
-                </div>
-            </Card>
-          </div>
-        </div>
-
-        <div className="lg:col-span-3 flex flex-col gap-6">
-          <Card className="border-slate-200 shadow-lg overflow-hidden rounded-[2rem] group transition-all hover:shadow-xl bg-card h-fit">
-            <div className="bg-slate-50/50 px-6 py-4 border-b flex items-center justify-between">
-               <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-50 rounded-lg border border-slate-200 shadow-sm text-blue-600">
-                     <Box className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-none mb-1">Interactive</span>
-                    <span className="text-sm font-bold text-slate-800">3D Visualizer</span>
-                  </div>
-               </div>
-            </div>
-            <div className="aspect-square relative bg-slate-900 overflow-hidden">
-               <BeamVisualizer3D 
-                 length={length} 
-                 width={width} 
-                 height={height} 
-                 thickness={thickness}
-                 thickness2={thickness2}
-                 sectionType={sectionType}
-                 supportCondition={supportCondition as any}
-                 intermediateSupports={intermediateSupports}
-                 unitSystem={unitSystem as any}
-               />
-            </div>
-            <CardContent className="p-6 bg-card border-t border-slate-100">
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Efficiency Index</p>
-               <div className="space-y-4">
-                  <div className="space-y-2">
-                     <div className="flex justify-between text-[10px] font-bold">
-                        <span className="text-slate-600 uppercase">Mass Intensity</span>
-                        <span className="text-slate-900 uppercase">{(results.summary.weight / length).toFixed(2)} kg/m</span>
-                     </div>
-                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (results.summary.weight / length) / 10 * 100)}%` }} />
-                     </div>
-                  </div>
-               </div>
-               <div className="mt-5 p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200">
-                  <div className="flex items-center gap-2 text-slate-500 mb-1">
-                     <ShieldCheck className="w-3.5 h-3.5" />
-                     <span className="text-[10px] font-black uppercase tracking-widest leading-none">Code Integrity</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 italic font-medium leading-relaxed">
-                     Geometric constraints such as local buckling and flange slenderness are verified according to {selectedCodeId} Eurocode or AISC standards.
-                  </p>
-               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-card">
-             <CardHeader className="p-4 border-b bg-slate-50/50">
-               <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400">Analysis Environment</CardTitle>
-             </CardHeader>
-             <CardContent className="p-6 space-y-4">
-                <div className="flex justify-between items-center text-[10px] font-bold">
-                  <span className="text-slate-400 uppercase">Standard</span>
-                  <Badge variant="secondary" className="rounded-md bg-blue-50 text-blue-700 px-2 py-0.5">{selectedCodeId}</Badge>
-                </div>
-                <div className="flex justify-between items-center text-[10px] font-bold">
-                  <span className="text-slate-400 uppercase">Material</span>
-                  <Badge variant="secondary" className="rounded-md bg-slate-100 text-slate-600 px-2 py-0.5">{MATERIALS[material].name}</Badge>
-                </div>
-                <div className="flex justify-between items-center text-[10px] font-bold">
-                  <span className="text-slate-400 uppercase">Supports</span>
-                  <Badge variant="secondary" className="rounded-md bg-slate-100 text-slate-600 px-2 py-0.5">{supportCondition.replace('_', ' ')}</Badge>
-                </div>
-                <div className="flex justify-between items-center text-[10px] font-bold">
-                  <span className="text-slate-400 uppercase">Load Case</span>
-                  <Badge variant="secondary" className="rounded-md bg-slate-100 text-slate-600 px-2 py-0.5">{activeCombination.name}</Badge>
-                </div>
-             </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const PRESET_PROFILES = [
-  {
-    id: 'mullion-50-150',
-    name: 'Mullion M150 (50x150)',
-    extruder: 'Standard Extrusions Ltd',
-    url: 'https://picsum.photos/seed/mullion1/400/300',
-    dimensions: { width: 50, height: 150, thickness: 3, thickness2: 3 }
-  },
-  {
-    id: 'transom-50-80',
-    name: 'Transom T80 (50x80)',
-    extruder: 'Standard Extrusions Ltd',
-    url: 'https://picsum.photos/seed/transom1/400/300',
-    dimensions: { width: 50, height: 80, thickness: 2.5, thickness2: 2.5 }
-  },
-  {
-    id: 'heavy-mullion-60-200',
-    name: 'Heavy Mullion H200 (60x200)',
-    extruder: 'Industrial Profiles Corp',
-    url: 'https://picsum.photos/seed/heavy1/400/300',
-    dimensions: { width: 60, height: 200, thickness: 4, thickness2: 4 }
-  },
-  {
-    id: 'slim-mullion-40-120',
-    name: 'Slim Mullion S120 (40x120)',
-    extruder: 'Architectural Systems',
-    url: 'https://picsum.photos/seed/slim1/400/300',
-    dimensions: { width: 40, height: 120, thickness: 2.5, thickness2: 2.5 }
-  },
-  {
-    id: 'channel-40-100',
-    name: 'C-Channel C100 (40x100)',
-    extruder: 'Structural Steel Co',
-    url: 'https://picsum.photos/seed/channel1/400/300',
-    dimensions: { width: 40, height: 100, thickness: 5, thickness2: 5 },
-    sectionType: 'channel'
-  },
-  {
-    id: 'l-plate-50-50',
-    name: 'L-Plate L50 (50x50)',
-    extruder: 'Structural Steel Co',
-    url: 'https://picsum.photos/seed/lplate1/400/300',
-    dimensions: { width: 50, height: 50, thickness: 5, thickness2: 5 },
-    sectionType: 'l-plate'
-  }
-];
-
-const ReferenceAttachmentCard = ({ 
-  attachment, 
-  onAttachmentChange,
-  setNotification,
-  onApplyPreset
-}: { 
-  attachment: string; 
-  onAttachmentChange: (v: string) => void;
-  setNotification: (v: { message: string; type: 'success' | 'error' } | null) => void;
-  onApplyPreset?: (preset: typeof PRESET_PROFILES[0]) => void;
-}) => {
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-  const processFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setNotification({ message: 'Only image files are supported', type: 'error' });
-      return;
-    }
-    if (file.size > 400 * 1024) {
-      setNotification({ message: 'Image size exceeds 400KB limit', type: 'error' });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      onAttachmentChange(e.target?.result as string);
-      setNotification({ message: 'Reference image attached', type: 'success' });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const file = items[i].getAsFile();
-        if (file) processFile(file);
-        break;
-      }
-    }
-  };
-
-  return (
-    <Card className="shadow-sm border-slate-200 overflow-hidden" onPaste={handlePaste}>
-      <CardHeader className="p-3 sm:pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-blue-600">
-            <Paperclip className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">Reference</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-7 text-[10px] gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1 bg-transparent border-none cursor-pointer">
-                <Box className="w-3 h-3" />
-                Presets
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Standard Profiles</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {PRESET_PROFILES.map((preset) => (
-                    <DropdownMenuItem 
-                      key={preset.id} 
-                      onClick={() => onApplyPreset?.(preset)}
-                      className="flex flex-col items-start gap-0.5"
-                    >
-                      <span className="font-bold text-xs">{preset.name}</span>
-                      <span className="text-[10px] text-slate-400">{preset.extruder}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {attachment && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-5 w-5 sm:h-6 sm:w-6 text-slate-400 hover:text-red-500"
-                onClick={() => onAttachmentChange('')}
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
-            )}
-          </div>
-        </div>
-        <CardTitle className="text-xs sm:text-sm">Calculation Reference</CardTitle>
-      </CardHeader>
-      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-        {attachment ? (
-          <div className="relative group rounded-lg overflow-hidden border bg-slate-50 aspect-video flex items-center justify-center">
-            <img 
-              src={attachment} 
-              alt="Reference" 
-              className="max-w-full max-h-full object-contain"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-               <Button 
-                 variant="secondary" 
-                 size="sm" 
-                 className="h-8 text-xs gap-2"
-                 onClick={() => fileInputRef.current?.click()}
-               >
-                 <ImageIcon className="w-3 h-3" />
-                 Replace
-               </Button>
-            </div>
-          </div>
-        ) : (
-          <div 
-            className="border-2 border-dashed border-slate-200 rounded-lg p-6 flex flex-col items-center justify-center gap-3 bg-slate-50/50 hover:bg-slate-50 hover:border-blue-200 transition-all cursor-pointer group"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-blue-500 transition-colors">
-              <ImageIcon className="w-5 h-5" />
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-bold text-slate-600">Click to upload or Paste image</p>
-              <p className="text-[10px] text-slate-400 mt-1">PNG, JPG up to 400KB</p>
-            </div>
-          </div>
-        )}
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          accept="image/*" 
-          onChange={handleFileChange} 
-        />
-      </CardContent>
-    </Card>
-  );
-};
-
-const CalculusStepsCard = ({ 
-  options, 
-  setOptions,
-  sectionProps,
-  factoredLoads,
-  beamProps,
-  results,
-  u,
-  unitSystem,
-  sectionType,
-  beamType,
-  width,
-  height,
-  thickness,
-  thickness2,
-  material,
-  safetyFactor,
-  activeCombination,
-  t,
-  criticalPoints,
-  toDisplay,
-  seismicRegion,
-  seismicCoeff,
-  loads,
-  calculationMode,
-  embedDepth,
-  edgeDistance,
-  concreteGrade,
-  boltCount,
-  boltDiameter
-}: {
-  options: { section: boolean; loads: boolean; analysis: boolean; stress: boolean; seismic: boolean };
-  setOptions: (v: any) => void;
-  sectionProps: any;
-  factoredLoads: any[];
-  beamProps: any;
-  results: any;
-  u: any;
-  unitSystem: string;
-  sectionType: string;
-  beamType: string;
-  width: number;
-  height: number;
-  thickness: number;
-  thickness2: number;
-  material: string;
-  safetyFactor: number;
-  activeCombination: Combination;
-  t: any;
-  criticalPoints?: any;
-  toDisplay: any;
-  seismicRegion: string;
-  seismicCoeff: number;
-  loads: Load[];
-  calculationMode?: string;
-  embedDepth?: number;
-  edgeDistance?: number;
-  concreteGrade?: number;
-  boltCount?: number;
-  boltDiameter?: number;
-}) => {
-  const toggleOption = (key: keyof typeof options) => {
-    setOptions({ ...options, [key]: !options[key] });
-  };
-
-  const castInResults = calculationMode === 'cast-in-embed' ? calculateCastInEmbed({
-    embedDepth: embedDepth ?? 120,
-    edgeDistance: edgeDistance ?? 150,
-    concreteGrade: concreteGrade ?? 30,
-    boltDiameter: boltDiameter ?? 12,
-    boltCount: boltCount ?? 2,
-    tensionLoad: 0, // Just for summary display in steps if needed, or pass real loads
-    shearLoad: 0,
-    safetyFactor
-  }) : null;
-
-  return (
-    <Card className="shadow-sm border-slate-200 overflow-hidden">
-      <CardHeader className="p-3 sm:p-4 border-b bg-slate-50/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-blue-600">
-            <Activity className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Calculus Steps</span>
-          </div>
-          <div className="flex gap-2">
-            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
-              <span className="text-[9px] font-bold text-slate-400 uppercase">Section</span>
-              <Switch checked={options.section} onCheckedChange={() => toggleOption('section')} className="scale-75" />
-            </div>
-            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
-              <span className="text-[9px] font-bold text-slate-400 uppercase">Loads</span>
-              <Switch checked={options.loads} onCheckedChange={() => toggleOption('loads')} className="scale-75" />
-            </div>
-            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
-              <span className="text-[9px] font-bold text-slate-400 uppercase">Analysis</span>
-              <Switch checked={options.analysis} onCheckedChange={() => toggleOption('analysis')} className="scale-75" />
-            </div>
-            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
-              <span className="text-[9px] font-bold text-slate-400 uppercase">Stress</span>
-              <Switch checked={options.stress} onCheckedChange={() => toggleOption('stress')} className="scale-75" />
-            </div>
-            <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
-              <span className="text-[9px] font-bold text-slate-400 uppercase">Seismic</span>
-              <Switch checked={options.seismic} onCheckedChange={() => toggleOption('seismic')} className="scale-75" />
-            </div>
-          </div>
-        </div>
-        <CardTitle className="text-sm sm:text-base mt-1">Detailed Calculation Steps</CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 space-y-6">
-        {calculationMode === 'cast-in-embed' && options.section && (
-          <div className="space-y-3">
-            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-              <Anchor className="w-3 h-3" />
-              Step 1: Anchor Geometry & Concrete Properties
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/20 p-3 rounded-xl border border-blue-100">
-              <div className="space-y-2">
-                <p className="text-[10px] font-medium text-slate-500 italic">Parameters:</p>
-                <div className="font-mono text-[11px] space-y-1.5">
-                   <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                     <span>Embed Depth (h_ef)</span>
-                     <span className="font-bold">{embedDepth} mm</span>
-                   </div>
-                   <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                     <span>Edge Distance (c_1)</span>
-                     <span className="font-bold">{edgeDistance} mm</span>
-                   </div>
-                   <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                     <span>Concrete Grade (f'_c)</span>
-                     <span className="font-bold">{concreteGrade} MPa</span>
-                   </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] font-medium text-slate-500 italic">Design Criteria (ACI 318):</p>
-                <div className="font-mono text-[11px] space-y-1.5">
-                   <div className="bg-white p-2 rounded border border-slate-200">
-                     N_b = 10 · √(f'c) · h_ef^1.5
-                   </div>
-                   <div className="bg-white p-2 rounded border border-slate-200">
-                     A_Nc = (1.5h_ef + c_1) · 3h_ef
-                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {calculationMode === 'beam' && options.section && (
-          <div className="space-y-3">
-            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-              <Layers className="w-3 h-3" />
-              Step 1: Section Properties
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-              <div className="space-y-2">
-                <p className="text-[10px] font-medium text-slate-500 italic">Formulas:</p>
-                <div className="font-mono text-[11px] space-y-1.5">
-                  {sectionType === 'solid' ? (
-                    <>
-                      <div className="bg-white p-2 rounded border border-slate-200">A = w × h</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">I = (w × h³) / 12</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">W = I / (h / 2)</div>
-                    </>
-                  ) : sectionType === 'channel' ? (
-                    <>
-                      <div className="bg-white p-2 rounded border border-slate-200">A = 2wt_f + (h-2t_f)t_w</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">I = (wh³)/12 - ((w-t_w)(h-2t_f)³)/12</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">W = I / (h / 2)</div>
-                    </>
-                  ) : sectionType === 'l-plate' ? (
-                    <>
-                      <div className="bg-white p-2 rounded border border-slate-200">A = wt_h + (h-t_h)t_v</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">I = Σ(I_i + A_i·d_i²)</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">W = I / y_max</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="bg-white p-2 rounded border border-slate-200">A = (w × h) - (w - 2t_x)(h - 2t_y)</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">I = (wh³ - (w-2t_x)(h-2t_y)³) / 12</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">W = I / (h / 2)</div>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] font-medium text-slate-500 italic">Calculations:</p>
-                    <div className="font-mono text-[11px] space-y-1.5">
-                      <div className="bg-white p-2 rounded border border-slate-200">A = {(sectionProps.area ?? 0).toFixed(2)} mm²</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">I = {(sectionProps.momentOfInertia ?? 0).toExponential(4)} mm⁴</div>
-                      <div className="bg-white p-2 rounded border border-slate-200">W = {(sectionProps.sectionModulus ?? 0).toExponential(4)} mm³</div>
-                    </div>
-              </div>
-            </div>
-            
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-2">
-                <div className="flex items-center gap-2 text-blue-700">
-                  <div className="p-1 rounded bg-blue-100">
-                    <Activity className="w-3 h-3" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider">I-Value (Moment of Inertia)</span>
-                </div>
-                <p className="text-[10px] text-slate-600 leading-relaxed">
-                  <strong>Calculus Measure:</strong> The second moment of area, defined as <code className="text-blue-700 font-bold">I = ∫ y² dA</code>. 
-                  It measures the section's geometric efficiency in resisting bending. A larger I-value significantly reduces deflection (Δ ∝ 1/I).
-                </p>
-              </div>
-              <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 space-y-2">
-                <div className="flex items-center gap-2 text-indigo-700">
-                  <div className="p-1 rounded bg-indigo-100">
-                    <Layers className="w-3 h-3" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider">W-Value (Section Modulus)</span>
-                </div>
-                <p className="text-[10px] text-slate-600 leading-relaxed">
-                  <strong>Calculus Measure:</strong> Derived as <code className="text-indigo-700 font-bold">W = I / y_max</code>. 
-                  It relates the internal bending moment to the maximum stress at the extreme fiber (σ = M/W). It defines the strength capacity of the section.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {options.loads && (
-          <div className="space-y-3">
-            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-              <Scale className="w-3 h-3" />
-              Step 2: Load Factoring ({activeCombination.name})
-            </h4>
-            <p className="text-[10px] text-slate-500 italic px-1">{activeCombination.description}</p>
-            <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-slate-200">
-                    <TableHead className="h-8 text-[9px] uppercase font-bold text-slate-400">Type</TableHead>
-                    <TableHead className="h-8 text-[9px] uppercase font-bold text-slate-400 text-right">Nominal</TableHead>
-                    <TableHead className="h-8 text-[9px] uppercase font-bold text-slate-400 text-center">Factor</TableHead>
-                    <TableHead className="h-8 text-[9px] uppercase font-bold text-slate-400 text-right">Factored</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {factoredLoads.map((load, idx) => (
-                    <TableRow key={idx} className="hover:bg-slate-100/50 border-slate-100">
-                      <TableCell className="py-2 text-[10px] font-medium text-slate-700 capitalize">{load.type} ({load.category})</TableCell>
-                      <TableCell className="py-2 text-[10px] font-mono text-right">{(load.value ?? 0).toFixed(2)}</TableCell>
-                      <TableCell className="py-2 text-[10px] font-mono text-center text-blue-600 font-bold">×</TableCell>
-                      <TableCell className="py-2 text-[10px] font-mono text-right font-bold text-slate-900">{(load.value ?? 0).toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        )}
-
-        {options.analysis && (
-          <div className="space-y-3">
-            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-              <Calculator className="w-3 h-3" />
-              Step 3: Beam Analysis
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-              <div className="space-y-2">
-                <p className="text-[10px] font-medium text-slate-500 italic">Key Results:</p>
-                  <div className="font-mono text-[11px] space-y-1.5">
-                    <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                      <span>Max Moment (M_max):</span>
-                      <span className="font-bold text-blue-600">{((results.summary.maxMoment ?? 0) / 1000000).toFixed(3)} kNm</span>
-                    </div>
-                    <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                      <span>Max Shear (V_max):</span>
-                      <span className="font-bold text-blue-600">{((results.summary.maxShear ?? 0) / 1000).toFixed(3)} kN</span>
-                    </div>
-                    <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                      <span>Max Deflection (Δ_max):</span>
-                      <span className="font-bold text-blue-600">{(results.summary.maxDeflection ?? 0).toFixed(3)} mm</span>
-                    </div>
-                  </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] font-medium text-slate-500 italic">Verification:</p>
-                <div className="font-mono text-[11px] space-y-1.5">
-                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                    <span>Span Ratio:</span>
-                    <span className="font-bold text-slate-900">{results.summary.deflectionRatio}</span>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                    <span>Limit (L/{beamType === 'transom' ? 240 : 175}):</span>
-                    <span className="font-bold text-slate-900">{(beamProps.length / (beamType === 'transom' ? 240 : 175)).toFixed(2)} mm</span>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-slate-200 flex justify-between">
-                    <span>Status:</span>
-                    <span className={cn("font-bold uppercase", results.summary.status === 'pass' ? "text-green-600" : "text-red-600")}>
-                      {results.summary.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Deflection Chart */}
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Deflection Visualization</h5>
-                <div className="text-[10px] font-mono text-blue-600 font-bold">
-                  Δ_max = {(results.summary.maxDeflection ?? 0).toFixed(3)} mm
-                </div>
-              </div>
-              <div className="h-48 bg-white rounded-xl border border-slate-200 p-2 overflow-hidden shadow-inner">
-                <ChartContainer 
-                  data={results.points.map((p: any) => ({ 
-                    ...p, 
-                    x: toDisplay(p.x, 'length'), 
-                    deflection: toDisplay(p.deflection, 'length') 
-                  }))} 
-                  dataKey="deflection" 
-                  color="#3B82F6" 
-                  unit={u.length} 
-                  label={t.deflection}
-                  invert
-                  unitSystem={unitSystem as any}
-                  u={u}
-                  criticalPoints={criticalPoints?.deflection}
-                  chartType="line"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {options.seismic && (
-          <div className="space-y-3">
-            <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center gap-2">
-              <Activity className="w-3 h-3" />
-              Seismic Parameter Verification
-            </h4>
-            <div className="bg-rose-50/30 p-3 rounded-xl border border-rose-100/50 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <p className="text-[10px] font-medium text-rose-700/70 italic uppercase tracking-wider font-bold">Region Database ({SEISMIC_REGIONS[seismicRegion as keyof typeof SEISMIC_REGIONS].name})</p>
-                <div className="font-mono text-[11px] space-y-1.5">
-                  <div className="bg-white/80 p-2 rounded border border-rose-100 flex justify-between">
-                    <span className="text-slate-500">Peak Ground Accel (ag/g):</span>
-                    <span className="font-bold text-rose-600">{SEISMIC_REGIONS[seismicRegion as keyof typeof SEISMIC_REGIONS].accel.toFixed(3)}</span>
-                  </div>
-                  <div className="bg-white/80 p-2 rounded border border-rose-100 flex justify-between">
-                    <span className="text-slate-500">Importance Factor (Ie):</span>
-                    <span className="font-bold text-rose-600">{SEISMIC_REGIONS[seismicRegion as keyof typeof SEISMIC_REGIONS].importance.toFixed(2)}</span>
-                  </div>
-                  <div className="bg-white/80 p-2 rounded border border-rose-100 flex justify-between">
-                    <span className="text-slate-500">Resp. Mod Factor (R):</span>
-                    <span className="font-bold text-rose-600">{SEISMIC_REGIONS[seismicRegion as keyof typeof SEISMIC_REGIONS].respMod.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] font-medium text-rose-700/70 italic uppercase tracking-wider font-bold">Derivation (Static Equivalent)</p>
-                <div className="font-mono text-[11px] space-y-1.5">
-                  <div className="bg-white/80 p-2 rounded border border-rose-100 space-y-1">
-                    <div className="flex justify-between items-center bg-rose-50/50 p-1 px-1.5 rounded mb-1 border border-rose-100">
-                      <span className="text-[9px] font-bold text-rose-600 uppercase">Seismic Coefficient (Cs)</span>
-                      <span className="text-[12px] font-bold text-rose-700">{seismicCoeff.toFixed(4)}</span>
-                    </div>
-                    <p className="text-[9px] text-slate-400 italic">Cs = ag/g × (Ie / R) × α (simplified local code model)</p>
-                  </div>
-                  <div className="bg-white/80 p-2 rounded border border-rose-100 space-y-1">
-                     <div className="flex justify-between items-center bg-rose-50/50 p-1 px-1.5 rounded border border-rose-100">
-                      <span className="text-[9px] font-bold text-rose-600 uppercase">Resultant Force (Fs)</span>
-                      <span className="text-rose-700 font-bold">{(loads.filter(l => l.category === 'seismic').reduce((s, l) => s + (l.value ?? 0), 0)).toFixed(4)} {u.force}/{u.length}</span>
-                    </div>
-                    <p className="text-[9px] text-slate-400 italic">Fs = Cs × Total Weight (W_dead)</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p className="text-[9px] text-slate-400 px-1 leading-relaxed bg-slate-50 p-2 rounded border border-slate-100">
-              <strong>Note:</strong> The seismic coefficient derived is based on the equivalent static force method as per the selected regional standard. For non-structural facade components, dynamic amplification may be required depending on the component's natural frequency and mounting height relative to the building height.
-            </p>
-          </div>
-        )}
-
-        {options.stress && (
-          <div className="space-y-3">
-            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-              <Scale className="w-3 h-3" />
-              Step 4: Stress Check
-            </h4>
-            <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Bending Stress Calculation</p>
-                    <div className="font-mono text-xs space-y-1">
-                      <p>σ = M_max / W</p>
-                      <p>σ = {(results.summary.maxMoment ?? 0).toFixed(0)} / {(sectionProps.sectionModulus ?? 0).toFixed(0)}</p>
-                      <p className="text-blue-600 font-bold">σ = {(results.summary.maxStress ?? 0).toFixed(2)} MPa</p>
-                    </div>
-                  </div>
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Allowable Stress</p>
-                    <div className="font-mono text-xs space-y-1">
-                      <p>σ_allow = fy / Safety Factor (γ)</p>
-                      <p>σ_allow = {beamProps.yieldStrength} / {safetyFactor}</p>
-                      <p className="text-green-600 font-bold">σ_allow = {(beamProps.yieldStrength / safetyFactor).toFixed(2)} MPa</p>
-                    </div>
-                  </div>
-              </div>
-              <div className={cn(
-                "p-3 rounded-lg border flex items-center justify-between",
-                (results.summary.maxStress ?? 0) <= (beamProps.yieldStrength / safetyFactor) 
-                  ? "bg-green-50 border-green-200 text-green-700" 
-                  : "bg-red-50 border-red-200 text-red-700"
-              )}>
-                <div className="flex items-center gap-2">
-                  {(results.summary.maxStress ?? 0) <= (beamProps.yieldStrength / safetyFactor) ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                  <span className="text-xs font-bold uppercase tracking-tight">
-                    {(results.summary.maxStress ?? 0) <= (beamProps.yieldStrength / safetyFactor) ? "Stress Check Passed" : "Stress Check Failed"}
-                  </span>
-                </div>
-                <span className="text-xs font-mono font-bold">
-                  {((results.summary.maxStress ?? 0) / (beamProps.yieldStrength / safetyFactor) * 100).toFixed(1)}% Utilization
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
-
-const REGIONS = [
-  { 
-    id: 'asia-east', 
-    name: 'East Asia', 
-    icon: <Globe className="w-4 h-4" />,
-    cities: ['Shanghai', 'Beijing', 'Guangzhou', 'Shenzhen', 'Hong Kong', 'Macau', 'Taipei', 'Tokyo', 'Osaka', 'Seoul', 'Busan'] 
-  },
-  { 
-    id: 'asia-se', 
-    name: 'Southeast & South Asia', 
-    icon: <MapPin className="w-4 h-4" />,
-    cities: ['Singapore', 'Kuala Lumpur', 'Bangkok', 'Jakarta', 'Manila', 'Ho Chi Minh', 'Mumbai', 'Delhi', 'Bangalore'] 
-  },
-  { 
-    id: 'europe', 
-    name: 'Europe & UK', 
-    icon: <Box className="w-4 h-4" />,
-    cities: ['London', 'Birmingham', 'Berlin', 'Munich', 'Paris', 'Lyon', 'Rome', 'Milan', 'Madrid', 'Barcelona', 'Amsterdam'] 
-  },
-  { 
-    id: 'americas', 
-    name: 'Americas', 
-    icon: <PlusCircle className="w-4 h-4" />,
-    cities: ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Miami', 'Toronto', 'Vancouver', 'Mexico City', 'Sao Paulo', 'Rio de Janeiro'] 
-  },
-  { 
-    id: 'mideast-africa', 
-    name: 'Middle East & Africa', 
-    icon: <Layers className="w-4 h-4" />,
-    cities: ['Dubai', 'Abu Dhabi', 'Riyadh', 'Jeddah', 'Doha', 'Muscat', 'Cape Town', 'Johannesburg', 'Cairo', 'Lagos'] 
-  },
-  { 
-    id: 'oceania', 
-    name: 'Oceania', 
-    icon: <Activity className="w-4 h-4" />,
-    cities: ['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Auckland', 'Wellington', 'Christchurch'] 
-  },
-];
-
-function KeyMapDialog({ onSelect }: { onSelect: (location: string) => void }) {
-  return (
-    <DialogContent className="max-w-2xl bg-white border-2 border-slate-200 shadow-2xl rounded-3xl overflow-hidden p-0 max-h-[90vh] flex flex-col">
-      <div className="bg-slate-900 p-6 text-white relative overflow-hidden shrink-0">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 blur-3xl -translate-y-1/2 translate-x-1/2 rounded-full" />
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-600/10 blur-2xl translate-y-1/2 -translate-x-1/2 rounded-full" />
-        
-        <DialogHeader className="relative z-10">
-          <DialogTitle className="flex items-center gap-3 text-xl sm:text-2xl font-black italic tracking-tighter">
-            <div className="bg-blue-600 p-1.5 sm:p-2 rounded-xl shadow-lg shadow-blue-900/40">
-              <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            </div>
-            LOCATION KEY MAP
-          </DialogTitle>
-          <DialogDescription className="text-slate-400 font-medium text-xs">
-            Select a project location to automatically configure region-specific design codes and climatic parameters.
-          </DialogDescription>
-        </DialogHeader>
-      </div>
-      
-      <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
-          {REGIONS.map((region) => (
-            <div key={region.id} className="space-y-3 sm:space-y-4">
-              <div className="flex items-center gap-2 border-b-2 border-slate-100 pb-2">
-                <span className="bg-slate-100 p-1.5 rounded-lg text-slate-500">
-                  {region.icon}
-                </span>
-                <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-widest">
-                  {region.name}
-                </h4>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {region.cities.map((city) => (
-                  <Button 
-                    key={city}
-                    variant="ghost"
-                    className="justify-start h-9 sm:h-10 text-[10px] sm:text-[11px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all border border-transparent hover:border-blue-100 px-2"
-                    onClick={() => onSelect(city)}
-                  >
-                    <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1.5 sm:mr-2 text-slate-400 group-hover:text-blue-500" />
-                    <span className="truncate">{city}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="mt-6 sm:mt-8 bg-blue-50/50 p-4 sm:p-5 rounded-3xl border border-blue-100/50 flex items-start gap-3 sm:gap-4">
-          <div className="bg-blue-600 p-1.5 sm:p-2 rounded-xl shadow-md shrink-0">
-            <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-[10px] sm:text-[11px] font-bold text-blue-900 uppercase tracking-tight">Pro Tip: Smart Configuration</p>
-            <p className="text-[10px] sm:text-[11px] text-blue-700/80 leading-relaxed font-medium">
-              Picking a city from this map instantly maps your project to international standards and <strong>seismic zones</strong>. This syncs wind pressures, snow loads, and seismic factors automatically.
-            </p>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-slate-50 px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center border-t border-slate-100 shrink-0">
-        <div className="flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-          <Activity className="w-3 h-3" />
-          Real-time Sync Active
-        </div>
-        <DialogFooter className="sm:justify-end">
-          <DialogClose render={<Button variant="outline" className="rounded-xl font-bold text-xs h-8 sm:h-9" />}>
-            Close Map
-          </DialogClose>
-        </DialogFooter>
-      </div>
-    </DialogContent>
-  );
-}
-
-export function App() {
-  // Beam State
+function App() {
   const [length, setLength] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
@@ -3140,6 +293,8 @@ export function App() {
     }
     return 'simply_supported';
   });
+
+// Mapping for automatic design code selection based on location input in multiple languages
   const [intermediateSupports, setIntermediateSupports] = useState<number[]>(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
@@ -3170,10 +325,6 @@ export function App() {
     }
     return 'Shanghai';
   });
-  const [hoveredLoad, setHoveredLoad] = useState<Load | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [mobileTab, setMobileTab] = useState<'inputs' | 'results'>('inputs');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Loads State
   const [loads, setLoads] = useState<Load[]>(() => {
@@ -3208,6 +359,11 @@ export function App() {
     }
     return 'c1';
   });
+
+  const [hoveredLoad, setHoveredLoad] = useState<Load | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [mobileTab, setMobileTab] = useState<'inputs' | 'results'>('inputs');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCombinationManagerOpen, setIsCombinationManagerOpen] = useState(false);
   const [isLocationMapOpen, setIsLocationMapOpen] = useState(false);
   const [showAllCodes, setShowAllCodes] = useState(false);
@@ -3238,8 +394,6 @@ export function App() {
     }
     return 'metric';
   });
-  
-  // Multi-Project State
   const [projects, setProjects] = useState<Project[]>(() => {
     const saved = localStorage.getItem('facadecalc_projects_list');
     if (saved) {
@@ -3257,7 +411,6 @@ export function App() {
   const [comparisonProjectId, setComparisonProjectId] = useState<string | null>(null);
   const [isBiViewMode, setIsBiViewMode] = useState(false);
 
-  // Project Info State
   const [calculationMode, setCalculationMode] = useState<'beam' | 'panel' | 'sealant' | 'bracket' | 'cast-in-embed'>(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
@@ -3363,7 +516,6 @@ export function App() {
     }
     return new Date().toTimeString().split(' ')[0].slice(0, 5);
   });
-
   const [projectNotes, setProjectNotes] = useState(() => {
     const saved = localStorage.getItem('facadecalc_project');
     if (saved) {
@@ -3375,10 +527,35 @@ export function App() {
     return 'Structural calculation for this project.';
   });
 
+  const [seismicRegion, setSeismicRegion] = useState<keyof typeof SEISMIC_REGIONS>(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.seismicRegion ?? 'china';
+      } catch (e) { return 'china'; }
+    }
+    return 'china';
+  });
+  const [seismicCoeff, setSeismicCoeff] = useState(() => {
+    const saved = localStorage.getItem('facadecalc_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        return data.seismicCoeff ?? SEISMIC_REGIONS.china.coeff;
+      } catch (e) { return SEISMIC_REGIONS.china.coeff; }
+    }
+    return SEISMIC_REGIONS.china.coeff;
+  });
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const [past, setPast] = useState<ProjectState[]>([]);
+  const [future, setFuture] = useState<ProjectState[]>([]);
+  const isHistoryAction = React.useRef(false);
+
   const t = TRANSLATIONS[lang];
   const u = UNITS[unitSystem];
 
-  // Unit Conversion Helpers
   const toDisplay = (val: number, type: keyof typeof UNITS.metric): number => {
     if (unitSystem === 'metric') {
       if (type === 'momentDisplay') return val / 1000000;
@@ -3409,77 +586,7 @@ export function App() {
     }
   };
 
-  // Seismic State
-  const [seismicRegion, setSeismicRegion] = useState<keyof typeof SEISMIC_REGIONS>(() => {
-    const saved = localStorage.getItem('facadecalc_project');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        return data.seismicRegion ?? 'china';
-      } catch (e) { return 'china'; }
-    }
-    return 'china';
-  });
-  const [seismicCoeff, setSeismicCoeff] = useState(() => {
-    const saved = localStorage.getItem('facadecalc_project');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        return data.seismicCoeff ?? SEISMIC_REGIONS.china.coeff;
-      } catch (e) { return SEISMIC_REGIONS.china.coeff; }
-    }
-    return SEISMIC_REGIONS.china.coeff;
-  });
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  
-  // Auto-switch design code based on location (Multilingual Support)
-  React.useEffect(() => {
-    if (!projectLocation) return;
-    
-    const loc = projectLocation.toLowerCase().trim();
-    let foundCode = '';
-
-    // Search through the mapping for multilingual matches
-    for (const key in LOCATION_CODE_MAPPING) {
-      const entry = LOCATION_CODE_MAPPING[key];
-      if (entry.matches.some(match => loc.includes(match.toLowerCase()))) {
-        foundCode = entry.codes[0];
-        break;
-      }
-    }
-
-    if (foundCode && foundCode !== selectedCodeId) {
-      setSelectedCodeId(foundCode);
-      
-      // Optional: Inform user of auto-detection
-      setNotification({
-        message: `Auto-detected location: ${projectLocation}. Applied ${foundCode} design standards.`,
-        type: 'success'
-      });
-      setTimeout(() => setNotification(null), 3000);
-    }
-
-    // Seismic detection mapping
-    let foundSeismic: keyof typeof SEISMIC_REGIONS | '' = '';
-    for (const city in LOCATION_SEISMIC_MAPPING) {
-      if (loc.includes(city)) {
-        foundSeismic = LOCATION_SEISMIC_MAPPING[city];
-        break;
-      }
-    }
-
-    if (foundSeismic && foundSeismic !== seismicRegion) {
-      setSeismicRegion(foundSeismic);
-      setSeismicCoeff(SEISMIC_REGIONS[foundSeismic].coeff);
-    }
-  }, [projectLocation, selectedCodeId, seismicRegion]);
-
-  // History State for Undo/Redo
-  const [past, setPast] = useState<HistoryState[]>([]);
-  const [future, setFuture] = useState<HistoryState[]>([]);
-  const isHistoryAction = React.useRef(false);
-
-  const getCurrentState = (): HistoryState => ({
+  const getCurrentState = (): ProjectState => ({
     projectTitle,
     projectLocation,
     projectDescription,
@@ -3529,7 +636,7 @@ export function App() {
     projectNotes
   });
 
-  const applyState = (state: HistoryState) => {
+  const applyState = (state: ProjectState) => {
     isHistoryAction.current = true;
     setProjectTitle(state.projectTitle);
     setProjectLocation(state.projectLocation);
@@ -3542,7 +649,7 @@ export function App() {
     setMaterial(state.material);
     setPanelMaterialId(state.panelMaterialId ?? 'aluminum_solid');
     setSealantMaterialId(state.sealantMaterialId ?? 'silicone_structural');
-    setBracketTypeId(state.bracketTypeId ?? 'combined');
+    setBracketTypeId(state.bracketTypeId as any);
     setSectionType(state.sectionType);
     setWidth(state.width);
     setHeight(state.height);
@@ -3601,7 +708,7 @@ export function App() {
   };
 
   // Effect to track changes and push to history with debounce
-  const lastStateRef = React.useRef<HistoryState | null>(null);
+  const lastStateRef = React.useRef<ProjectState | null>(null);
   const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   
   React.useEffect(() => {
@@ -3636,6 +743,48 @@ export function App() {
     loads, combinations, activeCombinationId,
     seismicRegion, seismicCoeff, projectNotes
   ]);
+
+  // Auto-switch design code based on location (Multilingual Support)
+  React.useEffect(() => {
+    if (!projectLocation) return;
+    
+    const loc = projectLocation.toLowerCase().trim();
+    let foundCode = '';
+
+    // Search through the mapping for multilingual matches
+    for (const key in LOCATION_CODE_MAPPING) {
+      const entry = LOCATION_CODE_MAPPING[key];
+      if (entry.matches.some(match => loc.includes(match.toLowerCase()))) {
+        foundCode = entry.codes[0];
+        break;
+      }
+    }
+
+    if (foundCode && foundCode !== selectedCodeId) {
+      setSelectedCodeId(foundCode);
+      
+      // Optional: Inform user of auto-detection
+      setNotification({
+        message: `Auto-detected location: ${projectLocation}. Applied ${foundCode} design standards.`,
+        type: 'success'
+      });
+      setTimeout(() => setNotification(null), 3000);
+    }
+
+    // Seismic detection mapping
+    let foundSeismic: keyof typeof SEISMIC_REGIONS | '' = '';
+    for (const city in LOCATION_SEISMIC_MAPPING) {
+      if (loc.includes(city)) {
+        foundSeismic = LOCATION_SEISMIC_MAPPING[city];
+        break;
+      }
+    }
+
+    if (foundSeismic && foundSeismic !== seismicRegion) {
+      setSeismicRegion(foundSeismic);
+      setSeismicCoeff(SEISMIC_REGIONS[foundSeismic].coeff);
+    }
+  }, [projectLocation, selectedCodeId, seismicRegion]);
 
   // Keyboard shortcuts for Undo/Redo
   React.useEffect(() => {
@@ -3787,10 +936,10 @@ export function App() {
 
   const beamProps: BeamProperties = useMemo(() => ({
     length,
-    elasticModulus: MATERIALS[material].e,
+    elasticModulus: MATERIALS[material]?.e ?? 70000,
     momentOfInertia: sectionProps.momentOfInertia,
     sectionModulus: sectionProps.sectionModulus,
-    yieldStrength: MATERIALS[material].yield,
+    yieldStrength: MATERIALS[material]?.yield ?? 160,
     safetyFactor,
     supportCondition,
   }), [length, material, sectionProps, safetyFactor, supportCondition]);
@@ -3854,7 +1003,8 @@ export function App() {
 
   const selfWeightPerUnit = useMemo(() => {
     const areaMm2 = sectionProps.area ?? 0;
-    const densityKgM3 = (MATERIALS[material as keyof typeof MATERIALS] as any).density ?? 2700;
+    const mat = MATERIALS[material as keyof typeof MATERIALS] as any;
+    const densityKgM3 = mat?.density ?? 2700;
     // Area (mm2) * 1e-6 (m2) * Density (kg/m3) * 9.81 (N/kg) = N/m
     // Divide by 1000 to get N/mm
     return (areaMm2 * 1e-6 * densityKgM3 * 9.81) / 1000;
@@ -5486,7 +2636,7 @@ export function App() {
                             max={60}
                             step={0.5}
                             precision={1}
-                            value={panelMaterialId.includes('acm') ? (PANEL_MATERIALS[panelMaterialId] as any).totalThickness : (thickness || 3)}
+                            value={panelMaterialId.includes('acm') ? ((PANEL_MATERIALS[panelMaterialId] as any)?.totalThickness ?? 4) : (thickness || 3)}
                             onChange={(val) => setThickness(val)}
                             disabled={panelMaterialId.includes('acm')}
                           />
@@ -5614,7 +2764,7 @@ export function App() {
                 <Info className="w-3.5 h-3.5" />
                 <span className="text-[10px] font-bold uppercase tracking-widest">{t.materialProps}</span>
               </div>
-              <CardTitle className="text-sm sm:text-base">{MATERIALS[material].name}</CardTitle>
+              <CardTitle className="text-sm sm:text-base">{(MATERIALS[material] as any)?.name ?? 'Unknown'}</CardTitle>
             </CardHeader>
             <CardContent className="p-3 sm:p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -5628,7 +2778,7 @@ export function App() {
                     </TooltipContent>
                   </Tooltip>
                   <div className="text-xs font-semibold bg-slate-50 p-1.5 rounded border border-slate-100">
-                    {toDisplay(MATERIALS[material].e, 'stress').toLocaleString()} {u.stress}
+                    {toDisplay((MATERIALS[material] as any)?.e ?? 70000, 'stress').toLocaleString()} {u.stress}
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -5641,7 +2791,7 @@ export function App() {
                     </TooltipContent>
                   </Tooltip>
                   <div className="text-xs font-semibold bg-slate-50 p-1.5 rounded border border-slate-100">
-                    {toDisplay(MATERIALS[material].yield, 'stress').toLocaleString()} {u.stress}
+                    {toDisplay((MATERIALS[material] as any)?.yield ?? 160, 'stress').toLocaleString()} {u.stress}
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -5654,7 +2804,7 @@ export function App() {
                     </TooltipContent>
                   </Tooltip>
                   <div className="text-xs font-semibold bg-slate-50 p-1.5 rounded border border-slate-100">
-                    {MATERIALS[material].poisson.toFixed(2)}
+                    {(MATERIALS[material] as any)?.poisson?.toFixed(2) ?? '-'}
                   </div>
                 </div>
               </div>
@@ -5959,7 +3109,7 @@ export function App() {
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Description:</span> <span className="truncate max-w-[200px]">{projectDescription || 'N/A'}</span></div>
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Design Code:</span> <span className="text-blue-700 font-bold">{selectedCodeId}</span></div>
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Combination:</span> <span>{activeCombination.name}</span></div>
-                          <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{MATERIALS[material].name}</span></div>
+                          <div className="flex gap-2"><span className="font-bold text-slate-700">Material:</span> <span>{(MATERIALS[material] as any)?.name ?? 'Unknown'}</span></div>
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Span:</span> <span>{toDisplay(length ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)} {u.length}</span></div>
                           <div className="flex gap-2"><span className="font-bold text-slate-700">Section:</span> <span>{(['hollow', 'channel', 'i-beam', 't-section'].includes(sectionType)) ? `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(thickness ?? 0, 'length').toFixed(unitSystem === 'metric' ? 1 : 3)}${u.length}` : `${toDisplay(width ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}x${toDisplay(height ?? 0, 'length').toFixed(unitSystem === 'metric' ? 0 : 2)}${u.length}`}</span></div>
                         </div>
@@ -6450,20 +3600,20 @@ export function App() {
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1.5">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-slate-500">Elastic Modulus (E)</span>
-                      <span className="text-[10px] font-mono font-bold text-blue-600">{toDisplay(MATERIALS[material].e, 'stress').toLocaleString()} {u.stress}</span>
+                      <span className="text-[10px] font-mono font-bold text-blue-600">{toDisplay((MATERIALS[material] as any)?.e ?? 70000, 'stress').toLocaleString()} {u.stress}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-slate-500">Yield Strength (fy)</span>
-                      <span className="text-[10px] font-mono font-bold text-blue-600">{toDisplay(MATERIALS[material].yield, 'stress').toFixed(0)} {u.stress}</span>
+                      <span className="text-[10px] font-mono font-bold text-blue-600">{toDisplay((MATERIALS[material] as any)?.yield ?? 160, 'stress').toFixed(0)} {u.stress}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-slate-500">Poisson's Ratio (ν)</span>
-                      <span className="text-[10px] font-mono font-bold text-blue-600">{MATERIALS[material].poisson.toFixed(2)}</span>
+                      <span className="text-[10px] font-mono font-bold text-blue-600">{(MATERIALS[material] as any)?.poisson?.toFixed(2) ?? '-'}</span>
                     </div>
                     <div className="flex justify-between items-center pt-1 border-t border-slate-200">
                       <span className="text-[10px] text-slate-500">Allowable Stress</span>
                       <span className="text-[10px] font-mono font-bold text-green-600">
-                        {toDisplay(MATERIALS[material].yield / safetyFactor, 'stress').toFixed(unitSystem === 'metric' ? 1 : 0)} {u.stress}
+                        {toDisplay(((MATERIALS[material] as any)?.yield ?? 160) / safetyFactor, 'stress').toFixed(unitSystem === 'metric' ? 1 : 0)} {u.stress}
                       </span>
                     </div>
                   </div>
@@ -6902,309 +4052,12 @@ export function App() {
   );
 }
 
-export default function Root() {
-  return <App />;
-}
-
-function SummaryCard({ label, value, subValue, icon, status, onClick, active, progress, tooltip }: { 
-  label: string; 
-  value: string; 
-  subValue?: string; 
-  icon: React.ReactNode;
-  status?: 'pass' | 'fail';
-  onClick?: () => void;
-  active?: boolean;
-  progress?: number;
-  tooltip?: string;
-}) {
-  const CardContentWrapper = (
-    <Card 
-      className={cn(
-        "shadow-sm border-slate-200 overflow-hidden cursor-pointer transition-all duration-200 group relative",
-        active ? "ring-2 ring-blue-500 border-transparent" : "hover:border-blue-300 hover:shadow-md"
-      )}
-      onClick={onClick}
-    >
-      <CardContent className="p-2 sm:p-3">
-        <div className="flex items-center justify-between mb-0.5 sm:mb-1">
-          <span className={cn(
-            "text-[7px] sm:text-[9px] font-bold uppercase tracking-wider truncate mr-1 transition-colors",
-            active ? "text-blue-600" : "text-slate-500 group-hover:text-blue-500"
-          )}>{label}</span>
-          <div className={cn(
-            "shrink-0 transition-transform duration-300 scale-75 sm:scale-100",
-            active ? "scale-90 sm:scale-110" : "group-hover:scale-90 sm:group-hover:scale-110"
-          )}>{icon}</div>
-        </div>
-        <div className="text-xs sm:text-base font-bold tracking-tight truncate">{value}</div>
-        {subValue && (
-          <div className={cn(
-            "text-[7px] sm:text-[9px] font-medium mt-0.5 truncate",
-            status === 'fail' ? "text-red-600" : status === 'pass' ? "text-green-600" : "text-slate-400"
-          )}>
-            {subValue}
-          </div>
-        )}
-        {progress !== undefined && !isNaN(progress) && (
-          <div className="mt-1.5 sm:mt-2 h-0.5 sm:h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, (progress || 0) * 100)}%` }}
-              className={cn(
-                "h-full transition-colors duration-500",
-                progress > 1 ? "bg-red-500" : progress > 0.8 ? "bg-amber-500" : "bg-blue-500"
-              )}
-            />
-          </div>
-        )}
-      </CardContent>
-      {status && (
-        <div className={cn(
-          "absolute top-0 right-0 w-1 h-full",
-          status === 'pass' ? "bg-green-500" : "bg-red-500"
-        )} />
-      )}
-    </Card>
-  );
-
-  if (tooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger>
-          {CardContentWrapper}
-        </TooltipTrigger>
-        <TooltipContent className="max-w-[200px] text-[10px] p-2">
-          {tooltip}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return CardContentWrapper;
-}
-
-function ChartContainer({ 
-  data, 
-  dataKey, 
-  color, 
-  unit, 
-  label, 
-  invert = false, 
-  formatter, 
-  unitSystem, 
-  u, 
-  criticalPoints,
-  chartType = 'area'
-}: { 
-  data: any[]; 
-  dataKey: string; 
-  color: string; 
-  unit: string;
-  label: string;
-  invert?: boolean;
-  formatter?: (v: number) => string;
-  unitSystem: 'metric' | 'imperial';
-  u: any;
-  criticalPoints?: { x: number; y: number; label: string }[];
-  chartType?: 'area' | 'line';
-}) {
-  const commonAxisProps = {
-    x: (
-      <XAxis 
-        dataKey="x" 
-        type="number" 
-        domain={[0, 'dataMax' as any]} 
-        tick={{ fontSize: 10, fill: '#64748B' }}
-        axisLine={{ stroke: '#CBD5E1' }}
-        tickLine={false}
-        label={{ value: `Distance (${u.length})`, position: 'bottom', offset: 0, fontSize: 10, fill: '#64748B' }}
-      />
-    ),
-    y: (
-      <YAxis 
-        reversed={invert}
-        tick={{ fontSize: 10, fill: '#64748B' }}
-        axisLine={{ stroke: '#CBD5E1' }}
-        tickLine={false}
-        tickFormatter={(v) => formatter ? formatter(v) : (Number(v) || 0).toFixed(1)}
-        label={{ value: `${label} (${unit})`, angle: -90, position: 'insideLeft', offset: 10, fontSize: 10, fill: '#64748B' }}
-      />
-    ),
-    grid: <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />,
-    tooltip: (
-      <ChartTooltip 
-        contentStyle={{ 
-          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-          border: '1px solid #E2E8F0', 
-          borderRadius: '12px',
-          fontSize: '12px',
-          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-          backdropFilter: 'blur(4px)'
-        }}
-        formatter={(v: number) => [formatter ? formatter(v) : `${(Number(v) || 0).toFixed(3)} ${unit}`, label]}
-        labelFormatter={(v) => `Position: ${Number(v).toFixed(unitSystem === 'metric' ? 0 : 2)} ${u.length}`}
-      />
-    ),
-    referenceLines: (
-      <>
-        {criticalPoints?.map((cp, i) => (
-          <ReferenceLine 
-            key={i} 
-            x={cp.x} 
-            stroke={color} 
-            strokeDasharray="5 5" 
-            opacity={0.6}
-          >
-            <RechartsLabel 
-              value={cp.label} 
-              position="top" 
-              fill={color} 
-              fontSize={10} 
-              fontWeight="bold"
-              offset={10}
-            />
-          </ReferenceLine>
-        ))}
-        {criticalPoints?.map((cp, i) => (
-          <ReferenceLine 
-            key={`y-${i}`} 
-            y={cp.y} 
-            stroke={color} 
-            strokeDasharray="3 3" 
-            opacity={0.4}
-          />
-        ))}
-      </>
-    )
-  };
-
+function Root() {
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      {chartType === 'area' ? (
-        <AreaChart data={data} margin={{ top: 25, right: 30, left: 10, bottom: 25 }}>
-          <defs>
-            <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
-              <stop offset="95%" stopColor={color} stopOpacity={0}/>
-            </linearGradient>
-          </defs>
-          {commonAxisProps.grid}
-          {commonAxisProps.x}
-          {commonAxisProps.y}
-          {commonAxisProps.tooltip}
-          <Area 
-            type="monotone" 
-            dataKey={dataKey} 
-            stroke={color} 
-            strokeWidth={3}
-            fillOpacity={1} 
-            fill={`url(#gradient-${dataKey})`} 
-            animationDuration={750}
-            activeDot={{ r: 6, stroke: '#FFF', strokeWidth: 2, fill: color }}
-          />
-          {commonAxisProps.referenceLines}
-        </AreaChart>
-      ) : (
-        <LineChart data={data} margin={{ top: 25, right: 30, left: 10, bottom: 25 }}>
-          {commonAxisProps.grid}
-          {commonAxisProps.x}
-          {commonAxisProps.y}
-          {commonAxisProps.tooltip}
-          <Line 
-            type="monotone" 
-            dataKey={dataKey} 
-            stroke={color} 
-            strokeWidth={3}
-            dot={false}
-            animationDuration={750}
-            activeDot={{ r: 6, stroke: '#FFF', strokeWidth: 2, fill: color }}
-          />
-          {commonAxisProps.referenceLines}
-        </LineChart>
-      )}
-    </ResponsiveContainer>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   );
 }
 
-function NumericInputWithControls({ 
-  value, 
-  onChange, 
-  min = -Infinity, 
-  max = Infinity, 
-  step = 1, 
-  precision = 2,
-  className,
-  id,
-  disabled = false
-}: { 
-  value: number; 
-  onChange: (val: number) => void; 
-  min?: number; 
-  max?: number; 
-  step?: number; 
-  precision?: number;
-  className?: string;
-  id?: string;
-  disabled?: boolean;
-}) {
-  const [localValue, setLocalValue] = useState((value ?? 0).toFixed(precision));
-
-  React.useEffect(() => {
-    setLocalValue((value ?? 0).toFixed(precision));
-  }, [value, precision]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (disabled) return;
-    const val = e.target.value;
-    setLocalValue(val);
-    if (val === '') return;
-    const num = parseFloat(val);
-    if (!isNaN(num)) {
-      onChange(Math.min(max, Math.max(min, num)));
-    }
-  };
-
-  const increment = () => {
-    if (disabled) return;
-    const newValue = Math.min(max, value + step);
-    onChange(newValue);
-  };
-
-  const decrement = () => {
-    if (disabled) return;
-    const newValue = Math.max(min, value - step);
-    onChange(newValue);
-  };
-
-  return (
-    <span className={cn("flex items-center gap-1", className)}>
-      <Button 
-        variant="outline" 
-        size="icon" 
-        className="h-8 w-8 sm:h-7 sm:w-7 shrink-0" 
-        onClick={decrement}
-        disabled={disabled || value <= min}
-      >
-        <Minus className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
-      </Button>
-      <Input 
-        id={id}
-        type="number" 
-        value={localValue} 
-        onChange={handleInputChange}
-        disabled={disabled}
-        className="h-8 sm:h-7 flex-1 text-center bg-white text-xs px-1"
-        step="any"
-      />
-      <Button 
-        variant="outline" 
-        size="icon" 
-        className="h-8 w-8 sm:h-7 sm:w-7 shrink-0" 
-        onClick={increment}
-        disabled={disabled || value >= max}
-      >
-        <Plus className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
-      </Button>
-    </span>
-  );
-}
+export default Root;
