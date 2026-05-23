@@ -2463,19 +2463,210 @@ function App() {
                       {calculationMode === 'beam' && (
                         <div className="grid gap-1.5">
                           <Label className="text-[10px] uppercase font-bold text-slate-400">{t.supportCondition}</Label>
-                          <Select value={supportCondition} onValueChange={(v: any) => setSupportCondition(v)}>
-                            <SelectTrigger className="bg-white h-8 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="simply_supported" className="text-xs">{t.simplySupported}</SelectItem>
-                              <SelectItem value="cantilever" className="text-xs">{t.cantilever}</SelectItem>
-                              <SelectItem value="propped_cantilever" className="text-xs">{t.proppedCantilever}</SelectItem>
-                              <SelectItem value="fixed_fixed" className="text-xs">{t.fixedFixed}</SelectItem>
-                              <SelectItem value="fixed_pinned" className="text-xs">{t.fixedPinned}</SelectItem>
-                              <SelectItem value="continuous" className="text-xs">{t.continuous}</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          {(() => {
+                            const supportDetails = {
+                              simply_supported: {
+                                label: t.simplySupported,
+                                desc: lang === 'zh'
+                                  ? '简支梁悬挂：两端铰接支持。允许端部自由转动但阻止位移。经典且最常用的受力边界。'
+                                  : lang === 'th'
+                                  ? 'รองรับแบบหมุนเฉย (Simply Supported) - ยึดหมุนและลูกกลิ้ง ปล่อยให้เกิดการหมุนตัวได้เสรี'
+                                  : lang === 'ms'
+                                  ? 'Sokongan Mudah: Sendi pin pada satu hujung, roller pada hujung lagi. Membenarkan putaran.'
+                                  : 'Simply Supported: Pinned hinge at one end, roller support at the other end. Prevents displacement, allows rotation.',
+                                formula: 'M_max = wL² / 8, Δ_max = 5wL⁴ / 384EI',
+                                svg: (
+                                  <svg className="w-14 h-6 text-current transition-colors" viewBox="0 0 60 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <line x1="8" y1="10" x2="52" y2="10" />
+                                    {/* Pinned support Left */}
+                                    <polygon points="12,10 9,15 15,15" fill="none" />
+                                    <line x1="7" y1="16" x2="17" y2="16" strokeWidth="1" />
+                                    {/* Roller support Right */}
+                                    <polygon points="48,10 45,15 51,15" fill="none" />
+                                    <circle cx="48" cy="17" r="1" fill="currentColor" stroke="none" />
+                                    <line x1="43" y1="18" x2="53" y2="18" strokeWidth="1" />
+                                  </svg>
+                                )
+                              },
+                              cantilever: {
+                                label: t.cantilever,
+                                desc: lang === 'zh'
+                                  ? '悬臂梁支持：一端完全固定刚性硬质连接，另一端悬空自由。端部弯矩和剪力最大。'
+                                  : lang === 'th'
+                                  ? 'คานยื่น (Cantilever) - ปลายด้านหนึ่งยึดแน่นกับผนังแข็งแรง อีกฝั่งลอยอิสระเหมาะสำหรับระเบียง'
+                                  : lang === 'ms'
+                                  ? 'Cantilever: Dipasang tegar sepenuhnya di satu hujung, satu hujung lagi bebas terapung.'
+                                  : 'Cantilever: Rigidly fixed support at one end, completely free at the other. Heavy root moments.',
+                                formula: 'M_max = wL² / 2, Δ_max = wL⁴ / 8EI',
+                                svg: (
+                                  <svg className="w-14 h-6 text-current transition-colors" viewBox="0 0 60 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    {/* Fixed wall */}
+                                    <line x1="10" y1="4" x2="10" y2="16" strokeWidth="2.5" />
+                                    <line x1="7" y1="6" x2="10" y2="3" strokeWidth="1" />
+                                    <line x1="7" y1="10" x2="10" y2="7" strokeWidth="1" />
+                                    <line x1="7" y1="14" x2="10" y2="11" strokeWidth="1" />
+                                    {/* Beam */}
+                                    <line x1="10" y1="10" x2="50" y2="10" />
+                                  </svg>
+                                )
+                              },
+                              propped_cantilever: {
+                                label: t.proppedCantilever,
+                                desc: lang === 'zh'
+                                  ? '支承悬臂梁：一端刚性固定，另一端简支（滚轴/销点式受力端），显着限制位移。'
+                                  : lang === 'th'
+                                  ? 'คานยื่นแบบมีค้ำยัน - ฝั่งหนึ่งยึดแน่นอย่างแข็งแรง อีกฝั่งจุดเชื่อมต่อรองด้วยลูกกลิ้ง'
+                                  : lang === 'ms'
+                                  ? 'Propped Cantilever: Satu hujung disokong tegar, hujung bertentangan disokong boleh laras.'
+                                  : 'Propped Cantilever: Rigidly fixed support at one end, simply supported (roller/pin) at the other.',
+                                formula: 'M_max = wL² / 8, Δ_max = wL⁴ / 185EI',
+                                svg: (
+                                  <svg className="w-14 h-6 text-current transition-colors" viewBox="0 0 60 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    {/* Fixed wall Left */}
+                                    <line x1="10" y1="4" x2="10" y2="16" strokeWidth="2.5" />
+                                    <line x1="7" y1="6" x2="10" y2="3" strokeWidth="1" />
+                                    <line x1="7" y1="10" x2="10" y2="7" strokeWidth="1" />
+                                    <line x1="7" y1="14" x2="10" y2="11" strokeWidth="1" />
+                                    {/* Beam */}
+                                    <line x1="10" y1="10" x2="48" y2="10" />
+                                    {/* Roller support right */}
+                                    <polygon points="48,10 45,15 51,15" fill="none" />
+                                    <line x1="43" y1="16" x2="53" y2="16" strokeWidth="1" />
+                                  </svg>
+                                )
+                              },
+                              fixed_fixed: {
+                                label: t.fixedFixed,
+                                desc: lang === 'zh'
+                                  ? '双端固定：两端完全固结，限制纵/横向位移及所有平面转动。跨中挠度极低。'
+                                  : lang === 'th'
+                                  ? 'ยึดแน่นสองข้าง (Fixed-Fixed) - ปลายคานทั้งสองข้างถูกยึดหลอมเป็นส่วนเดียวกัน ป้องกันการหมุนตัว'
+                                  : lang === 'ms'
+                                  ? 'Tetap-Tetap: Kedua-dua hujung dipasang mati. Penjimatan pesat terhadap lenturan tork.'
+                                  : 'Fixed-Fixed: Both ends rigidly fixed. Heavily resists joint rotation and structural deflections.',
+                                formula: 'M_max = wL² / 12, Δ_max = wL⁴ / 384EI',
+                                svg: (
+                                  <svg className="w-14 h-6 text-current transition-colors" viewBox="0 0 60 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    {/* Fixed wall Left */}
+                                    <line x1="10" y1="4" x2="10" y2="16" strokeWidth="2.5" />
+                                    <line x1="7" y1="6" x2="10" y2="3" strokeWidth="1" />
+                                    <line x1="7" y1="10" x2="10" y2="7" strokeWidth="1" />
+                                    <line x1="7" y1="14" x2="10" y2="11" strokeWidth="1" />
+                                    {/* Beam */}
+                                    <line x1="10" y1="10" x2="50" y2="10" />
+                                    {/* Fixed wall Right */}
+                                    <line x1="50" y1="4" x2="50" y2="16" strokeWidth="2.5" />
+                                    <line x1="50" y1="7" x2="53" y2="4" strokeWidth="1" />
+                                    <line x1="50" y1="11" x2="53" y2="8" strokeWidth="1" />
+                                    <line x1="50" y1="15" x2="53" y2="12" strokeWidth="1" />
+                                  </svg>
+                                )
+                              },
+                              fixed_pinned: {
+                                label: t.fixedPinned,
+                                desc: lang === 'zh'
+                                  ? '固定-铰支：一端完全刚接，另一端铰折支持（阻止端部纵横位移但可转弯）。'
+                                  : lang === 'th'
+                                  ? 'ยึดแน่นฝั่งหนึ่งกับจุดหมุน - ยึดแข็งเกร็งปลายซ้าย และเชื่อมกับข้อแกนหมุนปักดินในปลายขวา'
+                                  : lang === 'ms'
+                                  ? 'Tetap-Pin: Satu hujung bersokongan tetap mati, satu lagi berpagut sendi engsel.'
+                                  : 'Fixed-Pinned: Rigidly fixed joint at left boundary, and pinned hinge joint at the right boundary.',
+                                formula: 'M_max = 9wL² / 128, Δ_max = wL⁴ / 185EI',
+                                svg: (
+                                  <svg className="w-14 h-6 text-current transition-colors" viewBox="0 0 60 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    {/* Fixed wall Left */}
+                                    <line x1="10" y1="4" x2="10" y2="16" strokeWidth="2.5" />
+                                    <line x1="7" y1="6" x2="10" y2="3" strokeWidth="1" />
+                                    <line x1="7" y1="10" x2="10" y2="7" strokeWidth="1" />
+                                    <line x1="7" y1="14" x2="10" y2="11" strokeWidth="1" />
+                                    {/* Beam */}
+                                    <line x1="10" y1="10" x2="48" y2="10" />
+                                    {/* Pinned support Right */}
+                                    <polygon points="48,10 45,15 51,15" fill="none" />
+                                    <circle cx="48" cy="10" r="1" fill="currentColor" stroke="none" />
+                                    <line x1="42" y1="16" x2="54" y2="16" strokeWidth="1.5" />
+                                  </svg>
+                                )
+                              },
+                              continuous: {
+                                label: t.continuous,
+                                desc: lang === 'zh'
+                                  ? '多跨连续梁支撑：中继支撑设计，支持多点受力划分与弹性中间间距设定。'
+                                  : lang === 'th'
+                                  ? 'คานต่อเนื่อง (Continuous) - แนวคานต่อเชื่อมผ่านหลายสุมหัวเสารองรับ สามารถบวกจุดสนับสนุนพิกัดได้'
+                                  : lang === 'ms'
+                                  ? 'Rasuk Berterusan: Rentang berlapis bersambung melangkaui beberapa kedudukan tiang sokong.'
+                                  : 'Continuous Beam: Beam continuing dynamically over multiple spans. Highly redundant statically.',
+                                formula: 'Continuous Span Moment Distribution Method',
+                                svg: (
+                                  <svg className="w-14 h-6 text-current transition-colors" viewBox="0 0 60 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <line x1="8" y1="10" x2="52" y2="10" />
+                                    {/* Left support */}
+                                    <polygon points="12,10 9,15 15,15" fill="none" />
+                                    {/* Middle support */}
+                                    <polygon points="30,10 27,15 33,15" fill="none" />
+                                    {/* Right support */}
+                                    <polygon points="48,10 45,15 51,15" fill="none" />
+                                    <line x1="5" y1="16" x2="55" y2="16" strokeWidth="1" />
+                                  </svg>
+                                )
+                              }
+                            };
+
+                            return (
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-1">
+                                {Object.entries(supportDetails).map(([key, details], idx) => {
+                                  const isSelected = supportCondition === key;
+                                  return (
+                                    <TooltipProvider key={key}>
+                                      <Tooltip>
+                                        <TooltipTrigger render={
+                                          <button
+                                            id={`base-ui-_r_${(28 + idx).toString(16)}`}
+                                            type="button"
+                                            onClick={() => setSupportCondition(key as any)}
+                                            className={cn(
+                                              "flex flex-col items-center justify-between p-2.5 rounded-xl border text-center transition-all duration-200 outline-none select-none h-24 hover:-translate-y-[1px] w-full",
+                                              isSelected 
+                                                ? "bg-blue-50/70 border-blue-500 text-blue-700 shadow-sm ring-1 ring-blue-500/25" 
+                                                : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/50"
+                                            )}
+                                          >
+                                            {/* Micro Diagram */}
+                                            <div className={cn(
+                                              "flex items-center justify-center p-1 w-full h-10 rounded-lg transition-colors mt-0.5",
+                                              isSelected ? "text-blue-600" : "text-slate-400 opacity-80"
+                                            )}>
+                                              {details.svg}
+                                            </div>
+                                            
+                                            {/* Support Name */}
+                                            <span className="text-[10px] font-bold tracking-tight uppercase leading-snug mt-1.5 font-sans block truncate w-full text-center">
+                                              {details.label}
+                                            </span>
+                                          </button>
+                                        } />
+                                        <TooltipContent side="top" className="max-w-[250px] p-2.5 text-xs bg-slate-900 border-0 text-white rounded-lg shadow-xl shrink-0 z-50">
+                                          <div className="space-y-1">
+                                            <p className="font-bold text-[10px] text-blue-400 uppercase tracking-widest leading-none mb-1">
+                                              {details.label}
+                                            </p>
+                                            <p className="text-slate-300 text-[10px] sm:text-[10px] leading-relaxed">
+                                              {details.desc}
+                                            </p>
+                                            <div className="mt-2 pt-1.5 border-t border-slate-800 text-[9px] font-mono text-slate-400 flex justify-between gap-1 items-center">
+                                              <span>Limit Equations:</span>
+                                              <span className="text-blue-300 text-[8px] tracking-tight">{details.formula}</span>
+                                            </div>
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
@@ -2549,13 +2740,38 @@ function App() {
                         <div className="grid gap-1.5">
                           <Label className="text-[10px] uppercase font-bold text-slate-400">{t.sectionType}</Label>
                           <Tabs value={sectionType} onValueChange={(v: any) => setSectionType(v)} className="w-full">
-                            <TabsList className="grid w-full grid-cols-6 h-8">
-                              <TabsTrigger value="solid" className="text-[10px]">{t.solid}</TabsTrigger>
-                              <TabsTrigger value="hollow" className="text-[10px]">{t.hollow}</TabsTrigger>
-                              <TabsTrigger value="channel" className="text-[10px]">Channel</TabsTrigger>
-                              <TabsTrigger value="l-plate" className="text-[10px]">L-Plate</TabsTrigger>
-                              <TabsTrigger value="i-beam" className="text-[10px]">I-Beam</TabsTrigger>
-                              <TabsTrigger value="t-section" className="text-[10px]">T-Section</TabsTrigger>
+                            <TabsList className="grid w-full grid-cols-6 h-8 p-1 bg-slate-150 rounded-lg">
+                              <TabsTrigger value="solid" className="text-[10px] flex items-center justify-center gap-1.5 px-1 sm:px-2">
+                                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-current rounded-sm shrink-0 opacity-80" />
+                                <span className="truncate">{t.solid}</span>
+                              </TabsTrigger>
+                              <TabsTrigger value="hollow" className="text-[10px] flex items-center justify-center gap-1.5 px-1 sm:px-2">
+                                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 border-[1.5px] border-current bg-transparent rounded-sm shrink-0 opacity-80" />
+                                <span className="truncate">{t.hollow}</span>
+                              </TabsTrigger>
+                              <TabsTrigger value="channel" className="text-[10px] flex items-center justify-center gap-1.5 px-1 sm:px-2">
+                                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 border-y-[1.5px] border-l-[1.5px] border-current bg-transparent shrink-0 opacity-80" />
+                                <span className="truncate">Channel</span>
+                              </TabsTrigger>
+                              <TabsTrigger value="l-plate" className="text-[10px] flex items-center justify-center gap-1.5 px-1 sm:px-2">
+                                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 border-b-[1.5px] border-l-[1.5px] border-current bg-transparent shrink-0 opacity-80" />
+                                <span className="truncate">L-Plate</span>
+                              </TabsTrigger>
+                              <TabsTrigger value="i-beam" className="text-[10px] flex items-center justify-center gap-1.5 px-1 sm:px-2">
+                                <div className="flex flex-col items-center justify-center w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0 opacity-80 gap-[1px]">
+                                  <div className="h-[1.5px] w-2 sm:w-2.5 bg-current" />
+                                  <div className="h-1 sm:h-1.5 w-[1.5px] bg-current" />
+                                  <div className="h-[1.5px] w-2 sm:w-2.5 bg-current" />
+                                </div>
+                                <span className="truncate">I-Beam</span>
+                              </TabsTrigger>
+                              <TabsTrigger value="t-section" className="text-[10px] flex items-center justify-center gap-1.5 px-1 sm:px-2">
+                                <div className="flex flex-col items-center justify-start w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0 opacity-80 gap-[1px]">
+                                  <div className="h-[1.5px] w-2 sm:w-2.5 bg-current" />
+                                  <div className="h-1.5 sm:h-2 w-[1.5px] bg-current" />
+                                </div>
+                                <span className="truncate">T-Section</span>
+                              </TabsTrigger>
                             </TabsList>
                           </Tabs>
                         </div>
