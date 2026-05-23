@@ -4045,25 +4045,25 @@ function App() {
 
                   <div className="space-y-8">
                     {/* Supported Standards */}
-                    <section className="p-6 rounded-3xl bg-slate-900 text-white shadow-xl space-y-6">
-                      <h3 className="text-lg font-bold flex items-center gap-3">
-                        <Globe className="w-5 h-5 text-blue-400" />
+                    <section className="p-6 rounded-3xl bg-slate-50 border border-slate-200/80 text-slate-800 shadow-sm space-y-6">
+                      <h3 className="text-lg font-black flex items-center gap-3 text-slate-900">
+                        <Globe className="w-5 h-5 text-blue-600" />
                         Supported Standards
                       </h3>
                       <div className="space-y-6 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
                         {Array.from(new Set(CODES_OF_PRACTICE.map(c => c.region))).map(region => (
                           <div key={region} className="space-y-3">
-                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">
-                              <span className="h-px flex-1 bg-blue-900/50"></span>
+                            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                              <span className="h-px flex-1 bg-slate-200"></span>
                               {region}
                             </h4>
                             <div className="space-y-2">
                               {CODES_OF_PRACTICE.filter(c => c.region === region).map(item => (
-                                <div key={item.country} className="p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                                  <div className="text-xs font-bold mb-1">{item.country}</div>
+                                <div key={item.country} className="p-3 rounded-xl bg-white border border-slate-200/70 hover:bg-slate-100/50 transition-colors shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                                  <div className="text-xs font-bold mb-1 text-slate-800">{item.country}</div>
                                   <div className="flex flex-wrap gap-1">
                                     {item.codes.map((code, idx) => (
-                                      <span key={idx} className="text-[8px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded border border-blue-500/30">
+                                      <span key={idx} className="text-[8px] px-1.5 py-0.5 bg-blue-50/80 text-blue-600 rounded border border-blue-100">
                                         {code.split(' (')[0]}
                                       </span>
                                     ))}
